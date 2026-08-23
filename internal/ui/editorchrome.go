@@ -1,13 +1,10 @@
 package ui
 
-// The editor's one-line entry prompt: the tempo, the meter and the title,
-// each typed into a small panel over the notation.
-//
-// The toolbar that used to live here is in editortoolbar.go, where it is
-// symbols rather than the text chips this file was written for.
-
 import (
+	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -15,11 +12,10 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 
-	"github.com/S95F/guitarTutor/internal/score"
-	"github.com/S95F/guitarTutor/internal/score/textfmt"
+	"github.com/S95F/musicTutor/internal/score"
+	"github.com/S95F/musicTutor/internal/score/textfmt"
 )
 
-// cursorTech is the technique bitmask on the note under the cursor.
 func (e *Editor) cursorTech() score.Technique {
 	if n, ok := e.doc.NoteAt(e.doc.Cursor().Str); ok {
 		return n.Tech
@@ -27,9 +23,6 @@ func (e *Editor) cursorTech() score.Technique {
 	return 0
 }
 
-// --- the one-line entry ----------------------------------------------
-
-// edEntryKind is what a prompt is asking for.
 type edEntryKind int
 
 const (
@@ -37,29 +30,24 @@ const (
 	edEntryMeter
 	edEntryTitle
 	edEntryCapo
+	edEntrySaveName
 )
 
-// An edEntry is the prompt open over the notation.
+var errEntryKeep = errors.New("keep the entry open")
+
 type edEntry struct {
 	kind   edEntryKind
 	prompt string
 	hint   string
 	buf    string
 	max    int
-	// seeded marks buf as the value already in force rather than
-	// something the user typed. The first typed rune replaces it whole:
-	// nobody edits "0" into "12" by appending, and a seed that has to be
-	// backspaced away first turns every entry into three keystrokes of
-	// correction before the real one.
+
 	seeded bool
-	// allow reports whether a typed rune belongs in this entry, so a
-	// numeric field cannot be filled with letters.
+
 	allow func(r rune) bool
 	apply func(*Editor, string) error
 }
 
-// openEntry starts a prompt, seeded with what is currently in force so
-// that pressing enter straight away changes nothing.
 func (e *Editor) openEntry(kind edEntryKind) {
 	switch kind {
 	case edEntryTempo:
@@ -94,7 +82,13 @@ func (e *Editor) openEntry(kind edEntryKind) {
 			kind: kind, prompt: "piece title", hint: "shown in the header and saved with the piece",
 			buf: e.doc.Score().Title, max: 80,
 			allow: func(r rune) bool { return r >= 32 && r != 127 },
-			apply: func(e *Editor, s string) error { return e.doc.SetTitle(strings.TrimSpace(s)) },
+			apply: func(e *Editor, s string) error {
+
+				if s = strings.TrimSpace(s); s == e.doc.Score().Title {
+					return nil
+				}
+				return e.doc.SetTitle(s)
+			},
 		}
 	case edEntryCapo:
 		e.entry = &edEntry{
@@ -111,16 +105,53 @@ func (e *Editor) openEntry(kind edEntryKind) {
 			},
 		}
 	}
-	// Only the numeric prompts replace their seed on the first digit:
-	// nobody edits "0" into "12" by appending, but a title IS edited by
-	// appending, and eating it on the first keystroke would punish
-	// exactly the person adding one word to a long name.
+
 	e.entry.seeded = kind != edEntryTitle
 }
 
-// feed types this frame's runes into the entry: the first allowed one
-// replaces a seeded value whole (see edEntry.seeded), later ones append
-// up to max.
+func (e *Editor) openSaveEntry() {
+	if e.leaving {
+		e.leaving = false
+		e.leaveAfterSave = true
+	}
+	e.entry = &edEntry{
+		kind: edEntrySaveName, prompt: "name the piece — it saves into your library",
+		hint: "letters and spaces are fine",
+		buf:  strings.TrimSuffix(e.suggestedName(), ".gtab"), max: 60,
+		allow: func(r rune) bool {
+			switch r {
+			case '/', '\\', ':', '*', '?', '"', '<', '>', '|':
+				return false
+			}
+			return r >= 32 && r != 127
+		},
+		apply: func(e *Editor, s string) error {
+			name := strings.TrimSpace(s)
+			if name == "" {
+				return fmt.Errorf("the piece needs a name")
+			}
+			target := filepath.Join(e.libraryDir, name+".gtab")
+			if _, err := os.Stat(target); err == nil {
+				return fmt.Errorf("your library already has a piece called %q — pick another name", name)
+			}
+			if !e.writeTo(target) {
+				return errEntryKeep
+			}
+			e.afterSave()
+			return nil
+		},
+	}
+	e.entry.seeded = true
+}
+
+func (e *Editor) closeEntry() {
+	if e.saveEntryOpen() {
+		e.leaveAfterSave = false
+		e.practicePending = false
+	}
+	e.entry = nil
+}
+
 func (en *edEntry) feed(runes []rune) {
 	for _, r := range runes {
 		if !en.allow(r) {
@@ -135,7 +166,6 @@ func (en *edEntry) feed(runes []rune) {
 	}
 }
 
-// parseMeterText reads "n/d".
 func parseMeterText(s string) (num, den int, ok bool) {
 	i := strings.IndexByte(s, '/')
 	if i < 0 {
@@ -149,8 +179,6 @@ func parseMeterText(s string) (num, den int, ok bool) {
 	return n, d, true
 }
 
-// updateEntry runs the prompt. It owns the keyboard while it is open, so
-// typing a digit into a tempo cannot also write a fret.
 func (e *Editor) updateEntry() {
 	en := e.entry
 	en.feed(ebiten.AppendInputChars(nil))
@@ -160,27 +188,30 @@ func (e *Editor) updateEntry() {
 			en.buf, en.seeded = string(r[:len(r)-1]), false
 		}
 	case inpututil.IsKeyJustPressed(ebiten.KeyEscape):
-		e.entry = nil
+		e.closeEntry()
 	case inpututil.IsKeyJustPressed(ebiten.KeyEnter) || inpututil.IsKeyJustPressed(ebiten.KeyNumpadEnter):
 		e.commitEntry()
 	}
-	// A click outside the box cancels, matching the practice view's tempo
-	// entry.
-	if e.ptr.pressed && !e.ptr.over(edEntryRect()) {
-		e.entry = nil
+
+	if e.entry != nil && e.ptr.pressed && !e.ptr.over(edEntryRect()) {
+		e.closeEntry()
 	}
 }
 
-// commitEntry applies the prompt, keeping it open when what was typed does
-// not work — losing a half-typed value to a typo is its own small cruelty.
 func (e *Editor) commitEntry() {
 	en := e.entry
-	if strings.TrimSpace(en.buf) == "" && en.kind != edEntryTitle {
+	if en.seeded && en.kind != edEntrySaveName {
 		e.entry = nil
 		return
 	}
+	if strings.TrimSpace(en.buf) == "" && en.kind != edEntryTitle {
+		e.closeEntry()
+		return
+	}
 	if err := en.apply(e, en.buf); err != nil {
-		e.report(err)
+		if err != errEntryKeep {
+			e.report(err)
+		}
 		return
 	}
 	e.entry = nil

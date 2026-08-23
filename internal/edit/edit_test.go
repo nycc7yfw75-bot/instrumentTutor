@@ -1,18 +1,15 @@
 package edit
 
 import (
+	"math"
 	"os"
 	"strings"
 	"testing"
 
-	"github.com/S95F/guitarTutor/internal/score"
-	"github.com/S95F/guitarTutor/internal/score/textfmt"
+	"github.com/S95F/musicTutor/internal/score"
+	"github.com/S95F/musicTutor/internal/score/textfmt"
 )
 
-// saveable is the invariant every test asserts after every edit: the piece
-// still validates, and the format can still write it down. An editor that
-// can reach a state it cannot save is an editor that loses work, so this
-// is checked far more often than any individual operation's result.
 func saveable(t *testing.T, d *Doc) string {
 	t.Helper()
 	if err := d.Score().Validate(); err != nil {
@@ -28,7 +25,6 @@ func saveable(t *testing.T, d *Doc) string {
 	return string(src)
 }
 
-// barFull checks the "exactly full" invariant directly, in every track.
 func barFull(t *testing.T, d *Doc) {
 	t.Helper()
 	for ti, tr := range d.Score().Tracks {
@@ -58,7 +54,7 @@ func TestNewIsSaveable(t *testing.T) {
 	if !strings.Contains(src, "\\title Test") {
 		t.Errorf("the title is missing:\n%s", src)
 	}
-	// A new piece starts on the low string, where a guitarist starts.
+
 	if got, want := d.Cursor().Str, 6; got != want {
 		t.Errorf("cursor starts on string %d, want %d", got, want)
 	}
@@ -90,7 +86,6 @@ func TestTypeANote(t *testing.T) {
 	barFull(t, d)
 	saveable(t, d)
 
-	// Retyping corrects the fret rather than stacking a second note.
 	if err := d.SetFret(5); err != nil {
 		t.Fatalf("SetFret: %v", err)
 	}
@@ -113,7 +108,7 @@ func TestTypeAChord(t *testing.T) {
 	if got := len(d.Beat().Notes); got != 3 {
 		t.Fatalf("the chord has %d notes, want 3", got)
 	}
-	// Notes come back in string order however they were typed.
+
 	for i := 1; i < len(d.Beat().Notes); i++ {
 		if d.Beat().Notes[i].String <= d.Beat().Notes[i-1].String {
 			t.Errorf("the chord is not in string order: %+v", d.Beat().Notes)
@@ -140,8 +135,39 @@ func TestClearNoteLeavesARest(t *testing.T) {
 	saveable(t, d)
 }
 
+func TestClearNoteOnEmptyStringIsNotAnEdit(t *testing.T) {
+	d := New(NewOptions{})
+	if err := d.ClearNote(); err != nil {
+		t.Fatalf("ClearNote on an empty beat: %v", err)
+	}
+	if d.Dirty() {
+		t.Error("clearing nothing marked the piece dirty")
+	}
+	if d.CanUndo() {
+		t.Error("clearing nothing pushed an undo snapshot")
+	}
+
+	if err := d.SetFret(3); err != nil {
+		t.Fatal(err)
+	}
+	if !d.Undo() {
+		t.Fatal("nothing to undo after SetFret")
+	}
+	if err := d.ClearNote(); err != nil {
+		t.Fatal(err)
+	}
+	if !d.Redo() {
+		t.Error("a no-op clear threw away the redo stack")
+	}
+	if n, ok := d.NoteAt(6); !ok || n.Fret != 3 {
+		t.Errorf("redo after the no-op clear gave %+v ok=%v, want fret 3 back", n, ok)
+	}
+	barFull(t, d)
+	saveable(t, d)
+}
+
 func TestSetDurationEatsThePadding(t *testing.T) {
-	d := New(NewOptions{}) // 4/4, so 3840 ticks a bar
+	d := New(NewOptions{})
 	if err := d.SetFret(0); err != nil {
 		t.Fatal(err)
 	}
@@ -152,8 +178,7 @@ func TestSetDurationEatsThePadding(t *testing.T) {
 		t.Errorf("got %d ticks, want %d", got, score.Half)
 	}
 	barFull(t, d)
-	// The rest of the bar is padding, and a half note's worth of it is
-	// exactly one more half rest.
+
 	if got := len(d.Bar().Beats); got != 2 {
 		t.Errorf("the bar has %d beats, want 2 (the note and one rest)", got)
 	}
@@ -161,8 +186,8 @@ func TestSetDurationEatsThePadding(t *testing.T) {
 }
 
 func TestOverfullIsRefusedWhole(t *testing.T) {
-	d := New(NewOptions{Num: 2, Den: 4, Bars: 1}) // 1920 ticks a bar
-	// Two quarter notes fill the bar exactly.
+	d := New(NewOptions{Num: 2, Den: 4, Bars: 1})
+
 	if err := d.SetDuration(score.Quarter); err != nil {
 		t.Fatal(err)
 	}
@@ -179,7 +204,6 @@ func TestOverfullIsRefusedWhole(t *testing.T) {
 	before := saveable(t, d)
 	d.MarkSaved()
 
-	// A whole note cannot join them.
 	d.GoTo(Cursor{Bar: 0, Beat: 0, Str: 6})
 	err := d.SetDuration(score.Whole)
 	if err == nil {
@@ -191,13 +215,11 @@ func TestOverfullIsRefusedWhole(t *testing.T) {
 	if got := saveable(t, d); got != before {
 		t.Errorf("the refused edit changed the piece\n--- before ---\n%s\n--- after ---\n%s", before, got)
 	}
-	// A refused edit is not an edit: it leaves no trace in the history and
-	// does not make a saved piece dirty.
+
 	if d.Dirty() {
 		t.Error("the refused edit marked the piece dirty")
 	}
-	// The next undo has to take back the last edit that actually happened —
-	// the second note — rather than a slot the refusal left behind.
+
 	d.Undo()
 	d.GoTo(Cursor{Bar: 0, Beat: 1, Str: 6})
 	if _, ok := d.NoteAt(6); ok {
@@ -230,8 +252,7 @@ func TestUndoRedo(t *testing.T) {
 	if got := saveable(t, d); got != typed {
 		t.Errorf("redo did not re-apply the edit\n--- want ---\n%s\n--- got ---\n%s", typed, got)
 	}
-	// A new edit after an undo throws the redo branch away, as every
-	// editor does.
+
 	d.Undo()
 	if err := d.SetFret(9); err != nil {
 		t.Fatal(err)
@@ -242,9 +263,7 @@ func TestUndoRedo(t *testing.T) {
 }
 
 func TestUndoIsNotAliased(t *testing.T) {
-	// The history holds whole snapshots. A shallow copy would leave them
-	// pointing at the live bars, so an edit made after an undo would
-	// silently rewrite the history it came from.
+
 	d := New(NewOptions{})
 	if err := d.SetFret(1); err != nil {
 		t.Fatal(err)
@@ -264,7 +283,7 @@ func TestUndoIsNotAliased(t *testing.T) {
 
 func TestBarsMoveTogetherAcrossTracks(t *testing.T) {
 	d := New(NewOptions{})
-	if err := d.AddTrack("Rhythm"); err != nil {
+	if err := d.AddTrack("Rhythm", nil); err != nil {
 		t.Fatalf("AddTrack: %v", err)
 	}
 	if got := len(d.Score().Tracks); got != 2 {
@@ -298,8 +317,6 @@ func TestMeterChangeFollowsItsBar(t *testing.T) {
 	barFull(t, d)
 	saveable(t, d)
 
-	// Inserting a bar in front of the change must carry the change along
-	// with the bar it belongs to, not leave it stranded at a tick.
 	d.GoTo(Cursor{Bar: 0, Str: 6})
 	if err := d.InsertBar(); err != nil {
 		t.Fatalf("InsertBar: %v", err)
@@ -319,10 +336,7 @@ func TestTempoChangeFollowsItsBar(t *testing.T) {
 	if err := d.SetTempo(140); err != nil {
 		t.Fatalf("SetTempo: %v", err)
 	}
-	// Compared as microseconds per quarter, which is what the model stores.
-	// BPM is its reciprocal and 140 BPM is not a whole number of
-	// microseconds, so comparing the way back out would only be measuring
-	// that rounding.
+
 	tempoAt := func(bar int) int64 {
 		return d.Score().Tempos.At(d.Score().Tracks[0].Bars[bar].Start)
 	}
@@ -343,7 +357,6 @@ func TestTempoChangeFollowsItsBar(t *testing.T) {
 	}
 	saveable(t, d)
 
-	// And deleting the bar the change sits on takes the change with it.
 	d.GoTo(Cursor{Bar: 3, Str: 6})
 	if err := d.DeleteBar(); err != nil {
 		t.Fatalf("DeleteBar: %v", err)
@@ -367,8 +380,8 @@ func TestDeleteLastBarIsRefused(t *testing.T) {
 }
 
 func TestShorteningAMeterRefusesRatherThanLosingNotes(t *testing.T) {
-	d := New(NewOptions{Bars: 1}) // 4/4
-	// Fill the bar with four quarter notes.
+	d := New(NewOptions{Bars: 1})
+
 	for i := 0; i < 4; i++ {
 		d.GoTo(Cursor{Bar: 0, Beat: i, Str: 6})
 		if err := d.SetFret(i); err != nil {
@@ -390,7 +403,7 @@ func TestRetuneRefusesToStrandNotes(t *testing.T) {
 	if err := d.SetFret(0); err != nil {
 		t.Fatal(err)
 	}
-	// A four-string tuning has no string 6 for that note to live on.
+
 	err := d.SetTuning(score.Tuning{64, 59, 55, 50})
 	if err == nil {
 		t.Fatal("re-tuning away a string that had a note on it was accepted")
@@ -407,8 +420,7 @@ func TestCapoRefusesToPushNotesOffTheTop(t *testing.T) {
 	if err := d.SetFret(textfmt.MaxFret); err != nil {
 		t.Fatal(err)
 	}
-	// High E (64) + fret 30 is only 94, and no capo the format allows takes
-	// that past 127. Tune the top string high enough that one can.
+
 	if err := d.SetTuning(score.Tuning{90, 59, 55, 50, 45, 40}); err != nil {
 		t.Fatalf("SetTuning: %v", err)
 	}
@@ -422,8 +434,7 @@ func TestCapoRefusesToPushNotesOffTheTop(t *testing.T) {
 }
 
 func TestOpenSquaresUpARaggedPiece(t *testing.T) {
-	// A piece whose second track is shorter than its first: exactly what
-	// an importer produces, and not something the shared bar grid allows.
+
 	sc := &score.Score{
 		Title:  "Ragged",
 		Tempos: score.TempoMap{{Tick: 0, USPerQuarter: score.USPerQuarter(120)}},
@@ -452,9 +463,199 @@ func TestOpenSquaresUpARaggedPiece(t *testing.T) {
 	}
 	barFull(t, d)
 	saveable(t, d)
-	// Opening copies: the caller's score must be untouched.
+
 	if got := len(sc.Tracks[1].Bars); got != 1 {
 		t.Errorf("Open modified the caller's score (track 2 now has %d bars, was 1)", got)
+	}
+}
+
+func TestOpenAcceptsWindPieces(t *testing.T) {
+	sc, err := textfmt.Parse([]byte("\\instrument soprano sax\nD5.4 E5.4 G5.2"), "sax")
+	if err != nil {
+		t.Fatalf("parsing the wind fixture: %v", err)
+	}
+	d, err := Open(sc)
+	if err != nil {
+		t.Fatalf("Open refused a valid wind piece: %v", err)
+	}
+	if w := d.Wind(); w == nil || w.Name != "soprano sax" {
+		t.Errorf("Wind() = %v, want the soprano sax", w)
+	}
+	barFull(t, d)
+	saveable(t, d)
+}
+
+func TestWindPitchOps(t *testing.T) {
+	w := score.WindByName("soprano sax")
+	d := New(NewOptions{Wind: w})
+
+	if got, want := d.WindReference(), w.LowSounding+w.Span/2; got != want {
+		t.Errorf("empty WindReference = %d, want the mid-range %d", got, want)
+	}
+
+	if err := d.SetWindPitch(74); err != nil {
+		t.Fatalf("SetWindPitch(74): %v", err)
+	}
+	n, ok := d.NoteAt(1)
+	if !ok || n.String != 1 || n.Fret != 16 {
+		t.Fatalf("SetWindPitch left %+v ok=%v, want String 1 Fret 16", n, ok)
+	}
+	if got := d.WindReference(); got != w.LowSounding+16 {
+		t.Errorf("WindReference = %d, want the note under the cursor (%d)", got, w.LowSounding+16)
+	}
+
+	if err := d.ToggleTech(score.TechSlur); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.SetWindPitch(76); err != nil {
+		t.Fatal(err)
+	}
+	if n, _ = d.NoteAt(1); n.Fret != 18 || n.Tech&score.TechSlur == 0 {
+		t.Errorf("retyping the pitch gave %+v, want Fret 18 with its slur kept", n)
+	}
+
+	if err := d.NudgePitch(-12); err != nil {
+		t.Fatal(err)
+	}
+	if n, _ = d.NoteAt(1); n.Fret != 6 {
+		t.Errorf("NudgePitch(-12) left Fret %d, want 6", n.Fret)
+	}
+	if err := d.NudgePitch(-7); err == nil {
+		t.Error("NudgePitch below the horn's lowest note was not refused")
+	}
+
+	if err := d.SetWindPitch(127); err != nil {
+		t.Fatalf("SetWindPitch(127): %v — G9 is the top note name, not past it", err)
+	}
+	if err := d.SetWindPitch(128); err == nil {
+		t.Error("SetWindPitch(128) was not refused")
+	} else {
+		if !strings.Contains(err.Error(), "G#9") {
+			t.Errorf("the refusal %q does not name G#9, the note that was asked for", err)
+		}
+		if !strings.Contains(err.Error(), "G9") {
+			t.Errorf("the refusal %q does not name G9, the actual top", err)
+		}
+	}
+	if err := d.SetWindPitch(58); err != nil {
+		t.Fatalf("SetWindPitch at the horn's bottom: %v", err)
+	}
+	if err := d.SetWindPitch(57); err == nil {
+		t.Error("SetWindPitch below the horn's lowest note was not refused")
+	}
+
+	g := New(NewOptions{})
+	if err := g.SetWindPitch(74); err == nil {
+		t.Error("SetWindPitch on a guitar track was not refused")
+	}
+	if err := g.NudgePitch(1); err == nil {
+		t.Error("NudgePitch on a guitar track was not refused")
+	}
+}
+
+func TestWindRefusesFrettedVerbs(t *testing.T) {
+	d := New(NewOptions{Wind: score.WindByName("soprano sax")})
+	if err := d.SetWindPitch(74); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.SetFret(0); err == nil {
+		t.Error("SetFret on a wind track was not refused")
+	}
+	if err := d.SetCapo(2); err == nil {
+		t.Error("SetCapo on a wind track was not refused")
+	}
+	if err := d.SetTuning(score.StandardTuning); err == nil {
+		t.Error("SetTuning on a wind track was not refused")
+	}
+	if err := d.ToggleTech(score.TechPull); err == nil {
+		t.Error("a pull-off on a wind track was not refused")
+	}
+	if err := d.ToggleTech(score.TechDead); err == nil {
+		t.Error("a dead note on a wind track was not refused")
+	}
+
+	if err := d.ToggleTech(score.TechSlur); err != nil {
+		t.Errorf("ToggleTech(TechSlur): %v", err)
+	}
+	if err := d.ToggleTech(score.TechVibrato); err != nil {
+		t.Errorf("ToggleTech(TechVibrato): %v", err)
+	}
+	barFull(t, d)
+	saveable(t, d)
+}
+
+func TestNewClampsNaNTempo(t *testing.T) {
+	d := New(NewOptions{BPM: math.NaN()})
+	if got := d.TempoAtCursor(); got != textfmt.DefaultBPM {
+		t.Errorf("got %g BPM, want the default %g", got, float64(textfmt.DefaultBPM))
+	}
+	barFull(t, d)
+	saveable(t, d)
+}
+
+func TestTitleAndTrackNameRefuseCommentStarter(t *testing.T) {
+	d := New(NewOptions{Title: "Test"})
+	if err := d.SetTitle("AC//DC"); err == nil {
+		t.Error(`a title containing "//" was accepted`)
+	}
+	if got := d.Score().Title; got != "Test" {
+		t.Errorf("the refused title stuck: %q", got)
+	}
+	if err := d.SetTrackName("Riff // solo intro"); err == nil {
+		t.Error(`a track name containing "//" was accepted`)
+	}
+	if err := d.AddTrack("B // C", nil); err == nil {
+		t.Error(`AddTrack with "//" in the name was accepted`)
+	}
+	if got := len(d.Score().Tracks); got != 1 {
+		t.Errorf("the refused AddTrack left %d tracks, want 1", got)
+	}
+	saveable(t, d)
+}
+
+func TestExoticMeterRefusesInsteadOfPanicking(t *testing.T) {
+	fifths := func(trackBars ...int) *score.Score {
+		sc := &score.Score{
+			Title:  "Fifths",
+			Tempos: score.TempoMap{{Tick: 0, USPerQuarter: score.USPerQuarter(120)}},
+			Meters: score.MeterMap{{Tick: 0, Num: 1, Den: 5}},
+		}
+		for _, bars := range trackBars {
+			tr := &score.Track{Tuning: append(score.Tuning(nil), score.StandardTuning...), Program: textfmt.DefaultProgram}
+			for b := 0; b < bars; b++ {
+				tr.AppendBar(1, 5).AddBeat(768, score.Note{String: 6, Fret: 0})
+			}
+			sc.Tracks = append(sc.Tracks, tr)
+		}
+		return sc
+	}
+
+	ragged := fifths(2, 1)
+	if err := ragged.Validate(); err != nil {
+		t.Fatalf("the fixture should be model-valid: %v", err)
+	}
+	if _, err := Open(ragged); err == nil {
+		t.Error("Open squared up a piece whose meter no rests can fill")
+	}
+
+	d, err := Open(fifths(1))
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	if err := d.AppendBar(); err == nil {
+		t.Error("AppendBar invented a bar of rests no note length fills")
+	}
+	if err := d.AddTrack("Second", nil); err == nil {
+		t.Error("AddTrack invented a bar of rests no note length fills")
+	}
+	if got := d.BarCount(); got != 1 {
+		t.Errorf("the refusals changed the piece: %d bars, want 1", got)
+	}
+	if got := len(d.Score().Tracks); got != 1 {
+		t.Errorf("the refusals changed the piece: %d tracks, want 1", got)
+	}
+	if err := d.Score().Validate(); err != nil {
+		t.Errorf("the refusals left an invalid piece: %v", err)
 	}
 }
 
@@ -473,8 +674,7 @@ func TestOpenTheRichFixture(t *testing.T) {
 	}
 	barFull(t, d)
 	saveable(t, d)
-	// The fixture's two tracks are both four bars, so squaring up should
-	// have changed nothing about it.
+
 	if got := d.BarCount(); got != 4 {
 		t.Errorf("got %d bars, want 4", got)
 	}
@@ -577,8 +777,7 @@ func TestCursorStaysInsideThePiece(t *testing.T) {
 func TestMoveBeatCrossesBarlines(t *testing.T) {
 	d := New(NewOptions{Bars: 2})
 	d.GoToStart()
-	// Walk forward past the end of the piece; the cursor stops rather than
-	// wrapping or running off.
+
 	for i := 0; i < 100; i++ {
 		d.MoveBeat(1)
 	}
@@ -598,7 +797,7 @@ func TestDeletingTheLastTrackIsRefused(t *testing.T) {
 	if err := d.DeleteTrack(); err == nil {
 		t.Fatal("the only track was deleted")
 	}
-	if err := d.AddTrack("Second"); err != nil {
+	if err := d.AddTrack("Second", nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := d.DeleteTrack(); err != nil {
@@ -610,12 +809,6 @@ func TestDeletingTheLastTrackIsRefused(t *testing.T) {
 	saveable(t, d)
 }
 
-// TestRestsForMatchesItsContract pins exactly which spans can be filled,
-// and that the ones that can are filled with real note values summing to
-// the span. The contract is arithmetic, not taste: the shortest values are
-// 80 and 120 ticks, which between them make every multiple of 40 from 80
-// up, and 180 is the only value that is not a multiple of 40, so a span 20
-// past one needs exactly one 180 and whatever it leaves.
 func TestRestsForMatchesItsContract(t *testing.T) {
 	for r := int64(0); r <= 4*score.PPQ; r += tickGrid {
 		want := r == 0 ||
@@ -643,9 +836,7 @@ func TestRestsForMatchesItsContract(t *testing.T) {
 }
 
 func TestRestsForRefusesTheImpossible(t *testing.T) {
-	// Off the grid, out of range, and the spans the note values genuinely
-	// cannot express: shorter than the shortest rest, and the ones needing
-	// a dotted 32nd plus a leftover nothing covers.
+
 	for _, r := range []int64{-20, 10, 30, maxBarTicks + tickGrid, 20, 40, 60, 100, 140, 220} {
 		if _, ok := restsFor(r); ok {
 			t.Errorf("restsFor(%d) claimed to be fillable", r)
@@ -653,9 +844,6 @@ func TestRestsForRefusesTheImpossible(t *testing.T) {
 	}
 }
 
-// TestRestsForBeatsGreedy is the specific case a greedy solver gets stuck
-// on: a bar with one dotted 32nd in it. Greedy spends the long values
-// first and walks down to a 20-tick remainder nothing can fill.
 func TestRestsForBeatsGreedy(t *testing.T) {
 	const dotted32nd = 180
 	rests, ok := restsFor(4*score.PPQ - dotted32nd)

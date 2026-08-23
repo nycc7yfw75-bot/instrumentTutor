@@ -10,16 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/S95F/guitarTutor/internal/appconfig"
-	"github.com/S95F/guitarTutor/internal/audio"
-	"github.com/S95F/guitarTutor/internal/ui"
+	"github.com/S95F/musicTutor/internal/appconfig"
+	"github.com/S95F/musicTutor/internal/audio"
+	"github.com/S95F/musicTutor/internal/engine"
+	"github.com/S95F/musicTutor/internal/ui"
 )
 
-// --- test doubles -------------------------------------------------------
-
-// stubStream is an audio.Stream that records its lifecycle and never
-// delivers any audio: nothing here touches a real device, and a pass that
-// waits for the capture to complete waits forever unless it is cancelled.
 type stubStream struct {
 	cfg audio.StreamConfig
 
@@ -58,14 +54,6 @@ func (s *stubStream) counts() (started, stopped, closed int) {
 	return s.started, s.stopped, s.closed
 }
 
-// stubBackend hands out stubStreams and records every open attempt.
-//
-// openGate, when non-nil, blocks the FIRST OpenDuplex until it is closed —
-// that is how a test holds a calibration pass mid-flight without waiting
-// on a real device. Only the first, so a test for a guard that is missing
-// fails on its assertion instead of deadlocking behind the same gate.
-// openErr, when non-nil, fails the open (after the gate, so a held-open
-// pass can be released into a quick failure instead of the 20 s timeout).
 type stubBackend struct {
 	capture  []audio.DeviceInfo
 	playback []audio.DeviceInfo
@@ -118,8 +106,6 @@ func (b *stubBackend) openStreams() []*stubStream {
 	return out
 }
 
-// useStubBackend points the liveBackend seam at b for the test's duration,
-// so nothing reaches the machine's sound card.
 func useStubBackend(t *testing.T, b audio.Backend) {
 	t.Helper()
 	prev := liveBackend
@@ -127,7 +113,6 @@ func useStubBackend(t *testing.T, b audio.Backend) {
 	t.Cleanup(func() { liveBackend = prev })
 }
 
-// waitFor polls cond until it holds or the test gives up.
 func waitFor(t *testing.T, what string, cond func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
@@ -140,28 +125,11 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 	t.Fatalf("timed out waiting for %s", what)
 }
 
-// --- F1: the fatal config race -----------------------------------------
-
-// TestShellPrefsRaceSaveAgainstStoreOffset is the regression test for the
-// fatal config race. The game loop saves preferences (marshalling the
-// config's maps) while the calibration goroutine stores a freshly measured
-// offset into those same maps. Pre-fix, shellPrefs had no lock and
-// Calibrate wrote through a.prefs.cfg.SetOffset directly, so the two ran
-// concurrently over one map and Go aborted the process with "concurrent
-// map iteration and map write" — a throw, not a panic: unrecoverable, and
-// it kills practice outright.
-//
-// The abort cannot be caught, so the assertion is completion: this test
-// passes only if both goroutines finish and the config on disk is still
-// readable. Against the pre-fix code (SetOffset + Save from one goroutine,
-// setCountIn + Save from the other, unlocked — exactly what StoreOffset
-// and Save now do under the lock) it takes the process down.
 func TestShellPrefsRaceSaveAgainstStoreOffset(t *testing.T) {
 	t.Setenv(appconfig.EnvConfigDir, t.TempDir())
 
 	p := &shellPrefs{}
-	// A big map is what makes the window wide: encoding/json iterates
-	// every entry, and the writer only has to land inside that walk.
+
 	const seeded = 3000
 	for i := 0; i < seeded; i++ {
 		p.cfg.SetOffset(fmt.Sprintf("seed-cap-%04d", i), "seed-pb", i, 0.5)
@@ -175,11 +143,6 @@ func TestShellPrefsRaceSaveAgainstStoreOffset(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	// Both loops record failures and keep going rather than bailing out:
-	// the point is to run the whole racing pair, and a first-failure exit
-	// would cut the window short.
-
-	// The game loop: a settings change plus a save, over and over.
 	go func() {
 		defer wg.Done()
 		for i := 0; i < iters; i++ {
@@ -190,7 +153,6 @@ func TestShellPrefsRaceSaveAgainstStoreOffset(t *testing.T) {
 		}
 	}()
 
-	// The calibration goroutine: measured offsets landing in the config.
 	go func() {
 		defer wg.Done()
 		for i := 0; i < iters; i++ {
@@ -213,8 +175,6 @@ func TestShellPrefsRaceSaveAgainstStoreOffset(t *testing.T) {
 		t.Fatalf("%d of %d saves failed while the two goroutines raced", failed, 2*iters)
 	}
 
-	// Every clone that was marshalled must have been coherent, so the
-	// file left behind parses and carries both goroutines' work.
 	got, err := appconfig.Load()
 	if err != nil {
 		t.Fatalf("config written during the race does not load: %v", err)
@@ -227,11 +187,6 @@ func TestShellPrefsRaceSaveAgainstStoreOffset(t *testing.T) {
 	}
 }
 
-// TestShellPrefsSaveSnapshotIsDeep guards the other half of the fix: Save
-// must marshal a deep copy, not a struct copy. appconfig.Config.Save has a
-// value receiver, which copies the struct but shares the map headers and
-// the recents backing array — so a shallow copy would still hand
-// encoding/json the live maps.
 func TestShellPrefsSaveSnapshotIsDeep(t *testing.T) {
 	t.Setenv(appconfig.EnvConfigDir, t.TempDir())
 
@@ -258,13 +213,6 @@ func TestShellPrefsSaveSnapshotIsDeep(t *testing.T) {
 	}
 }
 
-// --- F2: one calibration at a time --------------------------------------
-
-// TestShellAudioCalibrateSingleOwner is the regression test for the
-// single-owner guard. The "one at a time" flag used to live on the
-// Settings screen, which the shell rebuilds on every visit — so a second
-// visit (or a second screen) happily started a second pass on the same
-// device pair. The guard now lives on the object that owns the device.
 func TestShellAudioCalibrateSingleOwner(t *testing.T) {
 	t.Setenv(appconfig.EnvConfigDir, t.TempDir())
 
@@ -282,7 +230,7 @@ func TestShellAudioCalibrateSingleOwner(t *testing.T) {
 		_, _, err := a.Calibrate("cap-usb", "pb-usb", nil)
 		first <- err
 	}()
-	// The first pass is now inside OpenDuplex, holding the device.
+
 	waitFor(t, "the first calibration to claim the device", func() bool {
 		return backend.openCount() == 1
 	})
@@ -299,8 +247,6 @@ func TestShellAudioCalibrateSingleOwner(t *testing.T) {
 		t.Fatal("first Calibrate returned nil, want the stub's open error")
 	}
 
-	// The guard is released when the pass returns, so the next visit to
-	// settings can calibrate: this attempt reaches the device again.
 	if _, _, err := a.Calibrate("cap-usb", "pb-usb", nil); errors.Is(err, errCalibrationBusy) {
 		t.Error("Calibrate still refused after the previous pass finished: the guard leaked")
 	}
@@ -309,9 +255,6 @@ func TestShellAudioCalibrateSingleOwner(t *testing.T) {
 	}
 }
 
-// --- F4: opening a second piece ------------------------------------------
-
-// oneBarGtab writes a minimal playable piece and returns its path.
 func oneBarGtab(t *testing.T) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "piece.gtab")
@@ -322,18 +265,11 @@ func oneBarGtab(t *testing.T) string {
 	return path
 }
 
-// TestOpenClosesPreviousSession is the regression test for the orphaned
-// stream. Nothing stops a second Open — the start screen can hand the
-// shell another piece — and Open used to overwrite o.session (and
-// o.player) with the new one, leaving the previous stream running with its
-// device held and no reference left to close it. Open now closes what it
-// finds before it starts anything.
 func TestOpenClosesPreviousSession(t *testing.T) {
 	t.Setenv(appconfig.EnvConfigDir, t.TempDir())
 
 	backend := &stubBackend{
-		// Both endpoints on one interface, so the split-device warning
-		// stays out of the way.
+
 		capture:  []audio.DeviceInfo{{ID: "cap-1", Name: "Stub Audio (Stub Interface)", Default: true}},
 		playback: []audio.DeviceInfo{{ID: "pb-1", Name: "Stub Out (Stub Interface)", Default: true}},
 	}
@@ -375,17 +311,6 @@ func TestOpenClosesPreviousSession(t *testing.T) {
 	}
 }
 
-// TestFailedOpenLeavesPreviousSessionPlaying is the regression test for
-// audit A2. Open used to release the running piece's audio as its very
-// first statement — but ReopenPiece deliberately keeps the current
-// practice screen when a load fails, so a failed F5 reload left a
-// live-looking screen with no audio behind it: frozen playhead, silent
-// transport, a header still claiming "playing". A failed Open must leave
-// the previous session exactly as it was; the teardown happens only once
-// the open is past the failure points, immediately before the new audio
-// is installed. (The browser flow needs no early teardown: the practice
-// screen it came from was popped, and its audio closed, before the
-// browser could open anything.)
 func TestFailedOpenLeavesPreviousSessionPlaying(t *testing.T) {
 	t.Setenv(appconfig.EnvConfigDir, t.TempDir())
 
@@ -422,8 +347,6 @@ func TestFailedOpenLeavesPreviousSessionPlaying(t *testing.T) {
 		t.Errorf("the previous stream was closed %d times by a failed open, want 0", closed)
 	}
 
-	// And a following successful open still swaps cleanly: the old
-	// session is closed exactly once, before the new one is installed.
 	if _, _, err := o.Open(oneBarGtab(t)); err != nil {
 		t.Fatalf("recovery Open: %v", err)
 	}
@@ -439,11 +362,6 @@ func TestFailedOpenLeavesPreviousSessionPlaying(t *testing.T) {
 	}
 }
 
-// TestShellAudioStoredConfidence checks the optional extension the
-// settings screen probes for to rate a stored measurement (the contract
-// method is StoredConfidence, asserted at compile time in shell.go): the
-// confidence stored beside an offset must read back, and a pair that has
-// never been measured must answer false rather than a made-up figure.
 func TestShellAudioStoredConfidence(t *testing.T) {
 	t.Setenv(appconfig.EnvConfigDir, t.TempDir())
 
@@ -464,10 +382,6 @@ func TestShellAudioStoredConfidence(t *testing.T) {
 	}
 }
 
-// TestSplitDeviceWarning: the clock-drift check returns its text instead
-// of setting the banner itself, so an open can compose it with the other
-// conditions — and the text now carries its remedy, because a warning
-// that names a problem without naming the fix is homework.
 func TestSplitDeviceWarning(t *testing.T) {
 	backend := &stubBackend{
 		capture: []audio.DeviceInfo{
@@ -501,8 +415,6 @@ func TestSplitDeviceWarning(t *testing.T) {
 	}
 }
 
-// TestImportSummary: the banner gets one line, so a pile of importer
-// warnings is coalesced into the first one plus a count.
 func TestImportSummary(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -524,10 +436,6 @@ func TestImportSummary(t *testing.T) {
 	}
 }
 
-// TestComposeBanner: the practice view's warning slot holds ONE message
-// (last writer wins), so the conditions of an open must arrive joined —
-// the device fallback used to vanish under the split-device warning, and
-// the missing calibration never reached the screen at all.
 func TestComposeBanner(t *testing.T) {
 	if got := composeBanner(nil); got != "" {
 		t.Errorf("composeBanner(nil) = %q, want empty", got)
@@ -540,14 +448,6 @@ func TestComposeBanner(t *testing.T) {
 	}
 }
 
-// TestSyncTrimBoundsAgree pins the one thing the two packages either side
-// of the audio/visual trim cannot check for themselves. internal/ui states
-// the bound the settings row enforces and deliberately knows nothing about
-// the config file; internal/appconfig clamps what it stores and knows
-// nothing about the UI. This file is the only place that imports both, so
-// it is the only place the two numbers can be compared — and if they ever
-// drift, the symptom is a setting the user can reach and the config
-// silently refuses to keep.
 func TestSyncTrimBoundsAgree(t *testing.T) {
 	if ui.MaxSyncTrimMS != appconfig.MaxSyncTrimMS {
 		t.Errorf("the settings row allows +/-%d ms and the config stores +/-%d ms",
@@ -555,8 +455,13 @@ func TestSyncTrimBoundsAgree(t *testing.T) {
 	}
 }
 
-// TestShellPrefsSyncTrimRoundTrips checks the optional Prefs extension the
-// settings row probes for: without it the row does not appear at all.
+func TestCountInBoundsAgree(t *testing.T) {
+	if ui.MaxCountIn != appconfig.MaxCountInBeats {
+		t.Errorf("the settings row offers 0-%d beats and the config stores 0-%d",
+			ui.MaxCountIn, appconfig.MaxCountInBeats)
+	}
+}
+
 func TestShellPrefsSyncTrimRoundTrips(t *testing.T) {
 	p := &shellPrefs{}
 	var _ interface {
@@ -572,8 +477,6 @@ func TestShellPrefsSyncTrimRoundTrips(t *testing.T) {
 	}
 }
 
-// TestFramesToDuration checks the conversion the latency hook reports
-// through, at the sample rate the whole pipeline runs at.
 func TestFramesToDuration(t *testing.T) {
 	for _, tt := range []struct {
 		frames int
@@ -590,26 +493,16 @@ func TestFramesToDuration(t *testing.T) {
 	}
 }
 
-// TestBytesPerFrameMatchesTheStreamFormat: BufferedSize counts bytes, and
-// the latency hook divides by this to get frames. oto is opened as stereo
-// float32, and the two have to agree or the compensation is out by a
-// factor.
 func TestBytesPerFrameMatchesTheStreamFormat(t *testing.T) {
 	if bytesPerFrame != 8 {
 		t.Errorf("bytesPerFrame is %d; oto is opened as 2 channels of float32, which is 8", bytesPerFrame)
 	}
-	// playerBufferBytes is built from the same unit, so the read-ahead it
-	// asks for has to come back out as the duration it was written as.
-	if got := framesToDuration(playerBufferBytes() / bytesPerFrame); got != playerReadAhead {
+
+	if got := framesToDuration(playerBufferBytes / bytesPerFrame); got != playerReadAhead {
 		t.Errorf("the configured read-ahead reads back as %v, want %v", got, playerReadAhead)
 	}
 }
 
-// TestEditPieceOpensBrokenGtabInTheEditor: a library entry that will not
-// parse routes to editPiece with the promise that the editor's text view
-// is where it gets repaired. The promise used to be empty — editPiece
-// re-parsed the file and refused on the identical error — so the one
-// guard that matters is that a broken .gtab still pushes an editor.
 func TestEditPieceOpensBrokenGtabInTheEditor(t *testing.T) {
 	dir := t.TempDir()
 	broken := filepath.Join(dir, "broken.gtab")
@@ -633,13 +526,126 @@ func TestEditPieceOpensBrokenGtabInTheEditor(t *testing.T) {
 		t.Fatalf("editPiece on a broken .gtab left the shell %d deep, want 2 — the editor never opened", got)
 	}
 
-	// A file that cannot even be read keeps the old refusal, on the
-	// browser rather than a pushed screen.
 	o.editPiece(filepath.Join(dir, "gone.gtab"))
 	if err := sh.Update(); err != nil {
 		t.Fatalf("draining the shell: %v", err)
 	}
 	if got := sh.Depth(); got != 2 {
 		t.Errorf("editPiece on a missing file changed the stack to %d deep, want it untouched at 2", got)
+	}
+}
+
+const uneditableMusicXML = `<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list><score-part id="P1"><part-name>Guitar</part-name></score-part></part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>7</divisions>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+      </attributes>
+      <note><pitch><step>E</step><octave>2</octave></pitch><duration>3</duration></note>
+      <note><rest/><duration>25</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+`
+
+func TestEditPieceUneditableImportStaysOnTheBrowser(t *testing.T) {
+	t.Setenv(appconfig.EnvConfigDir, t.TempDir())
+	path := filepath.Join(t.TempDir(), "odd.musicxml")
+	if err := os.WriteFile(path, []byte(uneditableMusicXML), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	sc, _, err := load(path)
+	if err != nil {
+		t.Fatalf("the fixture stopped loading: %v", err)
+	}
+	if _, err := ui.NewEditorFor(nil, sc, path); err == nil {
+		t.Skip("the editor now opens this piece; the refusal path needs a new fixture")
+	}
+
+	prefs := &shellPrefs{}
+	o := &shellOpener{prefs: prefs}
+	sh, browser := ui.NewBrowserShell(ui.Services{Opener: o, Prefs: prefs, Library: pieceLibrary{}})
+	o.shell, o.browser = sh, browser
+	t.Cleanup(o.CloseCurrent)
+
+	o.editPiece(path)
+	if err := sh.Update(); err != nil {
+		t.Fatalf("draining the shell: %v", err)
+	}
+	if got := sh.Depth(); got != 1 {
+		t.Fatalf("editPiece on an uneditable import left the shell %d deep, want 1 (no dead editor)", got)
+	}
+}
+
+func TestPractiseFromEditorFailureStaysOnTheEditor(t *testing.T) {
+	t.Setenv(appconfig.EnvConfigDir, t.TempDir())
+	prefs := &shellPrefs{}
+	o := &shellOpener{prefs: prefs}
+	sh, browser := ui.NewBrowserShell(ui.Services{Opener: o, Prefs: prefs, Library: pieceLibrary{}})
+	o.shell, o.browser = sh, browser
+	t.Cleanup(o.CloseCurrent)
+
+	ed := ui.NewEditor(sh)
+	o.installEditor(ed)
+	if err := sh.Update(); err != nil {
+		t.Fatalf("draining the shell: %v", err)
+	}
+	if got := sh.Depth(); got != 2 {
+		t.Fatalf("installEditor left the shell %d deep, want 2 (browser + editor)", got)
+	}
+
+	o.practiseFromEditor(ed, filepath.Join(t.TempDir(), "gone.gtab"))
+	if err := sh.Update(); err != nil {
+		t.Fatalf("draining the shell: %v", err)
+	}
+	if got := sh.Depth(); got != 2 {
+		t.Errorf("a failed practice open changed the stack to %d deep, want the editor untouched at 2", got)
+	}
+}
+
+func TestSoundFontAdoptionMarksOnTheGameLoop(t *testing.T) {
+	t.Setenv(appconfig.EnvConfigDir, t.TempDir())
+
+	backend := &stubBackend{
+		capture:  []audio.DeviceInfo{{ID: "cap-1", Name: "Stub Audio (Stub Interface)", Default: true}},
+		playback: []audio.DeviceInfo{{ID: "pb-1", Name: "Stub Out (Stub Interface)", Default: true}},
+	}
+	useStubBackend(t, backend)
+
+	prefs := &shellPrefs{}
+	prefs.SetDevices("cap-1", "pb-1")
+	o := &shellOpener{prefs: prefs}
+	t.Cleanup(o.CloseCurrent)
+
+	o.adoptSoundFont("picked.sf2")
+	if got := prefs.SoundFont(); got != "picked.sf2" {
+		t.Errorf("adopted SoundFont = %q, want picked.sf2", got)
+	}
+	if cfg, err := appconfig.Load(); err != nil || cfg.SoundFontPath != "picked.sf2" {
+		t.Errorf("persisted SoundFont = %q (err %v), want picked.sf2 saved", cfg.SoundFontPath, err)
+	}
+	if !o.sfPicked.Load() {
+		t.Fatal("adoptSoundFont did not arm the settings-changed mark")
+	}
+
+	sc := oneBarScore(t)
+	app := ui.New(newEngine(sc, engine.Options{}), sc, 0)
+	app.SetReloader(func() {})
+	o.drainSettingsMark(app)
+	if o.sfPicked.Load() {
+		t.Error("drainSettingsMark left the mark armed")
+	}
+
+	prefs.SetSoundFont("")
+	o.sfPicked.Store(true)
+	if _, _, err := o.Open(oneBarGtab(t)); err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	if o.sfPicked.Load() {
+		t.Error("Open left a pre-open pick armed; the fresh piece would offer a pointless reload")
 	}
 }

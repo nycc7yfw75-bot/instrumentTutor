@@ -1,6 +1,6 @@
 # The real-instrument test corpus
 
-Everything guitarTutor's audio and importer code is validated against in
+Everything musicTutor's audio and importer code is validated against in
 this repository is **synthesized or self-authored**: Karplus-Strong plucks
 for pitch, chroma and chord tests, and hand-built fixtures for the `.gp`
 and MusicXML importers. That is fast, deterministic, and it has already
@@ -26,7 +26,43 @@ testdata/real/
   chords/      strummed chords by shape — chord verification
   techniques/  palm mutes, bends, slides, hammer-ons — the hard cases
   scores/      .gp from Guitar Pro, .musicxml/.mxl from MuseScore
+  wind/
+    tones/         single sustained wind notes — pitch accuracy, octave errors
+    articulation/  tongued repeats, slurs, scoops — the hard cases
+    rooms/         takes with the app's own playback audible from speakers
 ```
+
+The wind side (D8) has the same gap in a sharper form: every sax number
+in the tree is measured on the synthesized reed voice, and nothing else.
+The three `wind/` directories are its landing zone —
+`corpus.WindTones`, `corpus.WindArticulation` and `corpus.WindRooms` in
+`internal/corpus`, with `wind/rooms/` reserved for takes recorded over a
+microphone while the app's own playback plays from speakers, the
+mic-bleed failure mode a DI'd guitar can never show. A wind-corpus test
+in `internal/pitch` already walks `wind/tones/`, so the **first**
+recording dropped in produces coverage with no further code.
+
+**Name each recording for its pitch.** The base name up to the first `-`
+is the pitch; everything after it is free description: `c5.wav`,
+`c5-mf-vibrato.wav`, `72-altissimo.wav`. The pitch token is the same
+grammar the `.gtab` `\tuning` directive reads — scientific pitch
+notation with an optional `#` or `b` (middle C = C4 = MIDI 60) or a bare
+MIDI key number — and it is the guitar corpus's own convention (`e2.wav`
+is the low E string, key 40). Crucially, the pitch is the **concert
+(sounding)** pitch, not the written one: a sax player thinks in written
+pitch, so convert before naming. Written D5 on a soprano sax = concert
+C5 = key 72, so the file is `c5.wav` (or `72.wav`) — never `d5.wav`.
+
+**What to record** (mono 48 kHz WAV, one file per case;
+`./scripts/fetch-corpus.sh wind` creates the directories and prints this
+checklist):
+
+- chromatic long tones across the range, one file per note → `wind/tones/`
+- one altissimo note → `wind/tones/`
+- tongued same-pitch repeats, at two tempi → `wind/articulation/`
+- a slurred scale → `wind/articulation/`
+- a scoop into a held note → `wind/articulation/`
+- one take with the app's playback on speakers → `wind/rooms/`
 
 ## What to fetch, and why these
 
@@ -48,7 +84,7 @@ this document by a wide margin.
 GPL-3.0 are *distribution* licences. GPLv3 §2 permits unlimited private
 use of copies you never convey; MPL-2.0 §3's obligations likewise trigger
 on distribution. Fetching these onto a developer's machine to run tests
-conveys nothing, so no copyleft obligation attaches and guitarTutor's MIT
+conveys nothing, so no copyleft obligation attaches and musicTutor's MIT
 licence is untouched. This only works because they stay gitignored — do
 not vendor the GPL corpus into the repository. (MPL-2.0 is per-file, so
 vendoring *those* would merely make those files MPL; GPL vendoring is the
@@ -77,7 +113,7 @@ cite them anyway — see [FIXTURES.md](FIXTURES.md).
 
 **Rejected, with reasons.** *IDMT-SMT-Guitar* is the best technique corpus
 going and is CC **BY-NC-ND** — usable for an unmonetised hobby project
-today, but it would become unusable the moment guitarTutor is sold or used
+today, but it would become unusable the moment musicTutor is sold or used
 commercially, and our MIT licence explicitly invites that downstream. ND
 also means a CI job uploading a trimmed clip as an artefact is a
 violation. Guitar-TECHS covers the same axis under CC BY 4.0, so take
@@ -90,7 +126,7 @@ or OAuth and cannot be scripted.
 
 ### Or record your own
 
-For guitarTutor's specific weak spots, five minutes of your own playing
+For musicTutor's specific weak spots, five minutes of your own playing
 beats any dataset, because you can record exactly the cases the tests say
 are marginal: **open G, open C and A major** (the voicings where
 synthesized chroma does not separate cleanly), a **downstroke strummed

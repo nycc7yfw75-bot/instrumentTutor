@@ -1,6 +1,6 @@
-# guitarTutor Roadmap
+# musicTutor Roadmap
 
-Phases are ordered so that every phase ends with something a guitarist can actually practice with. Phase 1 is deliberately a complete, useful product *before* any live audio input exists — the research behind this ordering is captured in [docs/DECISIONS.md](docs/DECISIONS.md).
+Phases are ordered so that every phase ends with something a musician can actually practice with. Phase 1 is deliberately a complete, useful product *before* any live audio input exists — the research behind this ordering is captured in [docs/DECISIONS.md](docs/DECISIONS.md). The app was guitar-only through Phase 5; the multi-instrument turn (below, after Phase 5) is where a second instrument family landed and the project stopped being guitarTutor.
 
 Guiding principles (violating these is a bug, not a style choice):
 
@@ -18,7 +18,7 @@ Guiding principles (violating these is a bug, not a style choice):
 Decisions and scaffolding that are painful to retrofit.
 
 - [x] Repository, module, license, README, roadmap
-- [x] **Score model** (`internal/score`): `Score{ppq, tempoMap, timeSigs, tracks}`, `Track{name, tuning, capo}`, bars → beats → `Note{string, fret, tied, technique}`. Pitch is always *derived* from tuning + fret + capo, so altered tunings and transposition are free.
+- [x] **Score model** (`internal/score`): `Score{ppq, tempoMap, timeSigs, tracks}`, `Track{name, tuning, capo}`, bars → beats → `Note{string, fret, tied, technique}`. Pitch is always *derived* from tuning + fret + capo, so altered tunings and transposition are free. *(The multi-instrument turn kept the invariant and generalized the derivation: a wind track derives from its instrument's lowest note instead — see D8.)*
 - [x] **Text tab format** (`internal/score/textfmt`): a small, alphaTex-*inspired* authoring format — header block (`\title`, `\tempo`, `\tuning`), bars separated by `|`, beats as `fret.string.duration`, chords in parens, technique suffixes (`h p s b v x`). Spec in [docs/TEXTFORMAT.md](docs/TEXTFORMAT.md); doubles as the test-fixture language. (Deliberately *not* claiming alphaTex compatibility — that would mean inheriting a large evolving grammar.)
 - [x] **Fixture corpus** (`testdata/`): the same 4-bar riff authored as `.mid` and text tab, with a cross-format equality test (`internal/integration`); `.gp` and `.musicxml` renditions land with their importers in Phase 3. Every importer bug in this space is a timing-semantics bug; only a shared corpus catches them.
 - [x] **UI spike** — resolved: **native Go with Ebitengine**. The Phase 1 scrolling-tab renderer was built natively at modest cost, which answers the question the spike existed to ask; embedding alphaTab (webview, JS↔Go IPC, second clock domain) is not needed. See DECISIONS D6.
@@ -35,7 +35,7 @@ Roughly "Guitar Pro 8's speed trainer minus the editor" — a product people pay
 - [x] Synthesis: a built-in Karplus-Strong plucked-string voice ships as the default (zero assets — nothing to download), with SoundFont SF2 synthesis via `go-meltysynth` when the user supplies a file (`-sf2`). See DECISIONS D2 amendment.
 - [x] **Frame-counted sequencer** (`internal/engine`): our own scheduler over the parsed score — *not* meltysynth's built-in MIDI sequencer — driving NoteOn/NoteOff, metronome accents, loop boundaries, and the tab cursor from one frame counter, rendering directly into `ebitengine/oto` v3 (beep turned out to be unneeded until Phase 3's file decoding).
 - [x] Audio pipeline standardized on 48 kHz float32 stereo
-- [x] Offline WAV renderer (`guitartutor render`) — same engine code path, used by the end-to-end tests
+- [x] Offline WAV renderer (`musictutor render`) — same engine code path, used by the end-to-end tests
 
 **The practice loop**
 
@@ -62,7 +62,7 @@ Live capture, and with it the cgo build event. This phase is where the two-clock
 - [x] `audio.Backend` interface (device enumeration, duplex stream open); Phase 1's oto path remains the playback-only fallback for `CGO_ENABLED=0` builds
 - [x] `gen2brain/malgo` (miniaudio) backend: **one full-duplex WASAPI shared-mode stream** — guitar capture and playback in one callback. 48 kHz float32, 480-frame periods negotiated on real hardware. (Found upstream: malgo v0.11.25's Backend enum omits `ma_backend_custom`, so its `BackendNull` requests the wrong backend — worked around locally; worth filing upstream.)
 - [x] Callback discipline: the callback renders the engine and memcpys capture into a race-free SPSC ring (drop-newest overflow, backpressure signal); analysis runs in an ordinary goroutine
-- [x] Device selection by name fragment (`guitartutor devices`, `-in`/`-out`), remembered in config; in-app picker delivered by the Phase 5 settings screen — *buffer-size setting and hot-unplug recovery still pending*
+- [x] Device selection by name fragment (`musictutor devices`, `-in`/`-out`), remembered in config; in-app picker delivered by the Phase 5 settings screen — *buffer-size setting and hot-unplug recovery still pending*
 - [x] Same-device steering: documented in `devices` output and README, and the practice view now raises a split-device warning banner when capture and playback are on different interfaces
 - [x] CI builds cgo on both platforms (runners ship gcc) plus a `CGO_ENABLED=0` fallback build check and a Linux `-race` leg; contributor toolchain documented in README
 
@@ -77,7 +77,7 @@ Live capture, and with it the cgo build event. This phase is where the two-clock
 **Scoring & feedback**
 
 - [x] Tuner view (T in the practice view): note name + cents bar from the live detector
-- [x] Latency calibration (`guitartutor calibrate`): click train over the duplex stream, cross-correlated, per-device-pair offset stored with confidence — verified end-to-end through a VB-Cable software loopback (94.6 ms at 0.87 confidence). *Manual nudge slider pending.*
+- [x] Latency calibration (`musictutor calibrate`): click train over the duplex stream, cross-correlated, per-device-pair offset stored with confidence — verified end-to-end through a VB-Cable software loopback (94.6 ms at 0.87 confidence). *Manual nudge slider pending.*
 - [x] Scoring against timing windows (±150 ms default) with the calibrated offset reconciling the input/output clocks; misses finalize behind a lag because the tracker reports notes only when they close
 - [x] Hit / close / miss feedback tinting the tab; running accuracy and input meter in the HUD — *per-section/per-pass accuracy breakdown pending*
 - [x] **Wait mode** (W): playback holds at each user note until the detector hears it (octave-exact, intonation-lenient)
@@ -142,6 +142,25 @@ Everything so far treats the command line as the front door: the practice *view*
 
 **Exit criteria:** a guitarist who has never opened a terminal can download the binary, double-click it, pick their interface, open a Guitar Pro file, and practice — with the command line remaining the fastest path for anyone who prefers it.
 
+## The multi-instrument turn — core landed (with the rename to musicTutor)
+
+The app's second instrument family: monophonic winds, first horn a B-flat soprano saxophone. The design is D8 in [docs/DECISIONS.md](docs/DECISIONS.md) — one chromatic lane per wind track, pitch still derived, written pitch shown to the player and concert pitch kept by the model — chosen so the engine, the event stream, and the scorer did not change at all.
+
+- [x] `score.WindInstrument` registry (sax family, flute, clarinet, trumpet: range, transposition, GM program) with per-family validation — a wind track holds one note per beat, no tunings, capos, pull-offs or dead notes
+- [x] `.gtab` wind authoring: `\instrument`, written-pitch beats (`D5.8`), the wind technique letters (`l` slur, `s` scoop, `b`, `v`), refusals that name what a horn cannot do ([docs/TEXTFORMAT.md](docs/TEXTFORMAT.md))
+- [x] MIDI and MusicXML wind import: classified by GM program (and MusicXML part name), no fretting inference, chords kept as their top note with a warning, MusicXML `<transpose>` honored — a MuseScore sax export arrives at correct concert pitch
+- [x] Built-in sustained wind voice (`synth.NewReed`), selected per track by GM program (`synth.NewBuiltin`); slurs re-pitch the standing tone, NoteOff is the breath stopping
+- [x] Practice view pitch ladder (height = written pitch, octave lines labelled) at exactly a six-string staff's height, so every layout invariant holds; tuner names written pitch on transposing tracks
+- [x] Per-instrument live wiring: detector range fitted to the horn's compass, strums unwired (no chords to verify; breath must not claim palm-mute credit), miss lag covering the longest held note at the slowest practice speed
+- [x] The synthetic wind round trip: the sax fixture through engine → reed → detector → scorer judges 14/14 Hit at accuracy 1.000, slurs, slide and vibrato included (`internal/practice/windtrip_test.go`)
+- [ ] **Real-recording validation** — everything above is synthesis. A mic'd sax brings room noise, breath, key clicks, and playback bleed (see Known Risks). The corpus harness is ready for it — a wind category with a filename-is-the-expectation contract (`internal/pitch`, layout in [docs/TESTDATA.md](docs/TESTDATA.md), skipped while empty) — but no recordings exist yet, so every threshold stays provisional until they do
+- [x] Wind parts in the notation editor: a fixed pitch-ladder grid (height = written pitch, octave C lines labelled, the reading the practice view teaches), note-letter entry with semitone/octave arrows, the wind mark set (slur, slide, bend, vibrato) on the toolbar — and an instrument picker on every new piece and new track, so a horn part starts on the grid instead of in the text view
+- [x] Guitar Pro wind parts: clean-room `ConcertPitch`/`TransposedPitch` reading, instrument resolved by declared GM program or by the written-minus-concert transposition plus range (never by name), any authored tuning or fingering vetoing the wind path; everything ambiguous keeps today's skip-with-warnings behavior, and the warnings stay the evidence trail for what real files carry
+- [x] MusicXML slur → `TechSlur` mapping (imported wind lines arrive slurred as written, not tongued)
+- [x] Soft same-pitch tonguing: a dip-recovery onset path for wind detector configs — a hop dipping ≥ 5 dB below the smoothed level then recovering within ~8 hops is a re-articulation, catching the soft strokes whose spectral flux never fires — tuned against the reed voice and provisional until the real-recording corpus lands
+
+**Exit criteria:** a sax player can import a MuseScore export or write a line in the text format, hear it at any tempo, loop the hard bar, and — with a mic and headphones — get feedback honest enough that a correctly held long tone is never called a miss. The synthetic half is machine-verified; the mic'd half needs a human with a horn, exactly as Phase 2's did with a guitar.
+
 ## Phase 6 — Reading and returning
 
 Two features this roadmap previously ruled out, revisited with their objections answered rather than waived. See DECISIONS D7 for the argument; the non-goals table below is amended, not deleted.
@@ -182,13 +201,14 @@ Two features this roadmap previously ruled out, revisited with their objections 
 | Amp/effect modeling | Use your amp sim of choice; the app wants your dry signal |
 | ABC / ASCII-tab import | Wrong abstraction / no rhythm information; ASCII tab may return as an *export* target |
 | Retention-funnel gamification: XP grind, loss-framing streaks, leaderboards | Practice tool, not a retention funnel — that judgment stands. What it over-rejected was the practice log Phase 5 already wanted, and recognition for deliberate practice; those arrive in Phase 6 with recognition that is additive only and a streak that never reads a verdict. See D7 and [docs/PROGRESS.md](docs/PROGRESS.md) |
-| Bass guitar (for now) | Detection windowing is sized for guitar range; bass low E is 41 Hz and needs different windows. Worth revisiting once guitar scoring is solid — file an issue if you want it |
+| Bass guitar (for now) | Detection config is per-instrument since the multi-instrument turn, but bass low E is 41 Hz and needs *bigger* analysis windows (higher latency), a fretted-family entry the instrument registry does not model yet, and its own validation. Worth revisiting now the abstraction exists — file an issue if you want it |
 
 ## Known risks (tracked, not ignored)
 
 - **cgo on Windows** (Phase 2+): contributors need mingw-w64 or zig cc; cross-compilation gets harder. Mitigation: pure-Go Phase 1, CI images prepared before the migration, documented setup.
 - **WASAPI capture latency floor**: shared-mode capture often sits at 10 ms periods regardless of playback's negotiated size. Acceptable for scoring (see latency budget); exclusive mode stays opt-in.
 - **Split-device clock drift**: capture and playback devices that aren't the same physical interface run on independent sample clocks that drift apart over a practice session — enough to matter against a ±100–150 ms scoring window, and uncorrectable by a static offset. Mitigation: same-device steering by default; if split setups prove common, periodic re-correlation of the calibration click.
+- **Microphone bleed (wind instruments)**: a sax is played into a mic, and a mic — unlike a guitar's DI — hears the app's own playback and metronome from the speakers. Nothing in the analysis path suppresses that bleed, so for winds headphones are a correctness requirement, not a comfort; the docs say so. If open-speaker practice proves common, the mitigation to research is gating analysis on the playback signal.
 - **Dormant dependencies**: `go-meltysynth` (last commit 2023) is vendored/forked from day one; `go-mp3` is unmaintained — MP3 import is best-effort, WAV/FLAC preferred.
 - **MIDI import lacks fingering**: fret-assignment heuristics can suggest unplayable fingerings; heuristic is swappable and inferred fingerings are marked in the UI. `.gp` import (Phase 3) is the real fix.
 - **Recognition amplifies every false negative** (Phase 6): a grey note on a tab is a shrug, but the same detection error costing a streak is a reason to close the app — and the detector has known, documented failure modes (monophonic chord handling, uncalibrated sessions, split-device drift). Mitigation: the streak is driven by practice time rather than verdicts, scoring is withheld entirely behind a credibility gate, and misses cannot subtract. All three are contract-tested, not conventions.

@@ -1,52 +1,3 @@
-// Package mxlimport reads MusicXML files — uncompressed .musicxml and the
-// zipped .mxl container — into the score model.
-//
-// The supported subset is MusicXML 4.0 score-partwise, with MuseScore's
-// exported files as the compatibility target (real MuseScore exports are
-// the validation gap until users supply them; the committed fixtures are
-// hand-authored in MuseScore's flavor). The sound-versus-display dualism
-// is resolved toward sound throughout: <duration> is authoritative for
-// timing (so <type>, <dot/>, and <time-modification> need no separate
-// handling — the duration already reflects them), <tie> (sound) rather
-// than <tied> (notation) drives tie merging, and <sound tempo> wins over
-// <metronome> when a direction carries both.
-//
-// Subset boundaries, stated plainly:
-//
-//   - Only voice 1 and staff 1 are imported; notes in other voices or
-//     staves are skipped with a warning (their durations still move the
-//     time cursor, so voice-1 timing is unaffected).
-//   - Grace notes and ornaments are skipped with a warning, as are
-//     <unpitched> percussion notes (counted once per part, not per note —
-//     a drum staff would otherwise bury every warning that matters).
-//   - <attributes><transpose> is honored: <pitch> is the WRITTEN pitch and
-//     the score model stores what SOUNDS, so chromatic + octave-change
-//     (and <double/>) are added to every note. A guitar part notated in
-//     treble clef with octave-change -1 — what MuseScore, Guitar Pro and
-//     Finale all emit — would otherwise import an octave sharp.
-//   - measure implicit="yes" (a pickup) is right-aligned to the barline.
-//     The score model has no short bar, so the bar stays full and gains a
-//     leading rest; the pickup still ends where beat 1 of bar 1 begins.
-//   - Forward/backward repeats and voltas are EXPANDED into a flat play
-//     order (see repeat.go). D.C./D.S./coda/fine jumps are not followed —
-//     they warn, since a wrong expansion is worse than none.
-//   - <backup> and <forward> are honored exactly — mishandling them is
-//     the documented silent-corruption trap in partial MusicXML
-//     implementations (docs/DECISIONS.md D3), so the cursor math is
-//     covered by regression tests.
-//   - <staff-tuning> (line 1 = the LOWEST string on the staff) and <capo>
-//     map to the track's Tuning and Capo. <technical><string>/<fret>
-//     (string 1 = the HIGHEST-pitched string, the same convention as the
-//     score model) are used directly when present; notes without them get
-//     an inferred fingering from internal/fretting, marked Inferred.
-//   - Everything else unsupported degrades to a warning, never an error;
-//     underfull measures are padded with rests. The result always passes
-//     score.Validate.
-//
-// Ticks are rescaled from the file's <divisions> to score.PPQ. Notes that
-// cross beat or bar boundaries continue as Tied notes, which score.Events
-// merges back into single events — the same round-trip invariant as
-// internal/midiimport.
 package mxlimport
 
 import (
@@ -60,33 +11,19 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/S95F/guitarTutor/internal/score"
+	"github.com/S95F/musicTutor/internal/score"
+	"github.com/S95F/musicTutor/internal/score/textfmt"
 )
 
-// DefaultProgram is the General MIDI program assumed for parts with no
-// midi-instrument declaration: 25, steel-string acoustic guitar, matching
-// the text format's and MIDI importer's default.
 const DefaultProgram = 25
 
-// zipMagic is the local-file-header signature every ZIP archive (and so
-// every .mxl) starts with.
 var zipMagic = []byte("PK\x03\x04")
 
-// Decompressed-size caps for .mxl archive members — the zip-bomb guard.
-// The sizes claimed in the archive's headers are untrusted, so the caps
-// are enforced on the bytes actually inflated.
 const (
-	maxContainerBytes = 1 << 20  // META-INF/container.xml
-	maxRootfileBytes  = 64 << 20 // the root MusicXML document
+	maxContainerBytes = 1 << 20
+	maxRootfileBytes  = 64 << 20
 )
 
-// Import parses a MusicXML document into a Score, returning human-readable
-// warnings for everything the import changed, skipped, or inferred. The
-// container is sniffed from the bytes — a ZIP signature means .mxl,
-// anything else is parsed as uncompressed XML — so the caller's file
-// extension does not matter. The first part containing notes becomes the
-// RoleUser track, later ones RoleBacking. The result always passes
-// score.Validate.
 func Import(data []byte) (*score.Score, []string, error) {
 	im := &importer{}
 	if bytes.HasPrefix(data, zipMagic) {
@@ -103,7 +40,6 @@ func Import(data []byte) (*score.Score, []string, error) {
 	return im.run(doc)
 }
 
-// ImportFile reads path and imports it via Import.
 func ImportFile(path string) (*score.Score, []string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -112,22 +48,16 @@ func ImportFile(path string) (*score.Score, []string, error) {
 	return Import(data)
 }
 
-// An importer holds one import's state: accumulated warnings and the
-// tempo/meter entries collected while walking the parts.
 type importer struct {
 	warns  []string
 	tempos score.TempoMap
 	meters score.MeterMap
 }
 
-// warnf records one human-readable warning.
 func (im *importer) warnf(format string, args ...any) {
 	im.warns = append(im.warns, fmt.Sprintf(format, args...))
 }
 
-// extractMXL opens a .mxl ZIP container and returns the root MusicXML
-// document named by META-INF/container.xml. A missing container.xml
-// degrades to picking the first XML file in the archive, with a warning.
 func (im *importer) extractMXL(data []byte) ([]byte, error) {
 	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
@@ -177,7 +107,6 @@ func (im *importer) extractMXL(data []byte) ([]byte, error) {
 	return readZipEntry(f, maxRootfileBytes)
 }
 
-// zipEntry finds one archive member by exact name.
 func zipEntry(zr *zip.Reader, name string) *zip.File {
 	for _, f := range zr.File {
 		if f.Name == name {
@@ -187,8 +116,6 @@ func zipEntry(zr *zip.Reader, name string) *zip.File {
 	return nil
 }
 
-// readZipEntry reads one archive member, erroring as soon as the
-// decompressed data exceeds limit bytes.
 func readZipEntry(f *zip.File, limit int64) ([]byte, error) {
 	rc, err := f.Open()
 	if err != nil {
@@ -205,8 +132,6 @@ func readZipEntry(f *zip.File, limit int64) ([]byte, error) {
 	return b, nil
 }
 
-// parseDoc unmarshals a score-partwise document, with a clearer error for
-// the score-timewise variant.
 func parseDoc(data []byte) (*xmlScorePartwise, error) {
 	var doc xmlScorePartwise
 	if err := xml.Unmarshal(data, &doc); err != nil {
@@ -218,7 +143,6 @@ func parseDoc(data []byte) (*xmlScorePartwise, error) {
 	return &doc, nil
 }
 
-// rootName returns the document's root element name, or "".
 func rootName(data []byte) string {
 	d := xml.NewDecoder(bytes.NewReader(data))
 	for {
@@ -232,17 +156,19 @@ func rootName(data []byte) string {
 	}
 }
 
-// run drives the import of a parsed document.
 func (im *importer) run(doc *xmlScorePartwise) (*score.Score, []string, error) {
-	s := &score.Score{Title: doc.title()}
+
+	title, changed := textfmt.CleanLabel(doc.title())
+	if changed {
+		im.warnf("title %q holds text a saved .gtab cannot (a line break or \"//\"); imported as %q", doc.title(), title)
+	}
+	s := &score.Score{Title: title}
 	decls := map[string]*xmlScorePart{}
 	for i := range doc.PartList.ScoreParts {
 		sp := &doc.PartList.ScoreParts[i]
 		decls[sp.ID] = sp
 	}
 
-	// One play order for the whole document: parts share barlines, so
-	// expanding each part's repeats on its own could desynchronise them.
 	order := im.playOrder(doc)
 
 	var parts []*partData
@@ -270,8 +196,6 @@ func (im *importer) run(doc *xmlScorePartwise) (*score.Score, []string, error) {
 		s.Meters = append(score.MeterMap{{Tick: 0, Num: 4, Den: 4}}, s.Meters...)
 	}
 
-	// Fingerings, overlap cleanup, and the global extent — a part's notes
-	// may spill past its last measure (overfull measures warn above).
 	var end int64
 	kept := parts[:0]
 	for _, pd := range parts {
@@ -311,8 +235,6 @@ func (im *importer) run(doc *xmlScorePartwise) (*score.Score, []string, error) {
 	return s, im.warns, nil
 }
 
-// dedupe keeps the last of consecutive entries sharing a tick (a later
-// event at the same tick overrides an earlier one).
 func dedupe[T any](in []T, tick func(T) int64) []T {
 	var out []T
 	for i, v := range in {

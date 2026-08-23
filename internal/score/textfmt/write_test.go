@@ -8,20 +8,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/S95F/guitarTutor/internal/score"
+	"github.com/S95F/musicTutor/internal/score"
 )
 
-// gtabFixtures are the .gtab sources in the tree. Every one of them has to
-// survive the round trip, so adding a fixture automatically extends the
-// coverage here.
 var gtabFixtures = []string{
 	"../../../testdata/fixture_riff.gtab",
 	"../../../testdata/fixture_rich.gtab",
+	"../../../testdata/fixture_sax.gtab",
 }
 
-// parseFixture reads and parses one fixture, failing the test if it does
-// not parse — the parser's own tests own that, so a failure here means the
-// fixture moved, not that the round trip is broken.
 func parseFixture(t *testing.T, path string) *score.Score {
 	t.Helper()
 	src, err := os.ReadFile(path)
@@ -35,11 +30,6 @@ func parseFixture(t *testing.T, path string) *score.Score {
 	return sc
 }
 
-// TestFormatRoundTrip is the contract the editor rests on: what Format
-// writes, Parse reads back as the same piece. Not "an equivalent piece" —
-// the same one, field for field, because the editor saves through Format
-// and re-opens through Parse, and any difference between the two is a
-// piece that quietly changes every time it is edited.
 func TestFormatRoundTrip(t *testing.T) {
 	for _, path := range gtabFixtures {
 		t.Run(filepath.Base(path), func(t *testing.T) {
@@ -60,10 +50,6 @@ func TestFormatRoundTrip(t *testing.T) {
 	}
 }
 
-// TestFormatIsStable checks that formatting is a fixed point: a piece that
-// has already been through Format writes identically the second time.
-// Without this a save could keep rewriting the same file with different
-// text — the thing that turns a git-diffable format into noise.
 func TestFormatIsStable(t *testing.T) {
 	for _, path := range gtabFixtures {
 		t.Run(filepath.Base(path), func(t *testing.T) {
@@ -87,8 +73,6 @@ func TestFormatIsStable(t *testing.T) {
 	}
 }
 
-// diffScores reports the first structural difference it finds, so a failed
-// round trip names the bar rather than dumping two whole scores.
 func diffScores(t *testing.T, want, got *score.Score) {
 	t.Helper()
 	if want.Title != got.Title {
@@ -125,8 +109,6 @@ func diffScores(t *testing.T, want, got *score.Score) {
 	}
 }
 
-// TestFormatOmitsDefaults keeps the output readable: the things a .gtab
-// file does not have to say, it does not say.
 func TestFormatOmitsDefaults(t *testing.T) {
 	sc := parseFixture(t, gtabFixtures[0])
 	src, err := Format(sc)
@@ -139,24 +121,16 @@ func TestFormatOmitsDefaults(t *testing.T) {
 			t.Errorf("output states the default %s:\n%s", unwanted, text)
 		}
 	}
-	// The sticky duration is what keeps a run of eighth notes from
-	// repeating ".8" eight times.
+
 	if n := strings.Count(text, ".8"); n != 1 {
 		t.Errorf("got %d explicit eighth durations, want 1 (the rest should stick):\n%s", n, text)
 	}
 }
 
-// TestFormatDurations checks every note value the format can hold, in a
-// piece built directly rather than parsed, so the duration table is
-// exercised independently of what the fixtures happen to use.
 func TestFormatDurations(t *testing.T) {
 	for _, d := range DurationNames() {
 		t.Run(d.Name, func(t *testing.T) {
-			// A bar this duration tiles exactly. Counting the meter in
-			// 32nds (den 32, one beat = 120 ticks) reaches every value in
-			// the table — including the triplets and dotted values that do
-			// not divide a quarter note — within the 64 beats the format
-			// allows a bar.
+
 			const den, beat = 32, 4 * score.PPQ / 32
 			num := 0
 			for n := 1; n <= 64; n++ {
@@ -175,7 +149,7 @@ func TestFormatDurations(t *testing.T) {
 			}
 			tr := &score.Track{
 				Tuning:  append(score.Tuning(nil), score.StandardTuning...),
-				Program: defaultProgram,
+				Program: DefaultProgram,
 			}
 			sc.Tracks = append(sc.Tracks, tr)
 			bar := tr.AppendBar(num, den)
@@ -186,9 +160,7 @@ func TestFormatDurations(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Format: %v", err)
 			}
-			// The quarter is the sticky duration a track starts on, so a bar
-			// of quarters states nothing at all — which is the point of the
-			// sticky rule, and worth asserting rather than exempting.
+
 			if d.Ticks == score.Quarter {
 				if strings.Contains(string(src), ".4") {
 					t.Errorf("a bar of quarter notes spells its duration; the quarter is the sticky default:\n%s", src)
@@ -208,8 +180,6 @@ func TestFormatDurations(t *testing.T) {
 	}
 }
 
-// TestDurationNamesCovers checks the palette the editor is built from is
-// the whole format: six note values, each plain, dotted and triplet.
 func TestDurationNamesCovers(t *testing.T) {
 	got := DurationNames()
 	if len(got) != 18 {
@@ -227,19 +197,13 @@ func TestDurationNamesCovers(t *testing.T) {
 	}
 }
 
-// TestBPMStringRoundTrips checks the tempo spelling over the whole range
-// the format accepts. Tempo is stored as microseconds per quarter and BPM
-// is its reciprocal, so most of these are not round numbers; the point is
-// that every one of them reads back as the exact value it came from.
 func TestBPMStringRoundTrips(t *testing.T) {
-	for us := int64(60000); us <= 6000000; us += 977 { // 1000 down to 10 BPM
+	for us := int64(60000); us <= 6000000; us += 977 {
 		s, err := bpmString(us)
 		if err != nil {
-			continue // outside the 1-1000 BPM the format accepts
+			continue
 		}
-		// strconv.ParseFloat then score.USPerQuarter is exactly what the
-		// parser's \tempo case does, so this checks the real conversion and
-		// not a lookalike.
+
 		bpm, err := strconv.ParseFloat(s, 64)
 		if err != nil {
 			t.Fatalf("bpmString(%d) = %q, which is not a number: %v", us, s, err)
@@ -253,10 +217,6 @@ func TestBPMStringRoundTrips(t *testing.T) {
 	}
 }
 
-// TestFormatRefusesWhatItCannotWrite pins the three shapes the model
-// allows and the format does not. Each has to name the problem rather than
-// emit text the parser would reject — or, worse, text that reads back as a
-// different piece.
 func TestFormatRefusesWhatItCannotWrite(t *testing.T) {
 	base := func() (*score.Score, *score.Track) {
 		sc := &score.Score{
@@ -264,7 +224,7 @@ func TestFormatRefusesWhatItCannotWrite(t *testing.T) {
 			Tempos: score.TempoMap{{Tick: 0, USPerQuarter: score.USPerQuarter(120)}},
 			Meters: score.MeterMap{{Tick: 0, Num: 4, Den: 4}},
 		}
-		tr := &score.Track{Tuning: append(score.Tuning(nil), score.StandardTuning...), Program: defaultProgram}
+		tr := &score.Track{Tuning: append(score.Tuning(nil), score.StandardTuning...), Program: DefaultProgram}
 		sc.Tracks = append(sc.Tracks, tr)
 		return sc, tr
 	}
@@ -272,7 +232,7 @@ func TestFormatRefusesWhatItCannotWrite(t *testing.T) {
 	t.Run("unwritable duration", func(t *testing.T) {
 		sc, tr := base()
 		bar := tr.AppendBar(4, 4)
-		bar.AddBeat(1000, score.Note{String: 6, Fret: 0}) // not a note value
+		bar.AddBeat(1000, score.Note{String: 6, Fret: 0})
 		bar.AddBeat(score.Whole-1000, score.Note{String: 6, Fret: 0})
 		_, err := Format(sc)
 		if err == nil || !strings.Contains(err.Error(), "not a note value") {
@@ -297,16 +257,60 @@ func TestFormatRefusesWhatItCannotWrite(t *testing.T) {
 		bar.AddBeat(score.Whole,
 			score.Note{String: 3, Fret: 0},
 			score.Note{String: 3, Fret: 2})
+
 		_, err := Format(sc)
-		if err == nil || !strings.Contains(err.Error(), "played twice") {
+		if err == nil || !strings.Contains(err.Error(), "string 3") {
 			t.Fatalf("got %v, want an error naming the repeated string", err)
 		}
 	})
 }
 
-// TestFormatNamesLaterTracks checks that a nameless second track is given
-// one. \track needs a name to exist, and without this the track's bars
-// would be appended to its predecessor — a silently different piece.
+func TestFormatRefusesCommentStarter(t *testing.T) {
+	sc := parseFixture(t, gtabFixtures[0])
+	sc.Title = "AC//DC"
+	if _, err := Format(sc); err == nil || !strings.Contains(err.Error(), `"//"`) {
+		t.Errorf("title: got %v, want an error naming the comment starter", err)
+	}
+	sc.Title = "Fixture Riff"
+	sc.Tracks[0].Name = "Riff // solo intro"
+	if _, err := Format(sc); err == nil || !strings.Contains(err.Error(), `"//"`) {
+		t.Errorf("track name: got %v, want an error naming the comment starter", err)
+	}
+}
+
+func TestFormatRefusesUnspellableMeter(t *testing.T) {
+	build := func(num, den int, beat int64) *score.Score {
+		sc := &score.Score{
+			Title:  "T",
+			Tempos: score.TempoMap{{Tick: 0, USPerQuarter: score.USPerQuarter(120)}},
+			Meters: score.MeterMap{{Tick: 0, Num: num, Den: den}},
+		}
+		tr := &score.Track{Tuning: append(score.Tuning(nil), score.StandardTuning...), Program: DefaultProgram}
+		sc.Tracks = append(sc.Tracks, tr)
+		bar := tr.AppendBar(num, den)
+		for filled := int64(0); filled < bar.Len(); filled += beat {
+			bar.AddBeat(beat, score.Note{String: 6, Fret: 0})
+		}
+		return sc
+	}
+
+	sc := build(4, 3, score.Triplet(score.Half))
+	if err := sc.Validate(); err != nil {
+		t.Fatalf("the 4/3 piece should be model-valid: %v", err)
+	}
+	if _, err := Format(sc); err == nil || !strings.Contains(err.Error(), "time signature") {
+		t.Errorf("4/3: got %v, want an error naming the time signature", err)
+	}
+
+	sc = build(65, 4, score.Quarter)
+	if err := sc.Validate(); err != nil {
+		t.Fatalf("the 65/4 piece should be model-valid: %v", err)
+	}
+	if _, err := Format(sc); err == nil || !strings.Contains(err.Error(), "time signature") {
+		t.Errorf("65/4: got %v, want an error naming the time signature", err)
+	}
+}
+
 func TestFormatNamesLaterTracks(t *testing.T) {
 	sc := &score.Score{
 		Title:  "Two",
@@ -314,7 +318,7 @@ func TestFormatNamesLaterTracks(t *testing.T) {
 		Meters: score.MeterMap{{Tick: 0, Num: 4, Den: 4}},
 	}
 	for i := 0; i < 2; i++ {
-		tr := &score.Track{Tuning: append(score.Tuning(nil), score.StandardTuning...), Program: defaultProgram}
+		tr := &score.Track{Tuning: append(score.Tuning(nil), score.StandardTuning...), Program: DefaultProgram}
 		bar := tr.AppendBar(4, 4)
 		bar.AddBeat(score.Whole, score.Note{String: 6, Fret: i})
 		sc.Tracks = append(sc.Tracks, tr)
@@ -338,8 +342,6 @@ func TestFormatNamesLaterTracks(t *testing.T) {
 	}
 }
 
-// TestWriteFileRoundTrip covers the save path end to end, including that
-// the temporary file it writes through does not survive.
 func TestWriteFileRoundTrip(t *testing.T) {
 	sc := parseFixture(t, gtabFixtures[1])
 	dir := t.TempDir()
@@ -351,8 +353,7 @@ func TestWriteFileRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseFile: %v", err)
 	}
-	// ParseFile seeds the title from the file name; the fixture states one,
-	// so this compares the real thing.
+
 	if !reflect.DeepEqual(got, sc) {
 		t.Error("WriteFile then ParseFile changed the score")
 		diffScores(t, sc, got)
@@ -370,9 +371,6 @@ func TestWriteFileRoundTrip(t *testing.T) {
 	}
 }
 
-// TestWriteFileOverwrites checks that saving over an existing piece
-// replaces it whole, rather than leaving a longer previous version's tail
-// behind it.
 func TestWriteFileOverwrites(t *testing.T) {
 	long := parseFixture(t, gtabFixtures[1])
 	short := parseFixture(t, gtabFixtures[0])
@@ -389,5 +387,61 @@ func TestWriteFileOverwrites(t *testing.T) {
 	}
 	if len(got.Tracks) != 1 {
 		t.Errorf("got %d tracks, want 1: the overwrite left the previous piece behind", len(got.Tracks))
+	}
+}
+
+func TestFormatRefusesWindWrittenBelowC0(t *testing.T) {
+	low := &score.WindInstrument{Name: "subcontra test", LowSounding: 0, Span: 12, Transpose: 0, Program: 73}
+	sc := &score.Score{
+		Title:  "T",
+		Tempos: score.TempoMap{{Tick: 0, USPerQuarter: score.USPerQuarter(120)}},
+		Meters: score.MeterMap{{Tick: 0, Num: 4, Den: 4}},
+	}
+	tr := &score.Track{Wind: low, Program: low.Program}
+	sc.Tracks = append(sc.Tracks, tr)
+	bar := tr.AppendBar(4, 4)
+	bar.AddBeat(score.Whole, score.Note{String: 1, Fret: 0})
+	if err := sc.Validate(); err != nil {
+		t.Fatalf("the low-instrument piece should be model-valid: %v", err)
+	}
+	_, err := Format(sc)
+	if err == nil || !strings.Contains(err.Error(), "written pitch") {
+		t.Fatalf("got %v, want a refusal naming the written pitch", err)
+	}
+
+	tr.Wind = &score.WindInstrument{Name: "flute", LowSounding: 12, Span: 36, Transpose: 0, Program: 73}
+	src, err := Format(sc)
+	if err != nil {
+		t.Fatalf("written C0: %v, want it accepted", err)
+	}
+	if !strings.Contains(string(src), "C0") {
+		t.Errorf("output lacks the C0 spelling:\n%s", src)
+	}
+}
+
+func TestCleanLabel(t *testing.T) {
+	for _, tc := range []struct {
+		in, want string
+		changed  bool
+	}{
+		{"Song", "Song", false},
+		{"  Song  ", "Song", false},
+		{"AC//DC", "AC/ /DC", true},
+		{"a///b", "a/ / /b", true},
+		{"line\r\nbreak", "line  break", true},
+		{"\n", "", true},
+		{"a / b", "a / b", false},
+	} {
+		got, changed := CleanLabel(tc.in)
+		if got != tc.want || changed != tc.changed {
+			t.Errorf("CleanLabel(%q) = %q, %v; want %q, %v", tc.in, got, changed, tc.want, tc.changed)
+		}
+	}
+
+	for _, in := range []string{"AC//DC", "x//", "//x", "///", "a\rb//c\n"} {
+		got, _ := CleanLabel(in)
+		if strings.Contains(got, "//") || strings.ContainsAny(got, "\r\n") {
+			t.Errorf("CleanLabel(%q) = %q still holds refused text", in, got)
+		}
 	}
 }

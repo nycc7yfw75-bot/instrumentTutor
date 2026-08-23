@@ -1,0 +1,151 @@
+package ui
+
+import (
+	"testing"
+
+	"github.com/S95F/musicTutor/internal/engine"
+	"github.com/S95F/musicTutor/internal/practice"
+	"github.com/S95F/musicTutor/internal/score"
+	"github.com/S95F/musicTutor/internal/synth"
+)
+
+func newAppWind(t *testing.T, bars int) *App {
+	t.Helper()
+	sc := &score.Score{
+		Tempos: score.TempoMap{{Tick: 0, USPerQuarter: 500000}},
+		Meters: score.MeterMap{{Tick: 0, Num: 4, Den: 4}},
+	}
+	w := score.WindByName("soprano sax")
+	if w == nil {
+		t.Fatal("no soprano sax in the registry")
+	}
+	tr := &score.Track{Name: "sax", Wind: w, Program: w.Program}
+	sc.Tracks = append(sc.Tracks, tr)
+	for i := 0; i < bars; i++ {
+		b := tr.AppendBar(4, 4)
+		b.AddBeat(score.Whole, score.Note{String: 1, Fret: 16 + i})
+	}
+	if err := sc.Validate(); err != nil {
+		t.Fatalf("fixture score does not validate: %v", err)
+	}
+	eng := engine.New(sc, engine.Options{Voices: synth.NewBuiltin})
+	return New(eng, sc, 0)
+}
+
+func TestWindBandMatchesSixStringGeometry(t *testing.T) {
+	wind := newAppWind(t, 4)
+	guitar := newApp(t, 4)
+	if got, want := wind.tabBottom(), guitar.tabBottom(); got != want {
+		t.Errorf("wind tabBottom = %.0f, six-string = %.0f; the two bands must agree", got, want)
+	}
+	bands := practiceBands(wind)
+	for i := 1; i < len(bands); i++ {
+		if bands[i].top < bands[i-1].bottom {
+			t.Errorf("wind track: %q overlaps %q", bands[i-1].name, bands[i].name)
+		}
+	}
+}
+
+func TestWindLadderPlacesPitch(t *testing.T) {
+	a := newAppWind(t, 4)
+	tr := a.displayed()
+	l := windLadderFor(tr)
+	if l.hi-l.lo < 12 {
+		t.Errorf("ladder compass %d..%d spans %d semitones, want at least an octave", l.lo, l.hi, l.hi-l.lo)
+	}
+	top, bottom := float64(tabTop), a.tabBottom()
+	prevY := bottom + 1
+	for i := 0; i < 4; i++ {
+		written := tr.Wind.Written(tr.Pitch(score.Note{String: 1, Fret: 16 + i}))
+		y := l.y(written, top, bottom)
+		if y < top || y > bottom {
+			t.Errorf("written %d drawn at %.1f, outside the band %.0f..%.0f", written, y, top, bottom)
+		}
+		if y >= prevY {
+			t.Errorf("written %d drawn at %.1f, not above the lower note at %.1f", written, y, prevY)
+		}
+		prevY = y
+	}
+}
+
+func TestWindLadderEmptyTrackShowsTheInstrument(t *testing.T) {
+	a := newAppWind(t, 0)
+	tr := a.displayed()
+	l := windLadderFor(tr)
+	w := tr.Wind
+	if l.lo > w.Written(w.LowSounding) || l.hi < w.Written(w.LowSounding+w.Span) {
+		t.Errorf("empty track ladder %d..%d does not cover the %s's written range %d..%d",
+			l.lo, l.hi, w.Name, w.Written(w.LowSounding), w.Written(w.LowSounding+w.Span))
+	}
+}
+
+func TestWindNoteLabelIsWrittenPitch(t *testing.T) {
+	tr := newAppWind(t, 1).displayed()
+
+	if got := windNoteLabel(tr, score.Note{String: 1, Fret: 16}); got != "D5" {
+		t.Errorf("label = %q, want D5", got)
+	}
+	if got := windNoteLabel(tr, score.Note{String: 1, Fret: 16, Tied: true}); got != "~D5" {
+		t.Errorf("tied label = %q, want ~D5", got)
+	}
+}
+
+func TestDisplayNameTransposes(t *testing.T) {
+	wind := newAppWind(t, 1)
+	if got := wind.displayName(72); got != "D5" {
+		t.Errorf("wind displayName(72) = %q, want the written D5", got)
+	}
+	guitar := newApp(t, 1)
+	if got := guitar.displayName(72); got != "C5" {
+		t.Errorf("guitar displayName(72) = %q, want the concert C5", got)
+	}
+}
+
+func TestWindVerdictKeying(t *testing.T) {
+	a := newAppWind(t, 1)
+	a.OfferResults([]practice.NoteResult{result(0, 1, practice.VerdictHit)})
+	a.syncLive()
+	if v, ok := a.verdictAt(0, 1, 0); !ok || v != practice.VerdictHit {
+		t.Errorf("verdictAt(0, 1) = %v, %v; want the offered Hit", v, ok)
+	}
+}
+
+func TestNewEditorForAcceptsWind(t *testing.T) {
+	sc := newAppWind(t, 1).sc
+	e, err := NewEditorFor(nil, sc, "")
+	if err != nil {
+		t.Fatalf("NewEditorFor refused a wind piece: %v", err)
+	}
+	if w := e.doc.Wind(); w == nil || w.Name != "soprano sax" {
+		t.Fatalf("the opened document's instrument = %v, want the soprano sax", w)
+	}
+	if e.text != nil {
+		t.Error("a wind piece opened into the text view; the grid is its editor now")
+	}
+}
+
+func TestWindTextViewRoundTrips(t *testing.T) {
+	src := "\\instrument soprano sax\nD5.4 E5.4 G5.2 |\n"
+	e := NewEditorForText(nil, []byte(src), "sax.gtab")
+
+	acted := false
+	e.applyTextThen(func() { acted = true })
+	if !acted {
+		t.Fatal("applyTextThen never ran the action on a valid wind text")
+	}
+	if e.text != nil {
+		t.Fatal("applyTextThen held the text view open; the grid edits wind parts now")
+	}
+	if w := e.doc.Wind(); w == nil {
+		t.Fatal("the applied document lost its instrument")
+	}
+
+	e.toggleText()
+	if e.text == nil {
+		t.Fatal("F2 would not show a wind piece's text")
+	}
+	e.toggleText()
+	if e.text != nil {
+		t.Fatal("F2 would not bring a wind piece back to the grid")
+	}
+}

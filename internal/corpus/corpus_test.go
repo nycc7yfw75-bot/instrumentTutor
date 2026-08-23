@@ -12,6 +12,32 @@ func TestDirLayout(t *testing.T) {
 	if got != want {
 		t.Errorf("Dir = %q, want %q", got, want)
 	}
+
+	got = Dir("../..", WindTones)
+	want = filepath.Join("../..", "testdata", "real", "wind", "tones")
+	if got != want {
+		t.Errorf("Dir(WindTones) = %q, want %q", got, want)
+	}
+}
+
+func TestFilesNestedCategory(t *testing.T) {
+	root := t.TempDir()
+	dir := Dir(root, WindTones)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"c5.wav", "g#4-scoop.flac", "notes.txt"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := Files(root, WindTones, ".wav", ".flac")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("got %d files, want 2: %v", len(got), got)
+	}
 }
 
 func TestFilesFiltersByExtension(t *testing.T) {
@@ -36,7 +62,7 @@ func TestFilesFiltersByExtension(t *testing.T) {
 	if len(got) != 2 {
 		t.Fatalf("got %d files, want 2: %v", len(got), got)
 	}
-	// Extension matching is case-insensitive, and directories are skipped.
+
 	var names []string
 	for _, p := range got {
 		names = append(names, filepath.Base(p))
@@ -60,9 +86,6 @@ func TestFilesMissingCorpus(t *testing.T) {
 	}
 }
 
-// TestRequireSkipsWithoutCorpus documents the contract that matters most:
-// a clone without the corpus must report skips, never failures. It runs
-// Require in a subtest and asserts that subtest skipped.
 func TestRequireSkipsWithoutCorpus(t *testing.T) {
 	root := t.TempDir()
 	var skipped bool

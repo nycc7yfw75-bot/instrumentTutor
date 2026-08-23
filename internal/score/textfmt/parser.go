@@ -7,59 +7,45 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/S95F/guitarTutor/internal/score"
+	"github.com/S95F/musicTutor/internal/score"
 )
 
-// The format's limits and defaults (see docs/TEXTFORMAT.md). These are
-// exported because the editor authors pieces in this format and has to
-// refuse — and default to — exactly what the format does; two copies of
-// "the highest fret" that disagree is a piece that will not save.
 const (
-	// MaxFret is the highest fret number the format accepts, for a capo as
-	// well as for a note.
 	MaxFret = 30
-	// DefaultBPM is the tempo a piece has when it states none.
+
 	DefaultBPM = 120
-	// DefaultProgram is the General MIDI program a track has when it states
-	// none (25 = steel-string acoustic guitar).
+
 	DefaultProgram = 25
 )
 
-// Unexported aliases, so the parser and writer below read as they did
-// before these limits acquired a second audience.
-const (
-	maxFret        = MaxFret
-	defaultBPM     = DefaultBPM
-	defaultProgram = DefaultProgram
-)
-
-// A parser holds the state of one Parse call: the scanner, the score
-// being built, the current track and open bar, and the pending mid-piece
-// directives that take effect at the next bar.
 type parser struct {
 	sc    *scanner
 	name  string
 	score *score.Score
 
-	track  *score.Track // current track; nil until a track is needed
-	bar    *score.Bar   // open bar; nil at a bar boundary
-	filled int64        // ticks filled so far in the open bar
-	sticky int64        // sticky beat duration in ticks (initially a quarter)
-	sawBar bool         // any bar begun anywhere in the piece
+	track  *score.Track
+	bar    *score.Bar
+	filled int64
+	sticky int64
+	sawBar bool
 
-	pendingTempo     *float64 // \tempo awaiting the next bar, in BPM
-	pendingTempoTick int64    // piece tick where the pending \tempo takes effect
-	pendingMeter     *[2]int  // \time awaiting the next bar, as {num, den}
-	pendingMeterTick int64    // piece tick where the pending \time takes effect
+	progSet   bool
+	tuningSet bool
+	capoSet   bool
+
+	pendingTempo     *float64
+	pendingTempoTick int64
+	pendingMeter     *[2]int
+	pendingMeterTick int64
+
+	tempoDirPos map[int64]pos
+	meterDirPos map[int64]pos
 }
 
-// errAt builds a ParseError at position at.
 func (p *parser) errAt(at pos, format string, args ...any) *ParseError {
 	return &ParseError{Name: p.name, Line: at.line, Col: at.col, Msg: fmt.Sprintf(format, args...)}
 }
 
-// run drives the main token loop, then closes any open final bar and
-// checks whole-score invariants.
 func (p *parser) run() error {
 	for {
 		p.sc.skipSpace()
@@ -101,8 +87,29 @@ func (p *parser) run() error {
 	if !p.sawBar {
 		return p.errAt(p.sc.pos(), "piece has no bars")
 	}
+
+	if p.pendingMeter != nil {
+		p.score.Meters = insertMeter(p.score.Meters, score.Meter{Tick: p.pendingMeterTick, Num: p.pendingMeter[0], Den: p.pendingMeter[1]})
+		p.pendingMeter = nil
+	}
+	if p.pendingTempo != nil {
+		p.score.Tempos = insertTempo(p.score.Tempos, score.Tempo{Tick: p.pendingTempoTick, USPerQuarter: score.USPerQuarter(*p.pendingTempo)})
+		p.pendingTempo = nil
+	}
 	if err := p.checkMeterAlignment(); err != nil {
 		return err
+	}
+
+	end := p.score.End()
+	for _, e := range p.score.Tempos {
+		if e.Tick == end {
+			return p.errAt(p.dirPos(p.tempoDirPos, end), `this \tempo takes effect at the very end of the piece, where it changes nothing and cannot be saved; delete it or add the bars it applies to`)
+		}
+	}
+	for _, m := range p.score.Meters {
+		if m.Tick == end {
+			return p.errAt(p.dirPos(p.meterDirPos, end), `this \time takes effect at the very end of the piece, where it changes nothing and cannot be saved; delete it or add the bars it applies to`)
+		}
 	}
 	if err := p.score.Validate(); err != nil {
 		return p.errAt(p.sc.pos(), "internal: parsed score fails validation: %v", err)
@@ -110,8 +117,13 @@ func (p *parser) run() error {
 	return nil
 }
 
-// ensureTrack returns the current track, materializing the default
-// unnamed track for pieces whose bars precede any \track directive.
+func (p *parser) dirPos(m map[int64]pos, tick int64) pos {
+	if at, ok := m[tick]; ok {
+		return at
+	}
+	return p.sc.pos()
+}
+
 func (p *parser) ensureTrack() *score.Track {
 	if p.track == nil {
 		p.track = p.newTrack("")
@@ -119,20 +131,17 @@ func (p *parser) ensureTrack() *score.Track {
 	return p.track
 }
 
-// newTrack appends a track with the format's defaults: standard E
-// tuning, no capo, steel-string acoustic program, user role.
 func (p *parser) newTrack(name string) *score.Track {
 	tr := &score.Track{
 		Name:    name,
 		Tuning:  append(score.Tuning(nil), score.StandardTuning...),
-		Program: defaultProgram,
+		Program: DefaultProgram,
 	}
 	p.score.Tracks = append(p.score.Tracks, tr)
+	p.progSet, p.tuningSet, p.capoSet = false, false, false
 	return tr
 }
 
-// beginBar opens a new bar on the current track, applying any pending
-// mid-piece \tempo and \time directives at their anchored ticks.
 func (p *parser) beginBar() {
 	tr := p.ensureTrack()
 	start := int64(0)
@@ -154,12 +163,6 @@ func (p *parser) beginBar() {
 	p.sawBar = true
 }
 
-// anchorTick returns the piece tick at which a mid-piece \tempo or \time
-// directive takes effect: the end of the current track's last bar, or 0
-// when the current track has no bars yet. Anchoring at directive-parse
-// time keeps the change at the piece position where it was written even
-// when a following \track directive rewinds the next bar's start to
-// tick 0.
 func (p *parser) anchorTick() int64 {
 	if p.track != nil {
 		if n := len(p.track.Bars); n > 0 {
@@ -170,8 +173,6 @@ func (p *parser) anchorTick() int64 {
 	return 0
 }
 
-// closeBar ends the open bar, rejecting one whose beats do not exactly
-// fill the meter. at is the position of the "|" (or of end of input).
 func (p *parser) closeBar(at pos) error {
 	if p.bar == nil {
 		return p.errAt(at, "empty bar")
@@ -184,9 +185,6 @@ func (p *parser) closeBar(at pos) error {
 	return nil
 }
 
-// addBeat appends one parsed beat, opening a new bar if none is open and
-// enforcing the bar's capacity under the meter in effect. at is the
-// beat's source position; no notes means a rest.
 func (p *parser) addBeat(at pos, dur int64, notes ...score.Note) error {
 	if p.bar == nil {
 		p.beginBar()
@@ -201,10 +199,6 @@ func (p *parser) addBeat(at pos, dur int64, notes ...score.Note) error {
 	return nil
 }
 
-// beatsIn renders a span of ticks as beats of a meter, for the messages a
-// person reads. Ticks are the model's unit — PPQ 960, defined nowhere a
-// user can see — and a bar being short by 960 of them means nothing to
-// somebody counting in beats.
 func beatsIn(ticks int64, den int) string {
 	beat := 4 * score.PPQ / int64(den)
 	if beat <= 0 {
@@ -213,9 +207,6 @@ func beatsIn(ticks int64, den int) string {
 	return strconv.FormatFloat(float64(ticks)/float64(beat), 'g', 3, 64)
 }
 
-// beatWord parses one non-chord beat token: a note "fret.string" with
-// optional duration and technique suffixes, or a rest "r" with optional
-// duration. tied is true when the main loop consumed a "~" prefix.
 func (p *parser) beatWord(tied bool) error {
 	p.ensureTrack()
 	tok, tp := p.sc.word()
@@ -256,15 +247,14 @@ func (p *parser) beatWord(tied bool) error {
 	return p.addBeat(tp, dur, n)
 }
 
-// beatChord parses "(note note ...)" plus an optional ".duration" and
-// technique suffix attached directly to the ")". tied ties every chord
-// note (from a "~" prefix on the whole chord); individual chord notes may
-// also carry their own "~". start is the beat's source position.
 func (p *parser) beatChord(tied bool, start pos) error {
 	p.ensureTrack()
-	p.sc.next() // consume "("
+	if w := p.track.Wind; w != nil {
+		return p.errAt(start, "chord on %s, which plays one note at a time", score.An(w.Name))
+	}
+	p.sc.next()
 	var notes []score.Note
-	seen := map[int]bool{} // string numbers already used in this chord
+	seen := map[int]bool{}
 	for {
 		p.sc.skipSpace()
 		if p.sc.eof() {
@@ -307,12 +297,11 @@ func (p *parser) beatChord(tied bool, start pos) error {
 	if len(notes) == 0 {
 		return p.errAt(start, "empty chord")
 	}
-	// An optional ".duration" and technique suffix attaches directly to
-	// the ")"; the techniques apply to every note of the chord.
+
 	dur := p.sticky
 	switch c := p.sc.peek(); c {
 	case 0, ' ', '\t', '\r', '\n', '|', '(', ')':
-		// No suffix.
+
 	default:
 		tok, tp := p.sc.word()
 		t := &tokScan{tok: tok, base: tp}
@@ -333,16 +322,17 @@ func (p *parser) beatChord(tied bool, start pos) error {
 	return p.addBeat(start, dur, notes...)
 }
 
-// noteCore parses "fret.string" at the token cursor, checking the fret
-// and string ranges against the current track.
 func (p *parser) noteCore(t *tokScan, tied bool) (score.Note, error) {
+	if w := p.track.Wind; w != nil {
+		return p.windNote(t, w, tied)
+	}
 	fp := t.pos()
 	fret, ok := t.uint()
 	if !ok {
 		return score.Note{}, p.errAt(fp, "malformed beat %q: expected a fret number", t.tok)
 	}
-	if fret > maxFret {
-		return score.Note{}, p.errAt(fp, "fret %d out of range (0-%d)", fret, maxFret)
+	if fret > MaxFret {
+		return score.Note{}, p.errAt(fp, "fret %d out of range (0-%d)", fret, MaxFret)
 	}
 	if t.peek() != '.' {
 		return score.Note{}, p.errAt(t.pos(), "malformed beat %q: expected \".\" after the fret", t.tok)
@@ -356,9 +346,7 @@ func (p *parser) noteCore(t *tokScan, tied bool) (score.Note, error) {
 	if ns := len(p.track.Tuning); str < 1 || str > ns {
 		return score.Note{}, p.errAt(sp, "string %d out of range (track has %d strings)", str, ns)
 	}
-	// Tuning, capo, and fret are each in range, but their sum is the
-	// sounding pitch and must fit MIDI (the components are all >= 0, so
-	// only the top can be exceeded).
+
 	if key := p.track.Tuning[str-1] + p.track.Capo + fret; key > 127 {
 		return score.Note{}, p.errAt(fp, "note sounds MIDI key %d (open %d + capo %d + fret %d), above 127",
 			key, p.track.Tuning[str-1], p.track.Capo, fret)
@@ -366,10 +354,25 @@ func (p *parser) noteCore(t *tokScan, tied bool) (score.Note, error) {
 	return score.Note{String: str, Fret: fret, Tied: tied}, nil
 }
 
-// duration parses ".N" (plain), ".N." (dotted), or ".Nt" (triplet) at
-// the token cursor and returns the length in ticks.
+func (p *parser) windNote(t *tokScan, w *score.WindInstrument, tied bool) (score.Note, error) {
+	np := t.pos()
+	written, ok := t.pitch()
+	if !ok {
+		return score.Note{}, p.errAt(np, "malformed beat %q: %s note is a written pitch name like %s", t.tok, score.An(w.Name), pitchName(w.Written(w.LowSounding)))
+	}
+	name := t.tok[:t.i]
+	sounding := w.Sounding(written)
+	if sounding < w.LowSounding {
+		return score.Note{}, p.errAt(np, "%s is below the %s's lowest note, %s", name, w.Name, pitchName(w.Written(w.LowSounding)))
+	}
+	if sounding > 127 {
+		return score.Note{}, p.errAt(np, "%s sounds MIDI key %d, above 127", name, sounding)
+	}
+	return score.Note{String: 1, Fret: sounding - w.LowSounding, Tied: tied}, nil
+}
+
 func (p *parser) duration(t *tokScan) (int64, error) {
-	t.i++ // consume "."
+	t.i++
 	dp := t.pos()
 	n, ok := t.uint()
 	if !ok {
@@ -403,14 +406,17 @@ func (p *parser) duration(t *tokScan) (int64, error) {
 	return base, nil
 }
 
-// techniques parses the technique letters that end a beat token, or-ing
-// them into the note's bitmask.
 func (p *parser) techniques(t *tokScan, n *score.Note) error {
+	wind := p.track.Wind != nil
 	for t.i < len(t.tok) {
-		tech, ok := techFor(t.tok[t.i])
+		tech, ok := techFor(t.tok[t.i], wind)
 		if !ok {
 			r, _ := utf8.DecodeRuneInString(t.tok[t.i:])
-			return p.errAt(t.pos(), "unknown technique %q (valid: h p s b v x)", string(r))
+			valid := "h p s b v x"
+			if wind {
+				valid = "l s b v"
+			}
+			return p.errAt(t.pos(), "unknown technique %q (valid: %s)", string(r), valid)
 		}
 		n.Tech |= tech
 		t.i++
@@ -418,8 +424,20 @@ func (p *parser) techniques(t *tokScan, n *score.Note) error {
 	return nil
 }
 
-// techFor maps a technique letter to its score.Technique bit.
-func techFor(c byte) (score.Technique, bool) {
+func techFor(c byte, wind bool) (score.Technique, bool) {
+	if wind {
+		switch c {
+		case 'l':
+			return score.TechSlur, true
+		case 's':
+			return score.TechSlide, true
+		case 'b':
+			return score.TechBend, true
+		case 'v':
+			return score.TechVibrato, true
+		}
+		return 0, false
+	}
 	switch c {
 	case 'h':
 		return score.TechHammer, true
@@ -437,11 +455,9 @@ func techFor(c byte) (score.Technique, bool) {
 	return 0, false
 }
 
-// directive dispatches one "\name ..." directive; the directive's
-// arguments run to the end of its line.
 func (p *parser) directive() error {
 	tok, tp := p.sc.word()
-	name := tok[1:] // tok starts with the dispatching "\"
+	name := tok[1:]
 	if name == "" {
 		return p.errAt(tp, `expected a directive name after "\"`)
 	}
@@ -466,15 +482,21 @@ func (p *parser) directive() error {
 			return err
 		}
 		bpm, perr := strconv.ParseFloat(arg.text, 64)
-		// The negated range form also rejects NaN (every comparison with
-		// NaN is false) and infinities, not just ordinary out-of-range
-		// values; anything outside [1, 1000] would over- or underflow
-		// score.USPerQuarter's int64.
+
 		if perr != nil || !(bpm >= 1 && bpm <= 1000) {
 			return p.errAt(arg.pos, "invalid tempo %q (want BPM in 1-1000)", arg.text)
 		}
+
+		tick := p.anchorTick()
+		if p.pendingTempo != nil && p.pendingTempoTick != tick {
+			return p.errAt(tp, `this \tempo would silently discard the \tempo written before the last \track, which takes effect at a different point in the piece; keep one, or move this one to where it should apply`)
+		}
 		p.pendingTempo = &bpm
-		p.pendingTempoTick = p.anchorTick()
+		p.pendingTempoTick = tick
+		if p.tempoDirPos == nil {
+			p.tempoDirPos = map[int64]pos{}
+		}
+		p.tempoDirPos[tick] = tp
 		return nil
 
 	case "time":
@@ -489,8 +511,17 @@ func (p *parser) directive() error {
 		if !ok {
 			return p.errAt(arg.pos, "invalid time signature %q (want n/d with d one of 1 2 4 8 16 32)", arg.text)
 		}
+
+		tick := p.anchorTick()
+		if p.pendingMeter != nil && p.pendingMeterTick != tick {
+			return p.errAt(tp, `this \time would silently discard the \time written before the last \track, which takes effect at a different point in the piece; keep one, or move this one to where it should apply`)
+		}
 		p.pendingMeter = &[2]int{num, den}
-		p.pendingMeterTick = p.anchorTick()
+		p.pendingMeterTick = tick
+		if p.meterDirPos == nil {
+			p.meterDirPos = map[int64]pos{}
+		}
+		p.meterDirPos[tick] = tp
 		return nil
 
 	case "track":
@@ -505,10 +536,40 @@ func (p *parser) directive() error {
 		p.sticky = score.Quarter
 		return nil
 
+	case "instrument":
+		if err := p.trackDirective(tp, `\instrument`); err != nil {
+			return err
+		}
+		iname := p.sc.restOfLine()
+		if iname == "" {
+			return p.errAt(tp, `\instrument requires an instrument name`)
+		}
+		w := score.WindByName(iname)
+		if w == nil {
+			return p.errAt(tp, "unknown instrument %q (this app knows: %s)", iname, strings.Join(score.WindNames(), ", "))
+		}
+		if p.track.Wind != nil {
+			return p.errAt(tp, "the track is already %s", score.An(p.track.Wind.Name))
+		}
+		if p.tuningSet || p.capoSet {
+			return p.errAt(tp, `\instrument cannot follow \tuning or \capo: %s has no strings`, score.An(w.Name))
+		}
+		p.track.Wind = w
+		p.track.Tuning = nil
+		p.track.Capo = 0
+		if !p.progSet {
+			p.track.Program = w.Program
+		}
+		return nil
+
 	case "tuning":
 		if err := p.trackDirective(tp, `\tuning`); err != nil {
 			return err
 		}
+		if w := p.track.Wind; w != nil {
+			return p.errAt(tp, `\tuning on %s, which has no strings`, score.An(w.Name))
+		}
+		p.tuningSet = true
 		args := p.sc.args()
 		if len(args) == 0 {
 			return p.errAt(tp, `\tuning requires at least one note`)
@@ -519,8 +580,7 @@ func (p *parser) directive() error {
 			if err != nil {
 				return p.errAt(a.pos, "invalid tuning note %q: %v", a.text, err)
 			}
-			// The file lists open strings low to high; the model stores
-			// the highest-pitched string first.
+
 			tuning[len(args)-1-i] = key
 		}
 		p.track.Tuning = tuning
@@ -530,13 +590,17 @@ func (p *parser) directive() error {
 		if err := p.trackDirective(tp, `\capo`); err != nil {
 			return err
 		}
+		if w := p.track.Wind; w != nil {
+			return p.errAt(tp, `\capo on %s, which has no capo`, score.An(w.Name))
+		}
+		p.capoSet = true
 		arg, err := p.oneArg(tp, name)
 		if err != nil {
 			return err
 		}
 		fret, perr := strconv.Atoi(arg.text)
-		if perr != nil || fret < 0 || fret > maxFret {
-			return p.errAt(arg.pos, "invalid capo %q (want 0-%d)", arg.text, maxFret)
+		if perr != nil || fret < 0 || fret > MaxFret {
+			return p.errAt(arg.pos, "invalid capo %q (want 0-%d)", arg.text, MaxFret)
 		}
 		p.track.Capo = fret
 		return nil
@@ -545,6 +609,7 @@ func (p *parser) directive() error {
 		if err := p.trackDirective(tp, `\program`); err != nil {
 			return err
 		}
+		p.progSet = true
 		arg, err := p.oneArg(tp, name)
 		if err != nil {
 			return err
@@ -569,9 +634,6 @@ func (p *parser) directive() error {
 	return p.errAt(tp, `unknown directive \%s`, name)
 }
 
-// trackDirective prepares a track-scoped directive: it materializes the
-// default track if needed and rejects the directive once the current
-// track has bars.
 func (p *parser) trackDirective(at pos, dir string) error {
 	if tr := p.ensureTrack(); len(tr.Bars) > 0 {
 		return p.errAt(at, "%s must appear before the current track's first bar", dir)
@@ -579,7 +641,6 @@ func (p *parser) trackDirective(at pos, dir string) error {
 	return nil
 }
 
-// oneArg reads the directive's arguments and requires exactly one.
 func (p *parser) oneArg(at pos, dir string) (argument, error) {
 	args := p.sc.args()
 	if len(args) == 0 {
@@ -591,9 +652,6 @@ func (p *parser) oneArg(at pos, dir string) (argument, error) {
 	return args[0], nil
 }
 
-// checkMeterAlignment verifies, once every track is parsed, that each bar
-// agrees with the final meter map: a mid-piece \time change must land on
-// a bar boundary of every track.
 func (p *parser) checkMeterAlignment() error {
 	for ti, tr := range p.score.Tracks {
 		for bi, bar := range tr.Bars {
@@ -615,7 +673,6 @@ func (p *parser) checkMeterAlignment() error {
 	return nil
 }
 
-// parseTimeSig parses "n/d" with a power-of-two denominator up to 32.
 func parseTimeSig(s string) (num, den int, ok bool) {
 	i := strings.IndexByte(s, '/')
 	if i < 0 {
@@ -633,9 +690,6 @@ func parseTimeSig(s string) (num, den int, ok bool) {
 	return 0, 0, false
 }
 
-// parsePitch parses one tuning note: scientific pitch notation (a letter,
-// an optional # or b, and an octave; middle C = C4 = MIDI 60) or a bare
-// MIDI note number 0-127.
 func parsePitch(s string) (int, error) {
 	if s == "" {
 		return 0, fmt.Errorf("empty note")
@@ -693,8 +747,6 @@ func parsePitch(s string) (int, error) {
 	return key, nil
 }
 
-// insertTempo inserts a tempo change keeping the map sorted, replacing
-// any existing entry at the same tick.
 func insertTempo(m score.TempoMap, e score.Tempo) score.TempoMap {
 	i := sort.Search(len(m), func(i int) bool { return m[i].Tick >= e.Tick })
 	if i < len(m) && m[i].Tick == e.Tick {
@@ -707,8 +759,6 @@ func insertTempo(m score.TempoMap, e score.Tempo) score.TempoMap {
 	return m
 }
 
-// insertMeter inserts a time-signature change keeping the map sorted,
-// replacing any existing entry at the same tick.
 func insertMeter(m score.MeterMap, e score.Meter) score.MeterMap {
 	i := sort.Search(len(m), func(i int) bool { return m[i].Tick >= e.Tick })
 	if i < len(m) && m[i].Tick == e.Tick {
@@ -721,20 +771,16 @@ func insertMeter(m score.MeterMap, e score.Meter) score.MeterMap {
 	return m
 }
 
-// A tokScan walks a single token, converting byte offsets back to source
-// columns for error positions.
 type tokScan struct {
 	tok  string
-	i    int // byte offset of the cursor within tok
-	base pos // source position of tok's first character
+	i    int
+	base pos
 }
 
-// pos returns the source position of the cursor.
 func (t *tokScan) pos() pos {
 	return pos{line: t.base.line, col: t.base.col + utf8.RuneCountInString(t.tok[:t.i])}
 }
 
-// peek returns the byte at the cursor, or 0 at the end of the token.
 func (t *tokScan) peek() byte {
 	if t.i >= len(t.tok) {
 		return 0
@@ -742,7 +788,6 @@ func (t *tokScan) peek() byte {
 	return t.tok[t.i]
 }
 
-// uint consumes a run of decimal digits at the cursor.
 func (t *tokScan) uint() (int, bool) {
 	start := t.i
 	for t.i < len(t.tok) && t.tok[t.i] >= '0' && t.tok[t.i] <= '9' {
@@ -753,10 +798,57 @@ func (t *tokScan) uint() (int, bool) {
 	}
 	n, err := strconv.Atoi(t.tok[start:t.i])
 	if err != nil {
-		return 0, false // overflow
+		return 0, false
 	}
 	return n, true
 }
 
-// rest returns the unconsumed remainder of the token.
+func (t *tokScan) pitch() (int, bool) {
+	if t.i >= len(t.tok) {
+		return 0, false
+	}
+	c := t.tok[t.i]
+	if c >= 'a' && c <= 'g' {
+		c -= 'a' - 'A'
+	}
+	var base int
+	switch c {
+	case 'C':
+		base = 0
+	case 'D':
+		base = 2
+	case 'E':
+		base = 4
+	case 'F':
+		base = 5
+	case 'G':
+		base = 7
+	case 'A':
+		base = 9
+	case 'B':
+		base = 11
+	default:
+		return 0, false
+	}
+	t.i++
+	acc := 0
+	if t.i < len(t.tok) {
+		switch t.tok[t.i] {
+		case '#':
+			acc, t.i = 1, t.i+1
+		case 'b':
+			acc, t.i = -1, t.i+1
+		}
+	}
+	oct, ok := t.uint()
+	if !ok {
+		return 0, false
+	}
+	key := (oct+1)*12 + base + acc
+	if key < 0 || key > 127 {
+		return 0, false
+	}
+	return key, true
+}
+
 func (t *tokScan) rest() string { return t.tok[t.i:] }
