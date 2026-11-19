@@ -54,7 +54,7 @@ func (e *Engine) mixClicks(left, right []float32) {
 			m = len(left)
 		}
 		for j := 0; j < m; j++ {
-			s := c.buf[c.pos+j]
+			s := c.buf[c.pos+j] * float32(e.clickGain)
 			left[j] += s
 			right[j] += s
 		}

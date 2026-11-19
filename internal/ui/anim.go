@@ -3,26 +3,24 @@ package ui
 import (
 	"image/color"
 	"time"
-
-	"github.com/hajimehoshi/ebiten/v2"
 )
 
+// Motion tokens. Hover is a colour change only (about 130ms to arrive); a press
+// shrinks small controls to animPressScale and only shades wide surfaces,
+// where a scale would read as a jump.
 const (
-	animHoverRate = 16.0
+	animHoverRate = 22.0
 	animPressRate = 34.0
-
-	animFlashSeconds = 0.28
 
 	animForgetFrames = 120
 
-	animLift = 1.5
-	animSink = 2.0
+	animPressScale = 0.97
+	animWideW      = 200.0
 )
 
 type animValues struct {
 	hover float64
 	press float64
-	flash float64
 }
 
 type animState struct {
@@ -62,19 +60,10 @@ func (a *animator) step(id string, hovered, down bool, dt float64) animValues {
 	st.seen = a.frame
 
 	pressed := hovered && down
-	if pressed && !st.down {
-		st.flash = 1
-	}
 	st.down = pressed
 
 	st.hover = ease(st.hover, boolTo(hovered), animHoverRate, dt)
 	st.press = ease(st.press, boolTo(pressed), animPressRate, dt)
-	if st.flash > 0 && animFlashSeconds > 0 {
-		st.flash -= dt / animFlashSeconds
-		if st.flash < 0 {
-			st.flash = 0
-		}
-	}
 	return st.animValues
 }
 
@@ -144,16 +133,15 @@ func withAlpha(c color.RGBA, alpha float64) color.RGBA {
 }
 
 func (av animValues) animate(r rect) rect {
-	r.y += -animLift*av.hover + (animLift+animSink)*av.press
-	return r
+	if r.w >= animWideW || av.press <= 0 {
+		return r
+	}
+	s := 1 - (1-animPressScale)*av.press
+	w, h := r.w*s, r.h*s
+	return rect{r.x + (r.w-w)/2, r.y + (r.h-h)/2, w, h}
 }
 
-func drawFlash(dst *ebiten.Image, r rect, av animValues) {
-	if av.flash <= 0 {
-		return
-	}
-
-	grow := 5 * (1 - av.flash)
-	ring := rect{r.x - grow, r.y - grow, r.w + 2*grow, r.h + 2*grow}
-	strokeRounded(dst, ring, withAlpha(colNote, 0.55*av.flash))
+// pressShade darkens a wide surface while it is held, its press feedback.
+func pressShade(c color.RGBA, av animValues) color.RGBA {
+	return lerpCol(c, colBG, 0.6*av.press)
 }

@@ -1339,20 +1339,17 @@ func (s *Settings) Update() error {
 	case inpututil.IsKeyJustPressed(ebiten.KeyEnter), inpututil.IsKeyJustPressed(ebiten.KeyKPEnter):
 		s.activate()
 	}
-	if s.ptr.pressed && s.ptr.over(backButtonRect(settingsBack)) {
+	if escButtonPressed(escBackChip, s.ptr) {
 		return errQuit
 	}
 	s.handleMouse(s.ptr)
 	return nil
 }
 
-var settingsBack = chipState{label: "BACK", key: "esc"}
-
 func (s *Settings) Draw(dst *ebiten.Image) {
 	dst.Fill(colBG)
-	br := backButtonRect(settingsBack)
-	drawHeaderAt(dst, br.x+br.w+14, "SETTINGS", "changes are saved as you make them", colDim)
-	drawChip(dst, br, settingsBack, s.anim.step("chip:back", s.ptr.over(br), s.ptr.down, uiFrameSeconds()))
+	x := drawEscButton(dst, escBackChip, &s.anim, s.ptr)
+	drawHeaderAt(dst, x, "SETTINGS", "changes are saved as you make them", colDim)
 
 	for _, it := range s.items() {
 		switch it.kind {

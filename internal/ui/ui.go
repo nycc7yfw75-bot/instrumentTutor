@@ -124,11 +124,14 @@ type App struct {
 	ph playhead
 
 	liveUI
+	mixerUI
 }
 
 func New(eng *engine.Engine, sc *score.Score, track int) *App {
 	eng.SetWaitTrack(track)
-	return &App{eng: eng, sc: sc, track: track, zoom: 1, countInBeats: defaultCountInBeats}
+	a := &App{eng: eng, sc: sc, track: track, zoom: 1, countInBeats: defaultCountInBeats}
+	a.mixerDrag = -1
+	return a
 }
 
 func (a *App) Run() error {
@@ -191,6 +194,10 @@ func (a *App) Update() error {
 	}
 	if a.helpOpen {
 		a.updateHelp()
+		return nil
+	}
+	if a.mixer.open {
+		a.updateMixer()
 		return nil
 	}
 	if a.warningVisible() && inpututil.IsKeyJustPressed(ebiten.KeyD) {
@@ -263,6 +270,8 @@ func (a *App) handleKeys() error {
 		}
 	case inpututil.IsKeyJustPressed(ebiten.KeyT):
 		a.tunerView = !a.tunerView
+	case inpututil.IsKeyJustPressed(ebiten.KeyV):
+		a.toggleMixer()
 	case inpututil.IsKeyJustPressed(ebiten.KeyW):
 		if a.waitCtl {
 			a.toggleWait()
@@ -629,8 +638,7 @@ var practiceBindings = []practiceBinding{
 	{Group: "tempo", Keys: "C", Desc: "Count-in on / off for the next play"},
 
 	{Group: "loop", Keys: "A / B,  L", Hint: "A/B loop", Desc: "Set the loop start / end at the current bar; L clears the loop"},
-	{Group: "loop", Keys: "shift+drag", Desc: "Drag out a new loop on the notation or the timeline, snapped to beats"},
-	{Group: "loop", Keys: "drag an edge", Desc: "Move a loop end: snaps to the beat, shift for tick-exact"},
+	{Group: "loop", Keys: "shift+drag, edges", Desc: "Shift+drag draws a new loop; drag an edge to move it (shift: tick-exact)"},
 
 	{Group: "tracks", Keys: "1..9", Hint: "1-9 mute", Desc: "Mute / unmute a track (or click its chip)"},
 	{Group: "tracks", Keys: "shift+1..9", Desc: "Solo a track; press again to release (or right-click it)"},
@@ -638,6 +646,7 @@ var practiceBindings = []practiceBinding{
 		Enabled: func(a *App) bool { return a.switchTrack != nil && len(a.sc.Tracks) > 1 }},
 
 	{Group: "practice", Keys: "M", Hint: "M click", Desc: "Metronome click on / off"},
+	{Group: "practice", Keys: "V", Hint: "V mixer", Desc: "Volume mixer: master, metronome, backing track and each track"},
 
 	{Group: "practice", Keys: "T", Hint: "T tuner", Desc: "Tuner overlay",
 		Caveat: liveInputCaveat(func(a *App) bool { return a.live })},
@@ -709,6 +718,7 @@ func (a *App) Draw(screen *ebiten.Image) {
 	if a.bpmEntry {
 		a.drawBPMEntry(screen)
 	}
+	a.drawMixer(screen)
 	if a.helpOpen {
 		a.drawHelp(screen)
 	}

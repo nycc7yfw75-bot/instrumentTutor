@@ -32,32 +32,11 @@ func TestAnimatorPressIsFasterThanHover(t *testing.T) {
 	}
 }
 
-func TestAnimatorFlashesOnThePressEdge(t *testing.T) {
-	var a animator
-
-	if av := step60(&a, "b", true, false, 5); av.flash != 0 {
-		t.Errorf("hovering flashed (%.3f)", av.flash)
-	}
-	a.tick()
-	av := a.step("b", true, true, 1.0/60)
-	if av.flash < 0.9 {
-		t.Fatalf("the press did not flash (%.3f)", av.flash)
-	}
-
-	held := step60(&a, "b", true, true, 6)
-	if held.flash >= av.flash {
-		t.Errorf("holding re-fired the flash (%.3f then %.3f)", av.flash, held.flash)
-	}
-	if gone := step60(&a, "b", true, true, 30); gone.flash != 0 {
-		t.Errorf("the flash is still %.3f half a second later", gone.flash)
-	}
-}
-
 func TestAnimatorPressOutsideTheControlDoesNothing(t *testing.T) {
 
 	var a animator
 	av := step60(&a, "b", false, true, 5)
-	if av.press != 0 || av.flash != 0 {
+	if av.press != 0 {
 		t.Errorf("a press elsewhere reached this control: %+v", av)
 	}
 }
@@ -128,14 +107,38 @@ func TestLerpColAndWithAlpha(t *testing.T) {
 	}
 }
 
-func TestAnimatedControlsStayWhereTheyAreHitTested(t *testing.T) {
-	if total := animLift + animSink; total > chipH/4 {
-		t.Errorf("a control moves %v pixels, a quarter of the %v it is tall; the hit region would no longer line up",
-			total, float64(chipH))
-	}
+func TestHoverNeverMovesAControl(t *testing.T) {
 	r := rect{10, 20, 100, chipH}
-	full := animValues{hover: 1, press: 1}.animate(r)
-	if full.x != r.x || full.w != r.w || full.h != r.h {
-		t.Errorf("animating moved the control sideways or resized it: %+v", full)
+	if got := (animValues{hover: 1}).animate(r); got != r {
+		t.Errorf("hovering moved the control from %+v to %+v; hover is a colour change only", r, got)
+	}
+}
+
+func TestPressShrinksSmallControlsAboutTheirCentre(t *testing.T) {
+	r := rect{10, 20, 100, chipH}
+	got := (animValues{press: 1}).animate(r)
+	if got.w >= r.w || got.w < r.w*0.95 {
+		t.Errorf("a full press left the width at %.2f of %.2f; want a shrink no deeper than 0.95", got.w, r.w)
+	}
+	if cx, gx := r.x+r.w/2, got.x+got.w/2; cx != gx {
+		t.Errorf("the press moved the centre from %.2f to %.2f", cx, gx)
+	}
+}
+
+func TestPressLeavesWideSurfacesInPlace(t *testing.T) {
+	r := rect{10, 20, 400, 40}
+	if got := (animValues{press: 1}).animate(r); got != r {
+		t.Errorf("a wide surface scaled on press (%+v); it should only shade", got)
+	}
+	if pressShade(colHover, animValues{press: 1}) == colHover {
+		t.Error("pressShade left a held wide surface unshaded")
+	}
+}
+
+func TestHoverArrivesWithinAboutAHundredAndFiftyMilliseconds(t *testing.T) {
+	var a animator
+	step60(&a, "b", false, false, 1)
+	if av := step60(&a, "b", true, false, 9); av.hover < 0.9 {
+		t.Errorf("after 150ms of hovering, hover is %.3f; want it near arrived", av.hover)
 	}
 }

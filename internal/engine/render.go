@@ -357,9 +357,7 @@ func (e *Engine) countInFPB() int {
 }
 
 func (e *Engine) mix(left, right []float32) {
-	for _, v := range e.voices {
-		v.Render(left, right)
-	}
+	e.mixVoices(left, right)
 	e.mixClicks(left, right)
 	e.absFrame += int64(len(left))
 }

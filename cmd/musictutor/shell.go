@@ -466,6 +466,8 @@ type shellOpener struct {
 	trackFor map[string]int
 	// carry hands tempo, playhead and loop across a track switch's re-open.
 	carry *trackCarry
+	// mixFor remembers each piece's mixer volumes for this run of the app.
+	mixFor map[string]engine.Mix
 }
 
 type trackCarry struct {
@@ -515,8 +517,17 @@ func (o *shellOpener) Open(path string) (ui.Screen, []string, error) {
 		}
 		eng.SeekTick(c.pos)
 	}
+	if m, ok := o.mixFor[path]; ok {
+		eng.SetMix(m)
+	}
 	app := ui.New(eng, sc, display)
 	app.SetCountIn(countIn)
+	app.SetMixChanged(func(m engine.Mix) {
+		if o.mixFor == nil {
+			o.mixFor = map[string]engine.Mix{}
+		}
+		o.mixFor[path] = m
+	})
 
 	app.SetTrackSwitcher(func(track int) {
 		lo, hi, on := eng.Loop()

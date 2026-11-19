@@ -122,6 +122,7 @@ func (b *Browser) drawHint(screen *ebiten.Image, l browserLayout) {
 		if st.act != nil {
 			fill = lerpCol(colBG, colHover, sv.hover)
 			edge = lerpCol(colPanelEdge, colDim, sv.hover)
+			fill = pressShade(fill, sv)
 		}
 		rr := sv.animate(r)
 		drawPanel(screen, rr, fill, edge)
@@ -140,6 +141,5 @@ func (b *Browser) drawHint(screen *ebiten.Image, l browserLayout) {
 		drawText(screen, mark, rr.x+10, rr.y+2, markCol)
 		drawText(screen, truncateW(st.title, rr.w-42), rr.x+30, rr.y+2, titleCol)
 		drawTextSmall(screen, truncateW(st.detail, rr.w-42), rr.x+30, rr.y+21, colDim)
-		drawFlash(screen, rr, sv)
 	}
 }

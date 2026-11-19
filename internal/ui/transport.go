@@ -94,6 +94,9 @@ var practiceChips = []practiceChip{
 			return "start musicTutor without a file to switch tracks here"
 		},
 		act: func(a *App) { a.cycleTrack(1) }},
+	{label: "MIXER", key: "V",
+		on:  func(a *App) bool { return a.mixer.open },
+		act: func(a *App) { a.toggleMixer() }},
 	{label: "SETTINGS", key: "S",
 		disabled: func(a *App) bool { return a.settings == nil },
 		whenOff:  func(a *App) string { return "settings need the full app — start musicTutor without a file" },

@@ -333,6 +333,7 @@ func (e *Editor) drawChrome(screen *ebiten.Image, l edToolbarLayout) {
 	paint := func(prefix string, b edButton, r rect, icon bool) {
 		over := live && e.ptr.over(r)
 		av := e.anim.step(prefix+b.id, over && !b.disabled, e.ptr.down, dt)
+		av.press = 0 // a dense toolbar skips the press scale; hover colour is its feedback
 		if icon {
 			drawIconGlyphButton(screen, r, b.glyph, b.on, b.disabled, av)
 		} else {
@@ -389,9 +390,6 @@ func drawValueButton(dst *ebiten.Image, r rect, b edButton, av animValues) {
 		x += glyphBox + 4
 	}
 	drawText(dst, b.label, x, r.y+(r.h-uiTextH)/2+1, ink)
-	if !b.disabled {
-		drawFlash(dst, r, av)
-	}
 }
 
 func (e *Editor) hotspots() []hotspot {

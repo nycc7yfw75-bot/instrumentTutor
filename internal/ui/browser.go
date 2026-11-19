@@ -864,6 +864,9 @@ func (b *Browser) Update() error {
 	if b.queuedEdits() != queued || b.helpOpen {
 		return nil
 	}
+	if escButtonPressed(escQuitChip, b.ptr) {
+		return errQuit
+	}
 	b.handleMouse(b.ptr)
 	return nil
 }

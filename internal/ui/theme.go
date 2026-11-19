@@ -55,6 +55,24 @@ func drawHeader(dst *ebiten.Image, title, status string, statusCol color.RGBA) {
 	drawHeaderAt(dst, uiPadX, title, status, statusCol)
 }
 
+// The esc button every screen shows at the top left of its header.
+var (
+	escBackChip = chipState{label: "BACK", key: "esc"}
+	escQuitChip = chipState{label: "QUIT", key: "esc"}
+)
+
+// drawEscButton draws a screen's esc button and returns where the title starts.
+func drawEscButton(dst *ebiten.Image, c chipState, an *animator, p pointer) float64 {
+	r := backButtonRect(c)
+	drawChip(dst, r, c, an.step("chip:esc", p.over(r), p.down, uiFrameSeconds()))
+	return r.x + r.w + 14
+}
+
+// escButtonPressed reports a click on a screen's esc button.
+func escButtonPressed(c chipState, p pointer) bool {
+	return p.pressed && p.over(backButtonRect(c))
+}
+
 // backButtonRect places a screen's esc button at the top left of the header.
 func backButtonRect(c chipState) rect {
 	return rect{uiPadX, uiHeaderY - 6, chipW(c), chipH}
@@ -171,7 +189,6 @@ func drawChip(dst *ebiten.Image, r rect, c chipState, av animValues) {
 		drawTextSmall(dst, c.key, r.x+(r.w-textWSmall(c.key))/2, r.y+20,
 			lerpCol(kc, colNote, av.hover))
 	}
-	drawFlash(dst, r, av)
 }
 
 const (
@@ -199,7 +216,6 @@ func drawIconGlyphButton(dst *ebiten.Image, r rect, id glyphID, on, disabled boo
 	r = av.animate(r)
 	drawPanel(dst, r, fill, edge)
 	drawGlyph(dst, id, glyphInset(r), ink)
-	drawFlash(dst, r, av)
 }
 
 func glyphInset(r rect) rect {
@@ -237,12 +253,17 @@ func drawButton(dst *ebiten.Image, r rect, id glyphID, label, key string, style 
 		drawPanel(dst, r, colBG, colBarline)
 		l := truncateW(label, avail)
 		x := textX(r, l, 1)
-		if id != glyphNone {
-			drawGlyph(dst, id, rect{x - glyphBox - 8, r.y + 6, glyphBox, glyphBox}, colDisabled)
+		// Same positions as the enabled button, so nothing shifts when it enables.
+		glyphY, textY := r.y+5, r.y+6
+		if key == "" {
+			glyphY, textY = r.y+(r.h-glyphBox)/2, r.y+(r.h-uiTextH)/2+1
 		}
-		drawText(dst, l, x, r.y+7, colBarline)
+		if id != glyphNone {
+			drawGlyph(dst, id, rect{x - glyphBox - 8, glyphY, glyphBox, glyphBox}, colDisabled)
+		}
+		drawText(dst, l, x, textY, colBarline)
 		if key != "" {
-			drawTextSmall(dst, key, r.x+(r.w-textWSmall(key))/2, r.y+24, colBarline)
+			drawTextSmall(dst, key, r.x+(r.w-textWSmall(key))/2, r.y+23, colBarline)
 		}
 		return
 	}
@@ -269,7 +290,6 @@ func drawButton(dst *ebiten.Image, r rect, id glyphID, label, key string, style 
 		drawText(dst, label, x, r.y+6, text)
 		drawTextSmall(dst, key, r.x+(r.w-textWSmall(key))/2, r.y+23, lerpCol(colDim, colNote, av.hover))
 	}
-	drawFlash(dst, r, av)
 }
 
 type iconKind int
@@ -289,7 +309,6 @@ func drawIconButton(dst *ebiten.Image, r rect, k iconKind, av animValues) {
 	drawPanel(dst, r, fill, edge)
 	cx, cy := r.x+r.w/2, r.y+r.h/2
 	drawIcon(dst, k, cx, cy, colNote)
-	drawFlash(dst, r, av)
 }
 
 func drawIcon(dst *ebiten.Image, k iconKind, cx, cy float64, col color.RGBA) {

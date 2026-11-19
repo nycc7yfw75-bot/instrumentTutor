@@ -221,6 +221,9 @@ func (e *Editor) Update() error {
 		e.updateEntry()
 		return nil
 	}
+	if escButtonPressed(escBackChip, e.ptr) {
+		return e.leave()
+	}
 	if e.text != nil {
 		return e.updateText()
 	}
@@ -230,7 +233,8 @@ func (e *Editor) Update() error {
 func (e *Editor) Draw(screen *ebiten.Image) {
 	screen.Fill(colBG)
 	e.anim.tick()
-	drawHeader(screen, e.headerTitle(), e.statusLine(), colHUD)
+	x := drawEscButton(screen, escBackChip, &e.anim, e.ptr)
+	drawHeaderAt(screen, x, e.headerTitle(), e.statusLine(), colHUD)
 	e.drawChrome(screen, e.layoutToolbar())
 	if e.text != nil {
 		e.drawTextPane(screen)
@@ -284,7 +288,7 @@ func (e *Editor) headerTitle() string {
 	}
 
 	const gap = 32.0
-	budget := screenW - 2*uiPadX - textW(e.statusLine()) - gap
+	budget := screenW - 2*uiPadX - backButtonRect(escBackChip).w - 14 - textW(e.statusLine()) - gap
 	return truncateWScaled(name, budget, uiTitleScl)
 }
 

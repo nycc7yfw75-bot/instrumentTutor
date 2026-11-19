@@ -94,7 +94,12 @@ type Engine struct {
 	backL, backR []float32
 	backOffset   float64
 	backGain     float64
-	backBase     float64
+
+	masterGain float64
+	clickGain  float64
+	trackGain  []float64
+	mixL, mixR []float32
+	backBase   float64
 
 	ciBeatsLeft int
 	ciFPB       int
@@ -150,6 +155,8 @@ func New(sc *score.Score, opts Options) *Engine {
 		metronome:        opts.Metronome,
 		scale:            1.0,
 		backGain:         1.0,
+		masterGain:       1.0,
+		clickGain:        1.0,
 		waitTrack:        -1,
 		waitRelTrack:     -1,
 	}
@@ -158,6 +165,10 @@ func New(sc *score.Score, opts Options) *Engine {
 	e.articRep = make([]synth.ContinuationReporter, len(sc.Tracks))
 	e.muted = make([]bool, len(sc.Tracks))
 	e.userTrack = make([]bool, len(sc.Tracks))
+	e.trackGain = make([]float64, len(sc.Tracks))
+	for i := range e.trackGain {
+		e.trackGain[i] = 1
+	}
 	for i, tr := range sc.Tracks {
 		e.voices[i] = opts.Voices(sr, tr.Program)
 		e.artic[i], _ = e.voices[i].(synth.Articulator)
@@ -411,6 +422,8 @@ func (e *Engine) RenderFrames(left, right []float32) {
 	clear(right)
 	e.mu.Lock()
 	e.render(left, right)
+	scaleBuf(left, e.masterGain)
+	scaleBuf(right, e.masterGain)
 	e.publish()
 	e.mu.Unlock()
 }
