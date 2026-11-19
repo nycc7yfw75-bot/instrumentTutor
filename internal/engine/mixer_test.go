@@ -3,6 +3,8 @@ package engine
 import (
 	"math"
 	"testing"
+
+	"github.com/S95F/musicTutor/internal/score"
 )
 
 // energy plays the fixture for half a second with the given mix and sums |sample|.
@@ -78,5 +80,22 @@ func TestLimiterKeepsTheOutputInsideFullScale(t *testing.T) {
 	}
 	if buf[4] >= 0 {
 		t.Errorf("the limiter flipped a negative peak to %v", buf[4])
+	}
+}
+
+func TestBendSegsFollowTheTempoAndPracticeSpeed(t *testing.T) {
+	e, _ := newFixtureEngine(t, Options{}) // 120 BPM: a quarter is half a second
+	ev := score.NoteEvent{Start: 960, End: 1920, Tech: score.TechBend,
+		Bends: []score.TimedBend{{Len: 960, Bend: score.Bend{Peak: 2, To: 0}}}}
+	if segs := e.bendSegs(&ev); len(segs) != 1 || segs[0].Len != 0.5 || segs[0].Peak != 1 {
+		t.Fatalf("at full speed: %+v, want half a second up a semitone (2 quarter-tones)", segs)
+	}
+	e.SetTempoScale(0.5)
+	if segs := e.bendSegs(&ev); segs[0].Len != 1 {
+		t.Errorf("at half speed the bend lasts %.2fs, want 1s", segs[0].Len)
+	}
+	bare := score.NoteEvent{Start: 0, End: 960, Tech: score.TechBend}
+	if segs := e.bendSegs(&bare); len(segs) != 1 || segs[0].Peak != 2 || segs[0].To != 2 {
+		t.Errorf("a .gtab bend with no amount plays as %+v, want a full bend up, held", segs)
 	}
 }

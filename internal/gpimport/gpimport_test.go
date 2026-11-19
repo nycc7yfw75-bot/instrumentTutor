@@ -1555,3 +1555,63 @@ func TestPaddedNamesImportWithoutWarnings(t *testing.T) {
 		t.Error("a title with \"//\" inside, which a .gtab cannot hold, no longer warns")
 	}
 }
+
+func TestGraceNotesBorrowTimeAndKeepTheBeat(t *testing.T) {
+	grace := func(id, note int, kind string) string {
+		return `<Beat id="` + itoa(id) + `"><GraceNotes>` + kind + `</GraceNotes><Rhythm ref="1" /><Notes>` + itoa(note) + `</Notes></Beat>`
+	}
+	plain := func(id, note int) string {
+		return `<Beat id="` + itoa(id) + `"><Rhythm ref="0" /><Notes>` + itoa(note) + `</Notes></Beat>`
+	}
+	// Bar: grace (no note before it), quarter, grace before the beat,
+	// quarter, half, then a grace with nothing after it.
+	doc := gpifDoc(
+		`<MasterBar><Time>4/4</Time><Bars>0</Bars></MasterBar>`,
+		`<Bar id="0"><Voices>0 -1 -1 -1</Voices></Bar>`,
+		`<Voice id="0"><Beats>0 1 2 3 4 5</Beats></Voice>`,
+		grace(0, 0, "BeforeBeat")+plain(1, 1)+grace(2, 2, "BeforeBeat")+plain(3, 3)+
+			`<Beat id="4"><Rhythm ref="2" /><Notes>4</Notes></Beat>`+grace(5, 5, "BeforeBeat"),
+		noteXML(0, 0, 2, "")+noteXML(1, 0, 3, "")+noteXML(2, 0, 5, "")+noteXML(3, 0, 7, "")+
+			noteXML(4, 0, 8, "")+noteXML(5, 0, 9, ""),
+		`<Rhythm id="0"><NoteValue>Quarter</NoteValue></Rhythm>`+
+			`<Rhythm id="1"><NoteValue>Eighth</NoteValue></Rhythm>`+
+			`<Rhythm id="2"><NoteValue>Half</NoteValue></Rhythm>`,
+	)
+	s, warns, err := importDoc(t, doc)
+	if err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+	if err := s.Validate(); err != nil {
+		t.Fatalf("Validate: %v", err)
+	}
+	type at struct {
+		start int64
+		fret  int
+		grace bool
+	}
+	var got []at
+	for _, b := range s.Tracks[0].Bars[0].Beats {
+		if len(b.Notes) > 0 {
+			got = append(got, at{b.Start, b.Notes[0].Fret, b.Notes[0].Tech&score.TechGrace != 0})
+		}
+	}
+	g := int64(graceTicks)
+	want := []at{
+		{0, 2, true},                 // no note before it in the bar: borrows the start of its main note
+		{g, 3, false},                // so this quarter starts a 32nd late
+		{score.Quarter - g, 5, true}, // before the beat: borrows the end of the quarter before
+		{score.Quarter, 7, false},    // and this quarter still lands on beat 2
+		{2 * score.Quarter, 8, false},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("beats = %+v, want %+v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("beat %d = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+	if !hasWarning(warns, "1 grace note") {
+		t.Errorf("warnings = %v, want the trailing grace with nothing to lead into reported", warns)
+	}
+}

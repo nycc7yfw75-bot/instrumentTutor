@@ -221,6 +221,9 @@ func (e *Engine) soundEvent(ev *score.NoteEvent) {
 		Velocity: ev.Velocity,
 		Vibrato:  ev.Tech&score.TechVibrato != 0,
 	}
+	if ev.Tech&score.TechBend != 0 {
+		spec.Bends = e.bendSegs(ev)
+	}
 
 	prev := -1
 	if attack, ok := continuationAttack(ev.Tech); ok {
@@ -456,4 +459,35 @@ func (e *Engine) publishPos(usq int64) {
 	e.aPosAdv.Store(advancing)
 	e.aPosDisc.Store(e.aDiscont.Load())
 	e.aPosSeq.Add(1)
+}
+
+// bendSegs turns a note's bends into seconds at the current tempo and
+// practice speed, in semitones (a bend's amount is in quarter-tones). A
+// bend with no amount (a .gtab "b") plays as a full bend up, held.
+func (e *Engine) bendSegs(ev *score.NoteEvent) []synth.BendSeg {
+	scale := e.scale
+	if scale <= 0 {
+		scale = 1
+	}
+	at := func(tick int64) float64 { return e.sc.Tempos.TimeAt(ev.Start+tick) - e.sc.Tempos.TimeAt(ev.Start) }
+	bends := ev.Bends
+	if len(bends) == 0 {
+		bends = []score.TimedBend{{Len: ev.End - ev.Start}}
+	}
+	out := make([]synth.BendSeg, 0, len(bends))
+	for _, b := range bends {
+		shape := b.Bend
+		if shape.Peak == 0 {
+			shape = score.Bend{Peak: 4, To: 4}
+		}
+		start := at(b.At) / scale
+		out = append(out, synth.BendSeg{
+			At:   start,
+			Len:  at(b.At+b.Len)/scale - start,
+			From: float64(shape.From) / 2,
+			Peak: float64(shape.Peak) / 2,
+			To:   float64(shape.To) / 2,
+		})
+	}
+	return out
 }

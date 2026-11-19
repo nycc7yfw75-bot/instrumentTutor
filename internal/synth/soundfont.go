@@ -71,6 +71,12 @@ type sfSlot struct {
 	vib      bool
 	vibPhase float64
 	vibInc   float64
+
+	// bends move bend over time while a bent note sounds, on top of
+	// bendBase (a continuation's offset from the sounding key).
+	bends    []BendSeg
+	bendT    int
+	bendBase float64
 }
 
 type soundFontVoice struct {
@@ -161,6 +167,7 @@ func (v *soundFontVoice) NoteOnSpecReport(spec NoteSpec) bool {
 		s.age = v.counter
 		v.counter++
 		v.setSlotVibrato(s, spec.Vibrato)
+		v.setSlotBends(s, spec.Bends, semis)
 		v.pushBend(s)
 		return true
 	}
@@ -176,6 +183,7 @@ func (v *soundFontVoice) NoteOnSpecReport(spec NoteSpec) bool {
 
 	s.bend, s.dst, s.step = 0, 0, 0
 	v.setSlotVibrato(s, spec.Vibrato)
+	v.setSlotBends(s, spec.Bends, 0)
 	v.pushBend(s)
 	s.key, s.logical = int32(spec.Key), int32(spec.Key)
 	s.held = true
@@ -241,11 +249,31 @@ func (v *soundFontVoice) AllNotesOff() {
 	v.ms.NoteOffAll(true)
 	for i := range v.slots {
 		s := &v.slots[i]
+		s.bends = nil
 		s.held = false
 		s.key, s.logical = -1, -1
 		s.bend, s.dst, s.step = 0, 0, 0
 		s.vib = false
 		v.pushBend(s)
+	}
+}
+
+// setSlotBends starts a bent note's bends on top of base semitones.
+func (v *soundFontVoice) setSlotBends(s *sfSlot, segs []BendSeg, base float64) {
+	if len(segs) == 0 {
+		s.bends = nil
+		return
+	}
+	s.bends, s.bendT, s.bendBase = segs, 0, base
+	v.applySlotBend(s) // a pre-bent note starts already bent
+}
+
+func (v *soundFontVoice) applySlotBend(s *sfSlot) {
+	off, done := bendOffset(s.bends, float64(s.bendT)/float64(v.sampleRate))
+	s.bend = s.bendBase + off
+	s.dst, s.step = s.bend, 0
+	if done {
+		s.bends = nil
 	}
 }
 
@@ -279,6 +307,11 @@ func (v *soundFontVoice) pushBend(s *sfSlot) {
 func (v *soundFontVoice) advance(n int) {
 	for i := range v.slots {
 		s := &v.slots[i]
+		if s.bends != nil {
+			s.bendT += n
+			v.applySlotBend(s)
+			v.pushBend(s)
+		}
 		if s.step != 0 {
 			s.bend += s.step * float64(n)
 			if (s.step > 0 && s.bend >= s.dst) || (s.step < 0 && s.bend <= s.dst) {
@@ -297,7 +330,7 @@ func (v *soundFontVoice) advance(n int) {
 
 func (v *soundFontVoice) modulating() bool {
 	for i := range v.slots {
-		if s := &v.slots[i]; s.step != 0 || s.vib {
+		if s := &v.slots[i]; s.step != 0 || s.vib || s.bends != nil {
 			return true
 		}
 	}

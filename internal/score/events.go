@@ -10,6 +10,16 @@ type NoteEvent struct {
 	String     int
 	Fret       int
 	Tech       Technique
+	// Bends are the bends sounded over the note, one per tied segment that
+	// bends: a held note can be bent and released more than once.
+	Bends []TimedBend
+}
+
+// TimedBend is one bend within a note: At and Len are ticks from the
+// note's start.
+type TimedBend struct {
+	At, Len int64
+	Bend    Bend
 }
 
 const DefaultVelocity = 0.8
@@ -29,6 +39,9 @@ func (s *Score) Events() []NoteEvent {
 							evs[ei].End = beat.Start + beat.Dur
 
 							evs[ei].Tech |= n.Tech
+							if n.Tech&TechBend != 0 {
+								evs[ei].Bends = append(evs[ei].Bends, TimedBend{At: beat.Start - evs[ei].Start, Len: beat.Dur, Bend: n.Bend})
+							}
 							continue
 						}
 
@@ -43,6 +56,9 @@ func (s *Score) Events() []NoteEvent {
 						Fret:     n.Fret,
 						Tech:     n.Tech,
 					})
+					if n.Tech&TechBend != 0 {
+						evs[len(evs)-1].Bends = []TimedBend{{Len: beat.Dur, Bend: n.Bend}}
+					}
 					ringing[n.String] = len(evs) - 1
 				}
 

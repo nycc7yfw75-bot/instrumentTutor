@@ -31,6 +31,9 @@ type NoteSpec struct {
 	From int
 
 	Vibrato bool
+
+	// Bends, when set, bend the note over time (a bent guitar string).
+	Bends []BendSeg
 }
 
 type Articulator interface {

@@ -49,3 +49,25 @@ func TestWithoutDrumsKeepsTheStringedTracks(t *testing.T) {
 		t.Errorf("dropped %d, left %d tracks; want the drum kit gone and the guitar kept", n, len(s.Tracks))
 	}
 }
+
+func TestTiedBendsKeepEachSegmentsBend(t *testing.T) {
+	s := &Score{
+		Tempos: TempoMap{{Tick: 0, USPerQuarter: 500000}},
+		Meters: MeterMap{{Tick: 0, Num: 4, Den: 4}},
+	}
+	tr := &Track{Name: "Lead", Tuning: StandardTuning}
+	b := tr.AppendBar(4, 4)
+	full := Bend{Peak: 4, To: 0}
+	b.AddBeat(Quarter, Note{String: 3, Fret: 4})
+	b.AddBeat(Quarter, Note{String: 3, Fret: 4, Tied: true, Tech: TechBend, Bend: full})
+	b.AddBeat(Half, Note{String: 3, Fret: 4, Tied: true, Tech: TechBend, Bend: full})
+	s.Tracks = []*Track{tr}
+	evs := s.Events()
+	if len(evs) != 1 {
+		t.Fatalf("got %d events, want the tied note as one", len(evs))
+	}
+	got := evs[0].Bends
+	if len(got) != 2 || got[0].At != Quarter || got[1].At != 2*Quarter || got[1].Len != Half {
+		t.Errorf("bends = %+v, want one at beat 2 and one at beat 3 (a half note long)", got)
+	}
+}

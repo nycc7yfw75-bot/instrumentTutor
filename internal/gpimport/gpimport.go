@@ -847,6 +847,9 @@ func parseTuning(pitches string) (score.Tuning, error) {
 type beatData struct {
 	dur   int64
 	notes []score.Note
+	// grace marks a grace-note beat; before is a Guitar Pro "BeforeBeat"
+	// grace, sounded ahead of the beat rather than on it.
+	grace, before bool
 }
 
 func (im *importer) fillBar(orig, mi int, bar *score.Bar, tc *trackConv) {
@@ -945,8 +948,12 @@ func (im *importer) barBeats(orig, mi int, tc *trackConv) []beatData {
 			im.warnf("voice %d: beat %d does not exist; skipped", first, bid)
 			continue
 		}
-		if strings.TrimSpace(gbt.GraceNotes) != "" {
-			im.graceSkipped++
+		if kind := strings.TrimSpace(gbt.GraceNotes); kind != "" {
+			notes := im.beatNotes(orig, mi, gbt, tc)
+			for i := range notes {
+				notes[i].Tech |= score.TechGrace
+			}
+			out = append(out, beatData{notes: notes, grace: true, before: strings.EqualFold(kind, "BeforeBeat")})
 			continue
 		}
 		out = append(out, beatData{
@@ -954,7 +961,7 @@ func (im *importer) barBeats(orig, mi int, tc *trackConv) []beatData {
 			notes: im.beatNotes(orig, mi, gbt, tc),
 		})
 	}
-	return out
+	return im.placeGraces(out)
 }
 
 func (im *importer) rhythmDur(gbt *gpBeat) int64 {
@@ -1140,7 +1147,7 @@ func (im *importer) windBeatNotes(orig, mi int, gbt *gpBeat, tc *trackConv) []sc
 
 func (im *importer) flushDeferredWarnings() {
 	if im.graceSkipped > 0 {
-		im.warnf("skipped %d grace-note beat(s): grace notes are not supported yet", im.graceSkipped)
+		im.warnf("left out %d grace note(s) with no note after them in the bar to lead into", im.graceSkipped)
 	}
 	var names []string
 	for n := range im.unknownProps {

@@ -605,10 +605,11 @@ func (s *Scorer) WaitConfirmed(evs []score.NoteEvent, notes []pitch.Note) {
 }
 
 // neverMissed reports notes the detector cannot judge fairly yet: a bend
-// sounds above its written fret, a dead note has no pitch. They can score a
+// sounds above its written fret, a dead note has no pitch, a grace note is
+// over too quickly. They can score a
 // hit or close, never a miss (a game rule: misses must be trustworthy).
 func neverMissed(ev score.NoteEvent) bool {
-	return ev.Tech&(score.TechBend|score.TechDead) != 0
+	return ev.Tech&(score.TechBend|score.TechDead|score.TechGrace) != 0
 }
 
 func (s *Scorer) finalize(r NoteResult) {

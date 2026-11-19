@@ -133,6 +133,9 @@ const (
 	// TechPalmMute is a note damped with the picking hand. It sounds and
 	// scores as written; it is shown on the tab, not saved to .gtab.
 	TechPalmMute
+	// TechGrace is a grace note: a quick ornament borrowing time from a
+	// neighbouring note. Drawn small; too quick to judge, so never a miss.
+	TechGrace
 
 	TechSlur = TechHammer
 )

@@ -789,3 +789,13 @@ func TestBendsAndDeadNotesNeverMiss(t *testing.T) {
 		t.Fatalf("stats %+v, results %+v: want only the plain note missed", st, rs)
 	}
 }
+
+func TestGraceNotesNeverMiss(t *testing.T) {
+	s := NewScorer(testConfig())
+	g := wev(57, 960)
+	g.Tech = score.TechGrace
+	s.ExpectNote(g, 1000)
+	if rs := drain(s); len(rs) != 0 || s.Stats().Miss != 0 {
+		t.Fatalf("an unplayed grace note scored %+v", rs)
+	}
+}

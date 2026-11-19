@@ -59,6 +59,13 @@ type ksVoice struct {
 	dst   float64
 	dStep float64
 
+	// bends drive d over time while a bent note sounds; bendBase is the
+	// unbent delay.
+	bends    []BendSeg
+	bendTick int
+	bendInv  float64
+	bendBase float64
+
 	vib      bool
 	vibPhase float64
 	vibInc   float64
@@ -83,6 +90,12 @@ func (v *ksVoice) tick() float32 {
 		v.d += v.dStep
 		if (v.dStep > 0 && v.d >= v.dst) || (v.dStep < 0 && v.d <= v.dst) {
 			v.d, v.dStep = v.dst, 0
+		}
+	}
+	if v.bends != nil {
+		v.bendTick++
+		if v.bendTick&15 == 0 {
+			v.applyBend()
 		}
 	}
 	if v.vib {
@@ -297,6 +310,7 @@ func (p *pluck) NoteOnSpec(spec NoteSpec) {
 		v.level = lvl
 	}
 	v.setVibrato(spec.Vibrato, p.sampleRate)
+	v.setBends(spec.Bends, target, p.sampleRate)
 
 }
 
@@ -322,6 +336,7 @@ func (p *pluck) pluckNote(key int, velocity, target float64, spec NoteSpec) {
 	v.killing = false
 	v.active = true
 	v.setVibrato(spec.Vibrato, p.sampleRate)
+	v.setBends(spec.Bends, target, p.sampleRate)
 }
 
 func (p *pluck) excite(v *ksVoice, amp float32, velocity float64, replace bool) {
@@ -407,6 +422,25 @@ func rescale(burst []float32, want float64) {
 	g := float32(want / have)
 	for k := range burst {
 		burst[k] *= g
+	}
+}
+
+// setBends starts a bent note's bends from base, its unbent delay.
+func (v *ksVoice) setBends(segs []BendSeg, base float64, sampleRate int) {
+	if len(segs) == 0 {
+		v.bends = nil
+		return
+	}
+	v.bends, v.bendTick, v.bendInv, v.bendBase = segs, 0, 1/float64(sampleRate), base
+	v.applyBend() // a pre-bent note starts already bent
+}
+
+func (v *ksVoice) applyBend() {
+	semis, done := bendOffset(v.bends, float64(v.bendTick)*v.bendInv)
+	v.d = v.bendBase * math.Pow(2, -semis/12)
+	v.dst, v.dStep = v.d, 0
+	if done {
+		v.bends = nil
 	}
 }
 
