@@ -539,6 +539,7 @@ func (o *shellOpener) Open(path string) (ui.Screen, []string, error) {
 	}
 	app := ui.New(eng, sc, display)
 	app.SetCountIn(countIn)
+	app.SetImportWarnings(warns)
 	app.SetMixChanged(func(m engine.Mix) {
 		if o.mixFor == nil {
 			o.mixFor = map[string]engine.Mix{}

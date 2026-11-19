@@ -121,6 +121,7 @@ type App struct {
 
 	liveUI
 	mixerUI
+	warnListUI
 }
 
 func New(eng *engine.Engine, sc *score.Score, track int) *App {
@@ -180,7 +181,7 @@ func (a *App) Update() error {
 	a.stepPlayhead()
 	a.ptr = readPointer()
 
-	if a.bpmEntry || a.helpOpen || a.mixer.open {
+	if a.bpmEntry || a.helpOpen || a.mixer.open || a.warnList.open {
 
 		a.drag = dragNone
 	}
@@ -194,6 +195,10 @@ func (a *App) Update() error {
 	}
 	if a.mixer.open {
 		a.updateMixer()
+		return nil
+	}
+	if a.warnList.open {
+		a.updateWarnList()
 		return nil
 	}
 	if a.warningVisible() && inpututil.IsKeyJustPressed(ebiten.KeyD) {
@@ -267,6 +272,8 @@ func (a *App) handleKeys() error {
 		a.tunerView = !a.tunerView
 	case inpututil.IsKeyJustPressed(ebiten.KeyV):
 		a.toggleMixer()
+	case inpututil.IsKeyJustPressed(ebiten.KeyI):
+		a.toggleWarnList()
 	case inpututil.IsKeyJustPressed(ebiten.KeyW):
 		if a.waitCtl {
 			a.toggleWait()
@@ -341,6 +348,10 @@ func (a *App) reloadPrompt() string {
 func (a *App) SetTunerView(on bool) { a.tunerView = on }
 
 func (a *App) SetHelpOpen(on bool) { a.helpOpen = on }
+
+// SetMixerOpen and SetWarnListOpen open an overlay as V and I do.
+func (a *App) SetMixerOpen(on bool)    { a.mixer.set(on) }
+func (a *App) SetWarnListOpen(on bool) { a.warnList.set(on) }
 
 func (a *App) openHelp() { a.helpOpen = true }
 
@@ -662,7 +673,7 @@ var practiceBindings = []practiceBinding{
 	{Group: "session", Keys: "F5", Desc: "Re-open this piece, picking up changed settings",
 		Enabled: func(a *App) bool { return a.reload != nil }},
 	{Group: "session", Keys: "? or F1", Hint: "? help", Desc: "This key-binding list"},
-	{Group: "session", Keys: "D", Desc: "Dismiss the warning banner"},
+	{Group: "session", Keys: "D / I", Desc: "Dismiss the warning banner; I lists every import warning"},
 	{Group: "session", Keys: "esc", Hint: "esc back", Desc: "Leave this piece and go back",
 		Reword: func(a *App) (string, string) {
 			if a.quitAll == nil {
@@ -714,6 +725,7 @@ func (a *App) Draw(screen *ebiten.Image) {
 		a.drawBPMEntry(screen)
 	}
 	a.drawMixer(screen)
+	a.drawWarnList(screen)
 	if a.helpOpen {
 		a.drawHelp(screen)
 	}

@@ -31,7 +31,7 @@ const (
 )
 
 func main() {
-	which := flag.String("screen", "practice", "glyphs, start, start-bare, settings, editor, editor-new, editor-pick, editor-text, editor-help, practice, practice-live, help or tuner")
+	which := flag.String("screen", "practice", "glyphs, start, start-bare, settings, editor, editor-new, editor-pick, editor-text, editor-help, practice, practice-live, mixer, warnings, help or tuner")
 	out := flag.String("o", "shot.png", "output PNG")
 	piece := flag.String("piece", "testdata/fixture_riff.gtab", "piece for the practice screens")
 	hover := flag.String("hover", "", "pin the cursor at x,y so hover states and tooltips are drawn")
@@ -161,6 +161,18 @@ func build(which, piece string) (ui.Screen, error) {
 		app.OfferTuner(pitch.Note{Key: 45, Cents: -17}, true)
 		app.SetTunerView(true)
 		return app, nil
+	case "mixer":
+		app.SetMixerOpen(true)
+		return app, nil
+	case "warnings":
+		var w []string
+		for i := 1; i <= 30; i++ {
+			w = append(w, fmt.Sprintf("bar %d: a grace note before the beat was dropped; the tab shows the main note only", i*7))
+		}
+		app.SetImportWarnings(w)
+		app.SetLiveWarning(fmt.Sprintf("imported with %d warnings: %s (and %d more)", len(w), w[0], len(w)-1))
+		app.SetWarnListOpen(true)
+		return app, nil
 	case "practice-live":
 		app.SetLiveStatus(func() (float64, int64) { return -14, 0 })
 		app.SetWaitControl(true)
@@ -275,12 +287,12 @@ func (fakeAudio) BackendName() string { return "WASAPI (shared)" }
 func (fakeAudio) SampleRate() int     { return 48000 }
 func (fakeAudio) Devices() ([]ui.DeviceOption, []ui.DeviceOption, error) {
 	return []ui.DeviceOption{
-			{ID: "cap-focus", Name: "Focusrite USB (Focusrite USB Audio)"},
-			{ID: "cap-rt", Name: "Microphone (Realtek(R) Audio)", Default: true},
-		}, []ui.DeviceOption{
-			{ID: "play-focus", Name: "Speakers (Focusrite USB Audio)"},
-			{ID: "play-rt", Name: "Speakers (Realtek(R) Audio)", Default: true},
-		}, nil
+		{ID: "cap-focus", Name: "Focusrite USB (Focusrite USB Audio)"},
+		{ID: "cap-rt", Name: "Microphone (Realtek(R) Audio)", Default: true},
+	}, []ui.DeviceOption{
+		{ID: "play-focus", Name: "Speakers (Focusrite USB Audio)"},
+		{ID: "play-rt", Name: "Speakers (Realtek(R) Audio)", Default: true},
+	}, nil
 }
 func (fakeAudio) CalibratedOffset(string, string) (int, bool) { return 0, false }
 func (fakeAudio) Calibrate(string, string, func(float64)) (int, float64, error) {

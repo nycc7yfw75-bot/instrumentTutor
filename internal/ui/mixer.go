@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"image/color"
 	"math"
 	"strings"
 
@@ -46,11 +45,10 @@ type mixerRow struct {
 }
 
 type mixerUI struct {
-	mixer       presence
-	mixerSel    int
-	mixerDrag   int // row being dragged, or -1
-	mixerCanvas *ebiten.Image
-	onMix       func(engine.Mix)
+	mixer     overlay
+	mixerSel  int
+	mixerDrag int // row being dragged, or -1
+	onMix     func(engine.Mix)
 }
 
 // SetMixChanged registers a callback for every volume change, so the opener
@@ -227,20 +225,12 @@ func (a *App) mixerMouse(p pointer, rows []mixerRow) {
 }
 
 func (a *App) drawMixer(screen *ebiten.Image) {
-	a.mixer.step(uiFrameSeconds())
-	if !a.mixer.visible() {
-		return
-	}
-	v := a.mixer.value
-	vector.DrawFilledRect(screen, 0, 0, screenW, screenH, withAlpha(color.RGBA{0, 0, 0, 255}, overlayScrimAlpha*v), false)
-
-	if a.mixerCanvas == nil {
-		a.mixerCanvas = ebiten.NewImage(screenW, screenH)
-	}
-	c := a.mixerCanvas
-	c.Clear()
 	rows := a.mixerRows()
 	card := a.mixerCard(len(rows))
+	a.mixer.draw(screen, card, func(c *ebiten.Image) { a.paintMixer(c, rows, card) })
+}
+
+func (a *App) paintMixer(c *ebiten.Image, rows []mixerRow, card rect) {
 	drawPanel(c, card, colPanel, colPanelEdge)
 	drawText(c, "MIXER", card.x+mixPadX, card.y+16, colInferred)
 	drawTextRight(c, a.mixerHeadNote(rows), card.x+card.w-mixPadX, card.y+16, colDim)
@@ -275,15 +265,4 @@ func (a *App) drawMixer(screen *ebiten.Image) {
 	}
 	foot := "up/down choose   left/right 5%   drag a slider   space play/pause"
 	drawText(c, foot, centreX(foot, card.x, card.w), card.y+card.h-mixFootH+12, colDim)
-
-	// The card grows from 0.97 and fades in, about its own centre.
-	s := overlayFromScale + (1-overlayFromScale)*v
-	cx, cy := card.x+card.w/2, card.y+card.h/2
-	op := &ebiten.DrawImageOptions{}
-	op.GeoM.Translate(-cx, -cy)
-	op.GeoM.Scale(s, s)
-	op.GeoM.Translate(cx, cy)
-	op.ColorScale.ScaleAlpha(float32(v))
-	op.Filter = ebiten.FilterLinear
-	screen.DrawImage(c, op)
 }

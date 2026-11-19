@@ -449,7 +449,13 @@ func (a *App) hitChrome(p pointer, l practiceLayout) bool {
 		spots = append(spots, hotspot{r: l.chips[i], on: func() { c.act(a) }})
 	}
 	if a.warningVisible() {
-		spots = append(spots, hotspot{r: warnRect(), on: a.dismissWarning})
+		spots = append(spots, hotspot{r: warnRect(), on: func() {
+			if len(a.importWarns) > 0 {
+				a.toggleWarnList()
+			} else {
+				a.dismissWarning()
+			}
+		}})
 	}
 	for i := range l.tracks {
 		i := i

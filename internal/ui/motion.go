@@ -1,5 +1,12 @@
 package ui
 
+import (
+	"image/color"
+
+	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/vector"
+)
+
 // Motion tokens for overlays that enter and leave (a modal-sized panel:
 // 200–300ms in on an ease-out, 20–30% shorter out on an ease-in).
 const (
@@ -96,3 +103,36 @@ func (p *presence) step(dt float64) {
 }
 
 func (p *presence) visible() bool { return p.open || p.value > 0 }
+
+// overlay is a pop-up card over a dimmed screen: it fades and grows in from
+// overlayFromScale about the card's centre, and shrinks back out.
+type overlay struct {
+	presence
+	canvas *ebiten.Image
+}
+
+// draw advances the animation and, while visible, dims the screen and draws
+// the card that paint draws onto a full-screen canvas.
+func (o *overlay) draw(screen *ebiten.Image, card rect, paint func(c *ebiten.Image)) {
+	o.step(uiFrameSeconds())
+	if !o.visible() {
+		return
+	}
+	v := o.value
+	vector.DrawFilledRect(screen, 0, 0, screenW, screenH, withAlpha(color.RGBA{0, 0, 0, 255}, overlayScrimAlpha*v), false)
+	if o.canvas == nil {
+		o.canvas = ebiten.NewImage(screenW, screenH)
+	}
+	o.canvas.Clear()
+	paint(o.canvas)
+
+	s := overlayFromScale + (1-overlayFromScale)*v
+	cx, cy := card.x+card.w/2, card.y+card.h/2
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Translate(-cx, -cy)
+	op.GeoM.Scale(s, s)
+	op.GeoM.Translate(cx, cy)
+	op.ColorScale.ScaleAlpha(float32(v))
+	op.Filter = ebiten.FilterLinear
+	screen.DrawImage(o.canvas, op)
+}

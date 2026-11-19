@@ -343,7 +343,8 @@ func (a *App) drawWarning(screen *ebiten.Image) {
 		}
 		y += l.lineH
 	}
-	drawText(screen, warnHint, centreX(warnHint, l.inner.x, l.inner.w), l.hintY, colHUD)
+	hint := a.warnBannerHint()
+	drawText(screen, hint, centreX(hint, l.inner.x, l.inner.w), l.hintY, colHUD)
 }
 
 var legendItems = []struct {
