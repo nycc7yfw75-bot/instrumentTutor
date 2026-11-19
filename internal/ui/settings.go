@@ -1349,7 +1349,7 @@ func (s *Settings) Update() error {
 func (s *Settings) Draw(dst *ebiten.Image) {
 	dst.Fill(colBG)
 	x := drawEscButton(dst, escBackChip, &s.anim, s.ptr)
-	drawHeaderAt(dst, x, "SETTINGS", "changes are saved as you make them", colDim)
+	drawHeaderAt(dst, x, "Settings", "Changes are saved as you make them", colDim)
 
 	for _, it := range s.items() {
 		switch it.kind {

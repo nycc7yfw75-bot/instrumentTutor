@@ -103,7 +103,7 @@ func TestDragKeepsThePointerItGrabbed(t *testing.T) {
 	tl := a.layout().timeline
 	a.handleMouse(pressAt(tl), false)
 
-	click := chipRect(t, a, "CLICK")
+	click := chipRect(t, a, "Click")
 	before := a.metronome
 	a.handleMouse(heldAt(click.x+click.w/2, click.y+click.h/2), false)
 	if a.metronome != before {
@@ -209,10 +209,10 @@ func TestChipsToggleTheirState(t *testing.T) {
 		label string
 		read  func() bool
 	}{
-		{"CLICK", func() bool { return a.metronome }},
-		{"RAMP", func() bool { return a.ramp }},
-		{"TUNER", func() bool { return a.tunerView }},
-		{"WAIT", func() bool { return a.wait }},
+		{"Click", func() bool { return a.metronome }},
+		{"Ramp", func() bool { return a.ramp }},
+		{"Tuner", func() bool { return a.tunerView }},
+		{"Wait", func() bool { return a.wait }},
 	}
 	for _, c := range cases {
 		before := c.read()
@@ -225,11 +225,11 @@ func TestChipsToggleTheirState(t *testing.T) {
 
 func TestLoopChipMakesAndClearsALoop(t *testing.T) {
 	a := newApp(t, 4)
-	a.handleMouse(pressAt(chipRect(t, a, "LOOP")), false)
+	a.handleMouse(pressAt(chipRect(t, a, "Loop")), false)
 	if _, _, on := a.eng.Loop(); !on {
 		t.Fatal("the LOOP chip should set a loop over the current bar")
 	}
-	a.handleMouse(pressAt(chipRect(t, a, "LOOP")), false)
+	a.handleMouse(pressAt(chipRect(t, a, "Loop")), false)
 	if _, _, on := a.eng.Loop(); on {
 		t.Error("clicking LOOP again should clear the loop")
 	}
@@ -304,11 +304,11 @@ func TestWheelOverTheTabZooms(t *testing.T) {
 
 func TestPositionCaptionReportsBarAndTime(t *testing.T) {
 	a := newApp(t, 8)
-	if got, want := a.positionCaption(), "bar 1 of 8"; len(got) < len(want) || got[:len(want)] != want {
+	if got, want := a.positionCaption(), "Bar 1 of 8"; len(got) < len(want) || got[:len(want)] != want {
 		t.Errorf("caption %q should start with %q", got, want)
 	}
 	a.eng.SeekTick(3840 * 3)
-	if got, want := a.positionCaption(), "bar 4 of 8"; got[:len(want)] != want {
+	if got, want := a.positionCaption(), "Bar 4 of 8"; got[:len(want)] != want {
 		t.Errorf("after seeking to bar 4 the caption is %q", got)
 	}
 
@@ -380,11 +380,11 @@ func TestSettingsChipEnablesWithAnOpener(t *testing.T) {
 	a := newApp(t, 4)
 	find := func() chipState {
 		for i, c := range practiceChips {
-			if c.label == "SETTINGS" {
+			if c.label == "Settings" {
 				return a.chipStates()[i]
 			}
 		}
-		t.Fatal("no SETTINGS chip")
+		t.Fatal("no Settings item")
 		return chipState{}
 	}
 	if !find().disabled {
@@ -395,7 +395,7 @@ func TestSettingsChipEnablesWithAnOpener(t *testing.T) {
 	if find().disabled {
 		t.Error("with an opener wired the chip should be usable")
 	}
-	a.handleMouse(pressAt(chipRect(t, a, "SETTINGS")), false)
+	a.handleMouse(pressAt(chipRect(t, a, "Settings")), false)
 	if opened != 1 {
 		t.Errorf("the SETTINGS chip opened settings %d times, want 1", opened)
 	}
@@ -694,11 +694,11 @@ func TestShiftPressOnALoopEdgeStillResizes(t *testing.T) {
 
 func TestTimelineHintTeachesTheMissingGesture(t *testing.T) {
 	a := newApp(t, 4)
-	if got := a.timelineHint(); !contains(got, "shift-drag") {
+	if got := a.timelineHint(); !contains(got, "Shift-drag") {
 		t.Errorf("with no loop the hint is %q, want it to teach shift-drag", got)
 	}
 	a.eng.SetLoop(0, 3840)
-	if got := a.timelineHint(); !contains(got, "drag the loop edges") {
+	if got := a.timelineHint(); !contains(got, "Drag the loop edges") {
 		t.Errorf("with a loop the hint is %q, want it to teach the edge drag", got)
 	}
 }
@@ -733,7 +733,7 @@ func TestDisabledChipClickExplains(t *testing.T) {
 		t.Fatal("the fixture should start with WAIT and SETTINGS disabled")
 	}
 
-	a.handleMouse(pressAt(chipRect(t, a, "WAIT")), false)
+	a.handleMouse(pressAt(chipRect(t, a, "Wait")), false)
 	if a.wait {
 		t.Error("the disabled WAIT chip engaged wait mode")
 	}
@@ -741,7 +741,7 @@ func TestDisabledChipClickExplains(t *testing.T) {
 		t.Errorf("clicking greyed WAIT said %q, want it to name the missing live input", got)
 	}
 
-	a.handleMouse(pressAt(chipRect(t, a, "SETTINGS")), false)
+	a.handleMouse(pressAt(chipRect(t, a, "Settings")), false)
 	if got := a.bpmMessage(); !contains(got, "full app") {
 		t.Errorf("clicking greyed SETTINGS said %q, want it to explain the standalone window", got)
 	}
@@ -782,13 +782,13 @@ func TestBackButtonLeavesLikeEsc(t *testing.T) {
 
 func TestTempoButtonsStepByFivePercent(t *testing.T) {
 	a := newApp(t, 4)
-	a.handleMouse(pressAt(chipRect(t, a, "SLOWER")), false)
+	a.handleMouse(pressAt(a.layout().tempo[0]), false)
 	if got := a.eng.TempoScale(); got < 0.949 || got > 0.951 {
-		t.Fatalf("SLOWER left the tempo at %.3f, want 0.95", got)
+		t.Fatalf("‹ left the tempo at %.3f, want 0.95", got)
 	}
-	a.handleMouse(pressAt(chipRect(t, a, "FASTER")), false)
+	a.handleMouse(pressAt(a.layout().tempo[2]), false)
 	if got := a.eng.TempoScale(); got < 0.999 || got > 1.001 {
-		t.Fatalf("FASTER left the tempo at %.3f, want 1.00", got)
+		t.Fatalf("› left the tempo at %.3f, want 1.00", got)
 	}
 }
 

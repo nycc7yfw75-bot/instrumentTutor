@@ -256,9 +256,9 @@ func (a *App) drawLiveHUD(screen *ebiten.Image) {
 
 func liveStatsLine(st practice.Stats) string {
 	if st.Hit+st.Close+st.Miss == 0 {
-		return "hit 0  close 0  miss 0"
+		return "Hit 0   Close 0   Miss 0"
 	}
-	return fmt.Sprintf("hit %d  close %d  miss %d  |  %.0f%%", st.Hit, st.Close, st.Miss, st.Accuracy()*100)
+	return fmt.Sprintf("Hit %d   Close %d   Miss %d   ·   %.0f%%", st.Hit, st.Close, st.Miss, st.Accuracy()*100)
 }
 
 const (
@@ -363,7 +363,7 @@ func (a *App) drawWarning(screen *ebiten.Image) {
 var legendItems = []struct {
 	s   string
 	col color.RGBA
-}{{"legend:", colHUD}, {"hit", colHit}, {"close", colClose}, {"miss", colMiss}}
+}{{"Hit", colHit}, {"Close", colClose}, {"Miss", colMiss}}
 
 const legendGap = 14.0
 

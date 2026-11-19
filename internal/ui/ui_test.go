@@ -709,11 +709,11 @@ func TestHintLineFromTable(t *testing.T) {
 
 func TestStatusLineCountsPassesOnlyInsideALoop(t *testing.T) {
 	a := newApp(t, 2)
-	if got := a.statusLine(); strings.Contains(got, "pass") {
+	if got := a.statusLine(); strings.Contains(got, "Pass") {
 		t.Errorf("status %q counts passes with no loop armed", got)
 	}
 	a.eng.SetLoop(0, 3840)
-	if got := a.statusLine(); !strings.Contains(got, "pass 0") {
+	if got := a.statusLine(); !strings.Contains(got, "Pass 0") {
 		t.Errorf("status %q should count passes once a loop is armed", got)
 	}
 }

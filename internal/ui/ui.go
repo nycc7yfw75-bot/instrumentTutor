@@ -5,6 +5,7 @@ import (
 	"image/color"
 	"math"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -121,6 +122,8 @@ type App struct {
 
 	liveUI
 	marks map[noteKey]tabMark // technique marks, built on first draw
+
+	tip tips // hover tooltips carrying each menu item's key
 
 	mixerUI
 	warnListUI
@@ -842,6 +845,14 @@ func (a *App) drawTab(screen *ebiten.Image) {
 				}
 				col, sounding := a.noteCue(beat.Start, beat.Dur, n.String, n.Inferred, pos, posTick, waiting)
 
+				if !wind && n.Tech&score.TechGrace != 0 {
+					// Grace notes read small, as on printed tab.
+					w := float32(textWSmall(label))
+					vector.DrawFilledRect(screen, nx-1, ny-7, w+2, 14, colNoteBG, false)
+					drawTextSmall(screen, label, float64(nx), float64(ny)-8, col)
+					drawTechMark(screen, a.tabMarks()[noteKey{beat.Start, n.String}], nx, ny, w, tickToX)
+					continue
+				}
 				w := float32(textWMono(label))
 				vector.DrawFilledRect(screen, nx-2, ny-9, w+4, 18, colNoteBG, false)
 				drawTextMono(screen, label, float64(nx), float64(ny)-9, col)
@@ -902,6 +913,11 @@ func (a *App) drawHUD(screen *ebiten.Image, l practiceLayout) {
 		drawText(screen, msg, centreX(msg, 0, screenW), a.msgY()+20, colClose)
 	}
 	drawFooter(screen, a.hintLine())
+	if a.helpOpen || a.mixer.visible() || a.warnList.visible() || a.bpmEntry {
+		a.tip.hide()
+	} else {
+		a.tip.draw(screen)
+	}
 }
 
 func (a *App) pieceTitle() string {
@@ -915,22 +931,22 @@ func (a *App) pieceTitle() string {
 }
 
 func (a *App) statusLine() string {
-	state := "paused"
+	// The tempo lives in the menu's tempo control; the header says what is
+	// happening.
+	parts := []string{"Paused"}
 	if a.eng.Playing() {
-		state = "playing"
+		parts[0] = "Playing"
 	}
 	if in, _ := a.eng.CountingIn(); in {
-		state = "count-in"
+		parts[0] = "Count-in"
 	}
-	s := fmt.Sprintf("%s     %.0f BPM  (x%.2f)", state, a.eng.EffectiveBPM(), a.eng.TempoScale())
-
 	if _, _, on := a.eng.Loop(); on {
-		s += fmt.Sprintf("     pass %d", a.eng.PassCount())
+		parts = append(parts, fmt.Sprintf("Pass %d", a.eng.PassCount()))
 	}
 	if a.live {
-		s += "     live"
+		parts = append(parts, "Live")
 	}
-	return s
+	return strings.Join(parts, "  ·  ")
 }
 
 func (a *App) statusColour() color.RGBA {

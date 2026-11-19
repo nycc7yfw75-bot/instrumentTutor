@@ -125,7 +125,7 @@ func TestLiveStatsLineEarnsItsPercentage(t *testing.T) {
 	if got := liveStatsLine(practice.Stats{}); strings.Contains(got, "%") {
 		t.Errorf("with nothing judged the stats line %q still grades the player", got)
 	}
-	if got := liveStatsLine(practice.Stats{}); !strings.Contains(got, "hit 0") {
+	if got := liveStatsLine(practice.Stats{}); !strings.Contains(got, "Hit 0") {
 		t.Errorf("the zero counts must still show, got %q", got)
 	}
 	if got := liveStatsLine(practice.Stats{Hit: 1, Miss: 1}); !strings.Contains(got, "50%") {

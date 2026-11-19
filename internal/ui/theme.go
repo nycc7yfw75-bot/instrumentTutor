@@ -57,15 +57,16 @@ func drawHeader(dst *ebiten.Image, title, status string, statusCol color.RGBA) {
 
 // The esc button every screen shows at the top left of its header.
 var (
-	escBackChip = chipState{label: "BACK", key: "esc"}
-	escQuitChip = chipState{label: "QUIT", key: "esc"}
+	escBackChip = chipState{label: "‹  Back", key: "esc"}
+	escQuitChip = chipState{label: "Quit", key: "esc"}
 )
 
 // drawEscButton draws a screen's esc button and returns where the title starts.
 func drawEscButton(dst *ebiten.Image, c chipState, an *animator, p pointer) float64 {
 	r := backButtonRect(c)
-	drawChip(dst, r, c, an.step("chip:esc", p.over(r), p.down, uiFrameSeconds()))
-	return r.x + r.w + 14
+	drawMenuItem(dst, r, c.label, false, false, an.step("chip:esc", p.over(r), p.down, uiFrameSeconds()))
+	vector.StrokeLine(dst, float32(r.x+r.w+12), float32(r.y+8), float32(r.x+r.w+12), float32(r.y+r.h-8), 1, colPanelEdge, false)
+	return r.x + r.w + 26
 }
 
 // escButtonPressed reports a click on a screen's esc button.
@@ -75,7 +76,8 @@ func escButtonPressed(c chipState, p pointer) bool {
 
 // backButtonRect places a screen's esc button at the top left of the header.
 func backButtonRect(c chipState) rect {
-	return rect{uiPadX, uiHeaderY - 6, chipW(c), chipH}
+	// A text link like the menu items: its ink starts at the left margin.
+	return rect{uiPadX - menuPadX, uiHeaderY - 2, menuItemW(c.label), chipH}
 }
 
 // drawHeaderAt is drawHeader with the title starting at x, leaving room

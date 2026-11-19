@@ -47,7 +47,11 @@ const (
 type practiceChip struct {
 	label string
 
+	// key is the shortcut, shown in the item's tooltip.
 	key string
+
+	// right puts the item in the right-aligned group.
+	right bool
 
 	on func(a *App) bool
 
@@ -59,49 +63,34 @@ type practiceChip struct {
 }
 
 var practiceChips = []practiceChip{
-	{label: "LOOP", key: "A B L",
+	{label: "Loop", key: "A / B, L clears",
 		on:  func(a *App) bool { _, _, on := a.eng.Loop(); return on },
 		act: func(a *App) { a.toggleLoop() }},
-	{label: "CLICK", key: "M",
+	{label: "Click", key: "M",
 		on:  func(a *App) bool { return a.metronome },
 		act: func(a *App) { a.toggleMetronome() }},
-	{label: "RAMP", key: "R",
+	{label: "Ramp", key: "R",
 		on:  func(a *App) bool { return a.ramp },
 		act: func(a *App) { a.toggleRamp() }},
-	{label: "COUNT-IN", key: "C",
+	{label: "Count-in", key: "C",
 		on:  func(a *App) bool { return a.CountInBeats() > 0 },
 		act: func(a *App) { a.toggleCountIn() }},
-	{label: "WAIT", key: "W",
+	{label: "Wait", key: "W",
 		on:       func(a *App) bool { return a.wait },
 		disabled: func(a *App) bool { return !a.waitCtl },
 		whenOff:  func(a *App) string { return "wait mode needs live input — " + a.liveRemedy() },
 		act:      func(a *App) { a.toggleWait() }},
-	{label: "TUNER", key: "T",
+	{label: "Tuner", key: "T", right: true,
 		on:  func(a *App) bool { return a.tunerView },
 		act: func(a *App) { a.tunerView = !a.tunerView }},
-	{label: "SLOWER", key: "down",
-		act: func(a *App) { a.eng.SetTempoScale(a.eng.TempoScale() - 0.05) }},
-	{label: "FASTER", key: "up",
-		act: func(a *App) { a.eng.SetTempoScale(a.eng.TempoScale() + 0.05) }},
-	{label: "BPM", key: "shift+B",
-		act: func(a *App) { a.openBPMEntry() }},
-	{label: "TRACK", key: "tab",
-		disabled: func(a *App) bool { return a.switchTrack == nil || a.playableTracks() < 2 },
-		whenOff: func(a *App) string {
-			if a.playableTracks() < 2 {
-				return "this piece has only one track to practise"
-			}
-			return "start musicTutor without a file to switch tracks here"
-		},
-		act: func(a *App) { a.cycleTrack(1) }},
-	{label: "MIXER", key: "V",
+	{label: "Mixer", key: "V", right: true,
 		on:  func(a *App) bool { return a.mixer.open },
 		act: func(a *App) { a.toggleMixer() }},
-	{label: "SETTINGS", key: "S",
+	{label: "Settings", key: "S", right: true,
 		disabled: func(a *App) bool { return a.settings == nil },
 		whenOff:  func(a *App) string { return "settings need the full app — start musicTutor without a file" },
 		act:      func(a *App) { a.openSettings() }},
-	{label: "HELP", key: "?",
+	{label: "Help", key: "?", right: true,
 		on:  func(a *App) bool { return a.helpOpen },
 		act: func(a *App) { a.openHelp() }},
 }
@@ -135,6 +124,12 @@ func (a *App) titleX() float64 {
 
 type practiceLayout struct {
 	transport [4]rect
+
+	// tempo is the tempo control: slower, the readout (exact BPM), faster.
+	tempo [3]rect
+
+	// dividers are the x positions of the thin lines between menu groups.
+	dividers []float64
 
 	chips []rect
 
@@ -178,19 +173,45 @@ func (a *App) msgY() float64 { return ptMsgY }
 func (a *App) layout() practiceLayout {
 	var l practiceLayout
 
-	x := uiPadX
+	// One row: transport | Loop Click Ramp Count-in Wait | tempo, then
+	// Tuner Mixer Settings Help pinned to the right.
+	x := uiPadX - (menuIconW-16)/2 // align the first icon's ink with the margin
 	for i := range l.transport {
-		l.transport[i] = rect{x, ptTransportY, ptBtnW, ptBtnH}
-		x += ptBtnW + ptBtnGap
+		l.transport[i] = rect{x, ptTransportY, menuIconW, chipH}
+		x += menuIconW + 4
 	}
-	x += 18
-
-	states := a.chipStates()
-	l.chips = make([]rect, len(states))
-	for i, c := range states {
-		w := chipW(c)
+	divide := func() {
+		x += menuGroupGap - menuGap/2
+		l.dividers = append(l.dividers, x)
+		x += menuGroupGap
+	}
+	divide()
+	l.chips = make([]rect, len(practiceChips))
+	for i, c := range practiceChips {
+		if c.right {
+			continue
+		}
+		w := menuItemW(c.label)
 		l.chips[i] = rect{x, ptTransportY, w, chipH}
-		x += w + chipGap
+		x += w + menuGap
+	}
+	x -= menuGap / 2
+	divide()
+	arrowW := textW("‹") + 2*menuPadX + 8
+	l.tempo[0] = rect{x, ptTransportY, arrowW, chipH}
+	l.tempo[1] = rect{x + arrowW, ptTransportY, tempoTextW, chipH}
+	l.tempo[2] = rect{x + arrowW + tempoTextW, ptTransportY, arrowW, chipH}
+
+	rx := screenW - uiPadX
+	for i := len(practiceChips) - 1; i >= 0; i-- {
+		c := practiceChips[i]
+		if !c.right {
+			continue
+		}
+		w := menuItemW(c.label)
+		rx -= w
+		l.chips[i] = rect{rx, ptTransportY, w, chipH}
+		rx -= menuGap
 	}
 
 	l.tracks = make([]rect, len(a.sc.Tracks))
@@ -448,6 +469,11 @@ func (a *App) hitChrome(p pointer, l practiceLayout) bool {
 		}
 		spots = append(spots, hotspot{r: l.chips[i], on: func() { c.act(a) }})
 	}
+	spots = append(spots,
+		hotspot{r: l.tempo[0], on: a.slower},
+		hotspot{r: l.tempo[1], on: a.openBPMEntry},
+		hotspot{r: l.tempo[2], on: a.faster},
+	)
 	if a.warningVisible() {
 		spots = append(spots, hotspot{r: warnRect(), on: func() {
 			if len(a.importWarns) > 0 {
@@ -603,13 +629,21 @@ func (a *App) drawTransport(dst *ebiten.Image, l practiceLayout, p pointer) {
 	}
 	dt := uiFrameSeconds()
 	names := [4]string{"transport:start", "transport:prev", "transport:play", "transport:next"}
+	tipText := [4]string{"Back to the start", "Previous bar", "Play / pause", "Next bar"}
+	tipKey := [4]string{"home", "left", "space", "right"}
 	for i, r := range l.transport {
-		drawIconButton(dst, r, icons[i], a.anim.step(names[i], p.over(r), p.down, dt))
+		drawMenuIcon(dst, r, icons[i], a.anim.step(names[i], p.over(r), p.down, dt))
+		a.tip.offer(names[i], tipText[i], tipKey[i], r, p.over(r), dt)
+	}
+	for _, x := range l.dividers {
+		drawMenuDivider(dst, x)
 	}
 	for i, c := range a.chipStates() {
 		r := l.chips[i]
-		drawChip(dst, r, c, a.anim.step("chip:"+c.label, p.over(r), p.down, dt))
+		drawMenuItem(dst, r, c.label, c.on, c.disabled, a.anim.step("chip:"+c.label, p.over(r) && !c.disabled, p.down, dt))
+		a.tip.offer("chip:"+c.label, c.label, c.key, r, p.over(r), dt)
 	}
+	a.drawTempo(dst, l, p, dt)
 }
 
 func (a *App) drawTrackStrip(dst *ebiten.Image, l practiceLayout, p pointer) {
@@ -617,34 +651,30 @@ func (a *App) drawTrackStrip(dst *ebiten.Image, l practiceLayout, p pointer) {
 		if r.empty() {
 			continue
 		}
-		name := a.trackName(i)
+		// No boxes: two lines of text. Your track has a 2px accent edge and
+		// accent name; a muted one recedes; a solo reads in green.
+		av := a.anim.step(fmt.Sprintf("track:%d", i), p.over(r), p.down, uiFrameSeconds())
 		muted := a.mutedAudibly(i)
-		fill, edge, col := colPanel, colPanelEdge, colNote
+		name, sub := lerpCol(colHUD, colNote, av.hover), colDim
 		switch {
-		case a.solo == i+1:
-			fill, edge, col = colOn, colOnEdge, colNote
+		case i == a.track:
+			name = colAccent
 		case muted:
-			fill, edge, col = colBG, colBarline, colString
-		case p.over(r):
-			fill, edge = colHover, colDim
+			name, sub = lerpCol(colString, colDim, av.hover), colBarline
 		}
-		drawPanel(dst, r, fill, edge)
+		if a.solo == i+1 {
+			sub = colOnEdge
+		}
 		if i == a.track {
-
-			vector.DrawFilledRect(dst, float32(r.x), float32(r.y), 3, float32(r.h), colInferred, false)
+			vector.FillRect(dst, float32(r.x), float32(r.y+3), 2, float32(r.h-6), colAccent, false)
 		}
-		label := truncateW(fmt.Sprintf("%d %s", i+1, name), r.w-18)
-		drawText(dst, label, r.x+9, r.y+3, col)
-
-		sub := colDim
-		if muted {
-			sub = colBarline
-		}
-		state := a.trackStateText(i)
+		label := truncateW(fmt.Sprintf("%d  %s", i+1, a.trackName(i)), r.w-18)
+		drawText(dst, label, r.x+10, r.y+2, name)
+		state := sentenceCase(a.trackStateText(i))
 		if i == a.track {
-			state = "you · " + state
+			state = "You · " + state
 		}
-		drawTextSmall(dst, state, r.x+9, r.y+20, sub)
+		drawTextSmall(dst, state, r.x+10, r.y+20, sub)
 	}
 	if n := a.hiddenTracks(l); n > 0 {
 		drawText(dst, a.hiddenTracksHint(len(l.tracks)-n, n), uiPadX, ptTracksY+chipH+4, colHint)
@@ -730,7 +760,7 @@ func (a *App) drawTimeline(dst *ebiten.Image, l practiceLayout, p pointer) {
 	if hover {
 		if i := a.sc.SectionAt(a.timelineTick(tl, p.x)); i >= 0 {
 			// Names too long for their stretch of timeline read in full here.
-			hint, hintCol = a.sc.Sections[i].Name+"   ·   click or drag to move   ·   [ ] jumps to a section start", colHUD
+			hint, hintCol = a.sc.Sections[i].Name+"   ·   Click or drag to move   ·   [ ] jumps to a section start", colHUD
 		}
 	}
 	drawTextSmall(dst, hint, screenW-uiPadX-textWSmall(hint), a.captionY()+2, hintCol)
@@ -738,9 +768,9 @@ func (a *App) drawTimeline(dst *ebiten.Image, l practiceLayout, p pointer) {
 
 func (a *App) timelineHint() string {
 	if _, _, on := a.eng.Loop(); on {
-		return "click or drag to move   ·   drag the loop edges to resize"
+		return "Click or drag to move   ·   Drag the loop edges to resize"
 	}
-	return "click or drag to move   ·   shift-drag to loop a section"
+	return "Click or drag to move   ·   Shift-drag to loop a section"
 }
 
 func (a *App) positionCaption() string {
@@ -755,9 +785,9 @@ func (a *App) positionCaption() string {
 	at := a.sc.Tempos.TimeAt(pos) / scale
 	total := a.sc.Tempos.TimeAt(a.pieceEnd()) / scale
 	if sec := a.currentSection(); sec != "" {
-		return fmt.Sprintf("bar %d of %d   %s     %s / %s", bar, lastBar, sec, clockText(at), clockText(total))
+		return fmt.Sprintf("Bar %d of %d   %s     %s / %s", bar, lastBar, sec, clockText(at), clockText(total))
 	}
-	return fmt.Sprintf("bar %d of %d     %s / %s", bar, lastBar, clockText(at), clockText(total))
+	return fmt.Sprintf("Bar %d of %d     %s / %s", bar, lastBar, clockText(at), clockText(total))
 }
 
 func clockText(sec float64) string {
