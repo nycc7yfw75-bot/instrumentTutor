@@ -1,7 +1,7 @@
 package synth
 
 import (
-	"bufio"
+	"bytes"
 	"fmt"
 	"math"
 	"os"
@@ -29,12 +29,15 @@ type SoundFont struct {
 }
 
 func LoadSoundFont(path string) (*SoundFont, error) {
-	f, err := os.Open(path)
+	// Read the whole file first: meltysynth reads each name with a single
+	// Read and fails on a short one, which a buffered reader returns when a
+	// name straddles its buffer (GeneralUser GS did). A bytes.Reader never
+	// returns short, and meltysynth keeps the samples in memory anyway.
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("load soundfont: %w", err)
 	}
-	defer f.Close()
-	sf, err := meltysynth.NewSoundFont(bufio.NewReader(f))
+	sf, err := meltysynth.NewSoundFont(bytes.NewReader(data))
 	if err != nil {
 		return nil, fmt.Errorf("load soundfont %s: %w", path, err)
 	}

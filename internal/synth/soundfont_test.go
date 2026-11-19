@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/sinshu/go-meltysynth/meltysynth"
@@ -96,7 +97,10 @@ func TestSoundFontVoice(t *testing.T) {
 	}
 }
 
-func buildTinySF2() []byte {
+func buildTinySF2() []byte { return buildTinySF2With("") }
+
+// buildTinySF2With adds an INFO comment (ICMT) when comment is not empty.
+func buildTinySF2With(comment string) []byte {
 	le := binary.LittleEndian
 	u16 := func(b *bytes.Buffer, v uint16) { binary.Write(b, le, v) }
 	u32 := func(b *bytes.Buffer, v uint32) { binary.Write(b, le, v) }
@@ -115,6 +119,9 @@ func buildTinySF2() []byte {
 	info.WriteString("INFO")
 	chunk(info, "ifil", []byte{2, 0, 1, 0})
 	chunk(info, "INAM", []byte("tiny\x00\x00"))
+	if comment != "" {
+		chunk(info, "ICMT", []byte(comment))
+	}
 
 	sdta := &bytes.Buffer{}
 	sdta.WriteString("sdta")
@@ -295,5 +302,18 @@ func TestSoundFontLegatoBeyondBendRangeReattacks(t *testing.T) {
 	}
 	if got := float64(sounding.key) + sounding.bend; got != 80 {
 		t.Errorf("chain's last note sounds MIDI %.1f, want 80", got)
+	}
+}
+
+// A text field longer than a buffered reader's buffer used to come back
+// short and fail the load ("failed to read the fixed-length string"), as
+// GeneralUser GS did.
+func TestLoadSoundFontWithALongComment(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "long.sf2")
+	if err := os.WriteFile(path, buildTinySF2With(strings.Repeat("x", 5000)+"\x00\x00"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadSoundFont(path); err != nil {
+		t.Fatalf("LoadSoundFont: %v", err)
 	}
 }
