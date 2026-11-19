@@ -139,6 +139,8 @@ func calibrateWith(ctx context.Context, a AudioServices, captureID, playbackID s
 type Settings struct {
 	sh *Shell
 
+	anim animator
+
 	rows []settingsRow
 	cur  int
 
@@ -389,6 +391,46 @@ func (s *Settings) refreshOffset() {
 	}
 	capID, playID := s.selectedIDs()
 	s.offFrames, s.offOK = a.CalibratedOffset(capID, playID)
+}
+
+type settingsOffsetSetter interface {
+	SetOffsetManually(captureID, playbackID string, frames int) error
+}
+
+const offsetNudgeMS = 5
+
+func (s *Settings) canNudgeOffset() bool {
+	_, ok := s.audio().(settingsOffsetSetter)
+	return ok && s.hasDevices()
+}
+
+// nudgeOffset moves the stored round-trip offset by d steps of offsetNudgeMS,
+// starting from zero for a pair that was never measured.
+func (s *Settings) nudgeOffset(d int) {
+	s.focusRow(srCalibrate)
+	if s.calibrating() {
+		s.notice = calBusyNotice
+		return
+	}
+	setter, ok := s.audio().(settingsOffsetSetter)
+	if !ok {
+		return
+	}
+	rate := s.rate
+	if rate <= 0 {
+		rate = settingsDefaultRate
+	}
+	frames := s.offFrames + d*offsetNudgeMS*rate/1000
+	if frames < 0 {
+		frames = 0
+	}
+	capID, playID := s.selectedIDs()
+	if err := setter.SetOffsetManually(capID, playID, frames); err != nil {
+		s.notice = "could not save the offset: " + err.Error()
+		return
+	}
+	s.notice = ""
+	s.refreshOffset()
 }
 
 func (s *Settings) moveCursor(d int) {
@@ -1000,12 +1042,13 @@ const (
 	settingsNoticeLines = 3
 	settingsSfNoteLines = 1
 
-	settingsCalHintLines = 2
+	settingsCalHintLines = 3
 )
 
 const calSetupHint = "plays a few seconds of clicks that must travel out and back in:" +
 	" point a mic at your speakers, or cable an output back into an input;" +
-	" a guitar's pickup won't hear them, a mic'd horn already does"
+	" a guitar's pickup won't hear them, a mic'd horn already does." +
+	" - / + fine-tune it by 5 ms: if notes you play on the beat show amber, step either way until they turn green"
 
 type settingsItemKind int
 
@@ -1149,11 +1192,16 @@ func (s *Settings) items() []settingsItem {
 		if running {
 			label = "measuring..."
 		}
-		b.addRow("round-trip offset", txt, col,
-			settingsButton{label: label, act: func(s *Settings) {
-				s.focusRow(srCalibrate)
-				s.startCalibration()
-			}})
+		buttons := []settingsButton{{label: label, act: func(s *Settings) {
+			s.focusRow(srCalibrate)
+			s.startCalibration()
+		}}}
+		if s.canNudgeOffset() {
+			buttons = append(buttons,
+				settingsButton{label: "-", disabled: running, act: func(s *Settings) { s.nudgeOffset(-1) }},
+				settingsButton{label: "+", disabled: running, act: func(s *Settings) { s.nudgeOffset(+1) }})
+		}
+		b.addRow("round-trip offset", txt, col, buttons...)
 		if running {
 			b.progress(sn.Progress)
 
@@ -1291,13 +1339,20 @@ func (s *Settings) Update() error {
 	case inpututil.IsKeyJustPressed(ebiten.KeyEnter), inpututil.IsKeyJustPressed(ebiten.KeyKPEnter):
 		s.activate()
 	}
+	if s.ptr.pressed && s.ptr.over(backButtonRect(settingsBack)) {
+		return errQuit
+	}
 	s.handleMouse(s.ptr)
 	return nil
 }
 
+var settingsBack = chipState{label: "BACK", key: "esc"}
+
 func (s *Settings) Draw(dst *ebiten.Image) {
 	dst.Fill(colBG)
-	drawHeader(dst, "SETTINGS", "changes are saved as you make them", colDim)
+	br := backButtonRect(settingsBack)
+	drawHeaderAt(dst, br.x+br.w+14, "SETTINGS", "changes are saved as you make them", colDim)
+	drawChip(dst, br, settingsBack, s.anim.step("chip:back", s.ptr.over(br), s.ptr.down, uiFrameSeconds()))
 
 	for _, it := range s.items() {
 		switch it.kind {

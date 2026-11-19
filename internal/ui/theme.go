@@ -55,6 +55,11 @@ func drawHeader(dst *ebiten.Image, title, status string, statusCol color.RGBA) {
 	drawHeaderAt(dst, uiPadX, title, status, statusCol)
 }
 
+// backButtonRect places a screen's esc button at the top left of the header.
+func backButtonRect(c chipState) rect {
+	return rect{uiPadX, uiHeaderY - 6, chipW(c), chipH}
+}
+
 // drawHeaderAt is drawHeader with the title starting at x, leaving room
 // on the left for a button.
 func drawHeaderAt(dst *ebiten.Image, x float64, title, status string, statusCol color.RGBA) {

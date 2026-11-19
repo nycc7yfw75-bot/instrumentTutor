@@ -125,7 +125,7 @@ func (a *App) backChip() chipState {
 }
 
 func (a *App) backRect() rect {
-	return rect{uiPadX, uiHeaderY - 6, chipW(a.backChip()), chipH}
+	return backButtonRect(a.backChip())
 }
 
 // titleX is where the piece title starts, right of the back button.

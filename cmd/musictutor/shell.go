@@ -168,15 +168,18 @@ type openTimeSettings struct {
 	countIn   int
 	captureID string
 	playID    string
+	offset    int
 }
 
 func (o *shellOpener) openTimeSnapshot() openTimeSettings {
 	capID, playID := o.prefs.Devices()
+	off, _ := o.prefs.offsetFor(capID, playID)
 	return openTimeSettings{
 		soundFont: o.prefs.SoundFont(),
 		countIn:   o.prefs.CountIn(),
 		captureID: capID,
 		playID:    playID,
+		offset:    off,
 	}
 }
 
@@ -409,6 +412,16 @@ func (a *shellAudio) CalibratedOffset(captureID, playbackID string) (int, bool) 
 
 func (a *shellAudio) StoredConfidence(captureID, playbackID string) (float64, bool) {
 	return a.prefs.confidenceFor(captureID, playbackID)
+}
+
+// SetOffsetManually stores a hand-tuned offset. A measured pair keeps its
+// confidence; a pair never measured is trusted as the player set it.
+func (a *shellAudio) SetOffsetManually(captureID, playbackID string, frames int) error {
+	conf, ok := a.prefs.confidenceFor(captureID, playbackID)
+	if !ok {
+		conf = 1
+	}
+	return a.prefs.StoreOffset(captureID, playbackID, frames, conf)
 }
 
 func (a *shellAudio) Calibrate(captureID, playbackID string, progress func(float64)) (int, float64, error) {
