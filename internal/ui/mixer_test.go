@@ -4,8 +4,6 @@ import (
 	"math"
 	"strings"
 	"testing"
-
-	"github.com/S95F/musicTutor/internal/engine"
 )
 
 func TestMixerClickSetsTheVolumeUnderThePointer(t *testing.T) {
@@ -34,16 +32,6 @@ func TestMixerClickOutsideClosesIt(t *testing.T) {
 	a.mixerMouse(pointer{x: 5, y: 5, down: true, pressed: true}, a.mixerRows())
 	if a.mixer.open {
 		t.Fatal("a click on the dimmed screen left the mixer open")
-	}
-}
-
-func TestMixerReportsEveryChange(t *testing.T) {
-	a := newAppTracks(t, 1, 1)
-	var got float64 = -1
-	a.onMix = func(m engine.Mix) { got = m.Master }
-	a.mixSet(mixerRow{kind: mixMaster}, 0.4)
-	if math.Abs(got-0.4) > 1e-9 {
-		t.Fatalf("the change callback saw master %.2f, want 0.40", got)
 	}
 }
 

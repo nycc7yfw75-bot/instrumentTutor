@@ -48,12 +48,7 @@ type mixerUI struct {
 	mixer     overlay
 	mixerSel  int
 	mixerDrag int // row being dragged, or -1
-	onMix     func(engine.Mix)
 }
-
-// SetMixChanged registers a callback for every volume change, so the opener
-// can carry the mix across a re-open.
-func (a *App) SetMixChanged(fn func(engine.Mix)) { a.onMix = fn }
 
 func (a *App) mixerRows() []mixerRow {
 	rows := []mixerRow{{kind: mixMaster, label: "Master"}, {kind: mixClick, label: "Metronome"}}
@@ -136,9 +131,6 @@ func (a *App) mixSet(r mixerRow, v float64) {
 		m.Tracks[r.track] = v
 	}
 	a.eng.SetMix(m)
-	if a.onMix != nil {
-		a.onMix(a.eng.Mix())
-	}
 }
 
 func (a *App) toggleMixer() {

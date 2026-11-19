@@ -47,6 +47,60 @@ type Config struct {
 	HideStartHint bool `json:"hideStartHint,omitempty"`
 
 	SyncTrimMS int `json:"syncTrimMS,omitempty"`
+
+	// Pieces remembers each piece's practice setup, keyed by file path.
+	Pieces map[string]PieceSetup `json:"pieces,omitempty"`
+}
+
+// PieceSetup is where a piece was left: reopening it starts here. Every
+// value is re-checked against the piece when applied, so a file that
+// changed on disk (fewer tracks, shorter) cannot carry a bad value in.
+type PieceSetup struct {
+	Track int       `json:"track"`
+	Tempo float64   `json:"tempo,omitempty"`
+	Pos   int64     `json:"pos,omitempty"`
+	LoopA int64     `json:"loopA,omitempty"`
+	LoopB int64     `json:"loopB,omitempty"`
+	Muted []bool    `json:"muted,omitempty"`
+	Solo  int       `json:"solo,omitempty"`
+	Mix   *PieceMix `json:"mix,omitempty"`
+	// Used is when the piece was last left (Unix seconds), for pruning.
+	Used int64 `json:"used"`
+}
+
+// PieceMix is the mixer: each volume 0 (silent) to 1.
+type PieceMix struct {
+	Master  float64   `json:"master"`
+	Click   float64   `json:"click"`
+	Backing float64   `json:"backing"`
+	Tracks  []float64 `json:"tracks"`
+}
+
+// MaxPieces is how many pieces' setups are kept; the least recently used
+// go first.
+const MaxPieces = 100
+
+// SetPiece records a piece's setup and drops the oldest beyond MaxPieces.
+func (c *Config) SetPiece(path string, s PieceSetup) {
+	if c.Pieces == nil {
+		c.Pieces = make(map[string]PieceSetup)
+	}
+	c.Pieces[filepath.Clean(path)] = s
+	for len(c.Pieces) > MaxPieces {
+		oldest, at := "", int64(0)
+		for k, v := range c.Pieces {
+			if oldest == "" || v.Used < at {
+				oldest, at = k, v.Used
+			}
+		}
+		delete(c.Pieces, oldest)
+	}
+}
+
+// Piece returns a piece's remembered setup.
+func (c Config) Piece(path string) (PieceSetup, bool) {
+	s, ok := c.Pieces[filepath.Clean(path)]
+	return s, ok
 }
 
 const MaxSyncTrimMS = 250

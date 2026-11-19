@@ -526,6 +526,26 @@ func (a *App) ensureMuteState() {
 	}
 }
 
+// MuteState returns the player's own mutes and the soloed track (1-based,
+// 0 for none), for remembering a piece's setup.
+func (a *App) MuteState() (muted []bool, solo int) {
+	a.ensureMuteState()
+	return append([]bool(nil), a.userMuted...), a.solo
+}
+
+// SetMuteState restores MuteState; a mismatched track count or an
+// out-of-range solo is ignored.
+func (a *App) SetMuteState(muted []bool, solo int) {
+	if len(muted) != len(a.sc.Tracks) {
+		return
+	}
+	a.userMuted = append([]bool(nil), muted...)
+	if solo >= 0 && solo <= len(a.sc.Tracks) {
+		a.solo = solo
+	}
+	a.applyMutes()
+}
+
 func (a *App) mutedAudibly(i int) bool {
 	a.ensureMuteState()
 	return a.userMuted[i] || (a.solo > 0 && a.solo != i+1)

@@ -334,6 +334,7 @@ func (p *shellPrefs) snapshot() appconfig.Config {
 	c.LatencyConfidence = maps.Clone(p.cfg.LatencyConfidence)
 	c.Recents = slices.Clone(p.cfg.Recents)
 	c.Created = slices.Clone(p.cfg.Created)
+	c.Pieces = maps.Clone(p.cfg.Pieces)
 	return c
 }
 
@@ -341,6 +342,18 @@ func (p *shellPrefs) offsetFor(captureID, playbackID string) (int, bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return calibratedOffset(p.cfg, captureID, playbackID)
+}
+
+func (p *shellPrefs) piece(path string) (appconfig.PieceSetup, bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.cfg.Piece(path)
+}
+
+func (p *shellPrefs) setPiece(path string, s appconfig.PieceSetup) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.cfg.SetPiece(path, s)
 }
 
 func (p *shellPrefs) confidenceFor(captureID, playbackID string) (float64, bool) {
@@ -461,41 +474,66 @@ type shellOpener struct {
 	player  *oto.Player
 	session *live.Session
 
-	// trackFor remembers, per piece path, the track the player switched to
-	// with Tab, so F5 and re-opening from the start screen keep it.
-	trackFor map[string]int
-	// carry hands tempo, playhead and loop across a track switch's re-open.
-	carry *trackCarry
-	// mixFor remembers each piece's mixer volumes for this run of the app.
-	mixFor map[string]engine.Mix
+	// cur is the piece on screen, so its setup can be saved when it is left.
+	cur *openPiece
 }
 
-type trackCarry struct {
-	scale  float64
-	pos    int64
-	lo, hi int64
-	loopOn bool
+type openPiece struct {
+	path string
+	app  *ui.App
+	eng  *engine.Engine
 }
 
-// switchTrack re-opens path showing and scoring track, carrying tempo,
-// playhead and loop over from eng. A failed re-open keeps the old choice.
-func (o *shellOpener) switchTrack(path string, eng *engine.Engine, track int) error {
-	lo, hi, on := eng.Loop()
-	o.carry = &trackCarry{scale: eng.TempoScale(), pos: eng.PosTick(), lo: lo, hi: hi, loopOn: on}
-	if o.trackFor == nil {
-		o.trackFor = map[string]int{}
+// setupOf reads where a piece is: track, tempo, playhead, loop, mutes, mixer.
+func setupOf(app *ui.App, eng *engine.Engine) appconfig.PieceSetup {
+	s := appconfig.PieceSetup{Track: app.Track(), Tempo: eng.TempoScale(), Pos: eng.PosTick(), Used: time.Now().Unix()}
+	if lo, hi, on := eng.Loop(); on {
+		s.LoopA, s.LoopB = lo, hi
 	}
-	prev, had := o.trackFor[path]
-	o.trackFor[path] = track
+	s.Muted, s.Solo = app.MuteState()
+	m := eng.Mix()
+	s.Mix = &appconfig.PieceMix{Master: m.Master, Click: m.Click, Backing: m.Backing, Tracks: m.Tracks}
+	return s
+}
+
+// applySetup puts a remembered tempo, loop, playhead and mix on a fresh
+// engine; the engine clamps or ignores anything that no longer fits.
+func applySetup(s appconfig.PieceSetup, eng *engine.Engine) {
+	if s.Tempo > 0 {
+		eng.SetTempoScale(s.Tempo)
+	}
+	if s.LoopB > s.LoopA {
+		eng.SetLoop(s.LoopA, s.LoopB)
+	}
+	eng.SeekTick(s.Pos)
+	if m := s.Mix; m != nil {
+		eng.SetMix(engine.Mix{Master: m.Master, Click: m.Click, Backing: m.Backing, Tracks: m.Tracks})
+	}
+}
+
+// saveCurrent remembers the on-screen piece's setup in the config file.
+func (o *shellOpener) saveCurrent() {
+	if o.cur == nil {
+		return
+	}
+	o.prefs.setPiece(o.cur.path, setupOf(o.cur.app, o.cur.eng))
+	_ = o.prefs.Save()
+}
+
+// switchTrack re-opens path showing and scoring track, keeping everything
+// else about the setup. A failed re-open keeps the old choice.
+func (o *shellOpener) switchTrack(path string, track int) error {
+	o.saveCurrent()
+	prev, _ := o.prefs.piece(path)
+	next := prev
+	next.Track = track
+	o.prefs.setPiece(path, next)
 	if _, err := o.shell.ReopenPiece(path); err != nil {
-		o.carry = nil
-		if had {
-			o.trackFor[path] = prev
-		} else {
-			delete(o.trackFor, path)
-		}
+		o.prefs.setPiece(path, prev)
+		_ = o.prefs.Save()
 		return err
 	}
+	_ = o.prefs.Save()
 	return nil
 }
 
@@ -523,38 +561,29 @@ func (o *shellOpener) Open(path string) (ui.Screen, []string, error) {
 	})
 
 	display := defaultTrack(sc)
-	if t, ok := o.trackFor[path]; ok && t < len(sc.Tracks) {
-		display = t
-	}
-	if c := o.carry; c != nil {
-		o.carry = nil
-		eng.SetTempoScale(c.scale)
-		if c.loopOn {
-			eng.SetLoop(c.lo, c.hi)
+	setup, remembered := o.prefs.piece(path)
+	if remembered {
+		if setup.Track >= 0 && setup.Track < len(sc.Tracks) {
+			display = setup.Track
 		}
-		eng.SeekTick(c.pos)
-	}
-	if m, ok := o.mixFor[path]; ok {
-		eng.SetMix(m)
+		applySetup(setup, eng)
 	}
 	app := ui.New(eng, sc, display)
+	if remembered {
+		app.SetMuteState(setup.Muted, setup.Solo)
+	}
 	app.SetCountIn(countIn)
 	app.SetImportWarnings(warns)
-	app.SetMixChanged(func(m engine.Mix) {
-		if o.mixFor == nil {
-			o.mixFor = map[string]engine.Mix{}
-		}
-		o.mixFor[path] = m
-	})
 
 	app.SetTrackSwitcher(func(track int) {
-		if err := o.switchTrack(path, eng, track); err != nil {
+		if err := o.switchTrack(path, track); err != nil {
 			app.SetLiveWarning("could not switch track: " + err.Error())
 		}
 	})
 
 	app.SetSettingsOpener(func() { o.showSettings(app) })
 	app.SetReloader(func() {
+		o.saveCurrent()
 		if _, err := o.shell.ReopenPiece(path); err != nil {
 			app.SetLiveWarning("could not re-open the piece: " + err.Error())
 		}
@@ -580,7 +609,12 @@ func (o *shellOpener) Open(path string) (ui.Screen, []string, error) {
 		}
 	}
 
-	o.CloseCurrent()
+	// A different piece replacing this one without the player leaving first
+	// still gets its setup remembered.
+	if o.cur != nil && o.cur.path != path {
+		o.saveCurrent()
+	}
+	o.closeAudio()
 
 	var conds []string
 
@@ -618,6 +652,7 @@ func (o *shellOpener) Open(path string) (ui.Screen, []string, error) {
 	if msg := composeBanner(conds); msg != "" {
 		app.SetLiveWarning(msg)
 	}
+	o.cur = &openPiece{path: path, app: app, eng: eng}
 	return app, warns, nil
 }
 
@@ -729,7 +764,15 @@ func (o *shellOpener) audioContext() (*oto.Context, error) {
 	return o.otoCtx, o.otoErr
 }
 
+// CloseCurrent runs when the player leaves a piece or quits: it remembers
+// the piece's setup, then stops its audio.
 func (o *shellOpener) CloseCurrent() {
+	o.saveCurrent()
+	o.cur = nil
+	o.closeAudio()
+}
+
+func (o *shellOpener) closeAudio() {
 	if o.session != nil {
 		o.session.Stop()
 		o.session = nil
