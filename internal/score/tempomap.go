@@ -82,6 +82,9 @@ func (m MeterMap) At(tick int64) Meter {
 func (ts Meter) BeatLen() int64 { return 4 * PPQ / int64(ts.Den) }
 
 func (s *Score) Validate() error {
+	if err := s.validateSections(); err != nil {
+		return err
+	}
 	if len(s.Tempos) == 0 || s.Tempos[0].Tick != 0 {
 		return fmt.Errorf("tempo map must start at tick 0")
 	}

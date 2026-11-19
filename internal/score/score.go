@@ -22,6 +22,10 @@ type Score struct {
 	Tempos TempoMap
 	Meters MeterMap
 	Tracks []*Track
+
+	// Sections are named parts of the piece (Intro, Verse, Solo), in order
+	// of their start tick; empty when the file names none.
+	Sections []Section
 }
 
 type TrackRole int
@@ -116,9 +120,19 @@ const (
 	TechBend
 	TechVibrato
 	TechDead
+	// TechPalmMute is a note damped with the picking hand. It sounds and
+	// scores as written; it is shown on the tab, not saved to .gtab.
+	TechPalmMute
 
 	TechSlur = TechHammer
 )
+
+// Bend is a bend's shape in quarter-tones (4 = a full bend, one whole
+// tone): where it starts, how high it goes, and where it ends. A zero Peak
+// means no amount is known (a .gtab "b" carries none).
+type Bend struct {
+	From, Peak, To uint8
+}
 
 type Note struct {
 	String int
@@ -128,6 +142,9 @@ type Note struct {
 
 	Inferred bool
 	Tech     Technique
+
+	// Bend is the bend's shape when Tech has TechBend and the file gave one.
+	Bend Bend
 }
 
 func (t *Track) AppendBar(num, den int) *Bar {

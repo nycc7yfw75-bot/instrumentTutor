@@ -245,7 +245,7 @@ func TestPermissive(t *testing.T) {
 
 	doc = strings.Replace(doc,
 		`<Property name="Fret"><Fret>0</Fret></Property>`,
-		`<Property name="Fret"><Fret>0</Fret></Property><Property name="Bended"><Enable /></Property>`,
+		`<Property name="Fret"><Fret>0</Fret></Property><Property name="SomeFutureProperty"><Enable /></Property>`,
 		1)
 	s, warns, err := importDoc(t, doc,
 		[2]string{"VERSION", "8.0"},
@@ -254,8 +254,8 @@ func TestPermissive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Import: %v", err)
 	}
-	if !hasWarning(warns, "Bended") {
-		t.Errorf("warnings = %v, want an unsupported-property warning naming Bended", warns)
+	if !hasWarning(warns, "SomeFutureProperty") {
+		t.Errorf("warnings = %v, want an unsupported-property warning naming SomeFutureProperty", warns)
 	}
 	evs := s.Events()
 	if len(evs) != 1 || evs[0].Key != 40 || evs[0].Start != 0 || evs[0].End != score.Whole {
@@ -1377,5 +1377,103 @@ func TestBadTuningWarnsOnce(t *testing.T) {
 	evs := s.Events()
 	if len(evs) != 1 || evs[0].Key != 40 || evs[0].String != 6 {
 		t.Fatalf("events = %+v, want one low-E note on string 6", evs)
+	}
+}
+
+func TestSectionMarkersBecomeSections(t *testing.T) {
+	bar := func(id int, section string) string {
+		return `<MasterBar><Time>4/4</Time><Bars>` + itoa(id) + `</Bars>` + section + `</MasterBar>`
+	}
+	doc := gpifDoc(
+		bar(0, `<Section><Text><![CDATA[
+          Intro ]]></Text></Section>`)+
+			bar(1, "")+
+			bar(2, `<Section><Letter>B</Letter><Text></Text></Section>`)+
+			bar(3, `<Section><Text>Verse
+ 1</Text></Section>`)+
+			bar(4, `<Section></Section>`),
+		`<Bar id="0"><Voices>0 -1 -1 -1</Voices></Bar><Bar id="1"><Voices>0 -1 -1 -1</Voices></Bar>`+
+			`<Bar id="2"><Voices>0 -1 -1 -1</Voices></Bar><Bar id="3"><Voices>0 -1 -1 -1</Voices></Bar>`+
+			`<Bar id="4"><Voices>0 -1 -1 -1</Voices></Bar>`,
+		`<Voice id="0"><Beats>0</Beats></Voice>`,
+		`<Beat id="0"><Rhythm ref="0" /><Notes>0</Notes></Beat>`,
+		noteXML(0, 0, 0, ""),
+		`<Rhythm id="0"><NoteValue>Whole</NoteValue></Rhythm>`,
+	)
+	s, _, err := importDoc(t, doc)
+	if err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+	want := []score.Section{{Tick: 0, Name: "Intro"}, {Tick: 2 * 3840, Name: "B"}, {Tick: 3 * 3840, Name: "Verse 1"}}
+	if len(s.Sections) != len(want) {
+		t.Fatalf("sections = %+v, want %+v (the empty marker on bar 5 skipped)", s.Sections, want)
+	}
+	for i := range want {
+		if s.Sections[i] != want[i] {
+			t.Errorf("section %d = %+v, want %+v", i, s.Sections[i], want[i])
+		}
+	}
+}
+
+func TestTechniquesImport(t *testing.T) {
+	prop := func(name, body string) string { return `<Property name="` + name + `">` + body + `</Property>` }
+	on := "<Enable/>"
+	note := func(id, fret int, props, elems string) string {
+		return `<Note id="` + itoa(id) + `"><Properties>` +
+			prop("String", `<String>2</String>`) + prop("Fret", `<Fret>`+itoa(fret)+`</Fret>`) +
+			props + `</Properties>` + elems + `</Note>`
+	}
+	notes := note(0, 5, prop("HopoOrigin", on)+prop("Slide", "<Flags>2</Flags>"), "") +
+		note(1, 7, prop("HopoDestination", on), "") +
+		note(2, 5, prop("HopoDestination", on), "") +
+		note(3, 7, prop("Bended", on)+prop("BendOriginValue", "<Float>0</Float>")+
+			prop("BendMiddleValue", "<Float>100</Float>")+prop("BendDestinationValue", "<Float>0</Float>")+
+			prop("BendMiddleOffset1", "<Float>12</Float>")+prop("Midi", "<Number>57</Number>"), "") +
+		note(4, 7, prop("Muted", on), "") +
+		note(5, 3, prop("PalmMuted", on), "<Vibrato>Slight</Vibrato>") +
+		note(6, 3, prop("Slide", "<Flags>4</Flags>"), "") +
+		note(7, 3, "", "")
+	var beats, ids string
+	for i := 0; i < 8; i++ {
+		beats += `<Beat id="` + itoa(i) + `"><Rhythm ref="0" /><Notes>` + itoa(i) + `</Notes></Beat>`
+		ids += itoa(i) + " "
+	}
+	doc := gpifDoc(
+		`<MasterBar><Time>4/4</Time><Bars>0</Bars></MasterBar>`,
+		`<Bar id="0"><Voices>0 -1 -1 -1</Voices></Bar>`,
+		`<Voice id="0"><Beats>`+ids+`</Beats></Voice>`,
+		beats, notes,
+		`<Rhythm id="0"><NoteValue>Eighth</NoteValue></Rhythm>`,
+	)
+	s, warns, err := importDoc(t, doc)
+	if err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+	for _, w := range warns {
+		if strings.Contains(w, "not supported") {
+			t.Errorf("a handled property still warns: %q", w)
+		}
+	}
+	var got []score.Note
+	for _, b := range s.Tracks[0].Bars[0].Beats {
+		got = append(got, b.Notes[0])
+	}
+	want := []score.Technique{
+		0,                                  // picked, slides into the next
+		score.TechHammer | score.TechSlide, // 5 -> 7: up is a hammer-on, and the slide lands here
+		score.TechPull,                     // 7 -> 5: down is a pull-off
+		score.TechBend,
+		score.TechDead,
+		score.TechPalmMute | score.TechVibrato,
+		0, // slides out into nothing: no target to mark
+		0, // so the note after it is plain
+	}
+	for i, w := range want {
+		if got[i].Tech != w {
+			t.Errorf("note %d (fret %d): techniques %b, want %b", i, got[i].Fret, got[i].Tech, w)
+		}
+	}
+	if b := got[3].Bend; b != (score.Bend{From: 0, Peak: 4, To: 0}) {
+		t.Errorf("bend-and-release shape = %+v, want up a full tone (4 quarter-tones) and back", b)
 	}
 }

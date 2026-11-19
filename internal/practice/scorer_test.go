@@ -484,9 +484,10 @@ func TestScorerWaitConfirmedDeadNote(t *testing.T) {
 		t.Errorf("got %+v, want no error figures for a note with no measurable pitch", r)
 	}
 
+	// Unplayed, it is never a miss: dead notes cannot be judged fairly.
 	s.ExpectNote(dead, 96000)
-	if rs := drain(s); len(rs) != 1 || rs[0].Verdict != VerdictMiss {
-		t.Errorf("second pass results %+v, want a normal Miss", rs)
+	if rs := drain(s); len(rs) != 0 || s.Stats().Miss != 0 {
+		t.Errorf("second pass results %+v, want no miss for an unplayed dead note", rs)
 	}
 }
 
@@ -770,5 +771,21 @@ func TestScorerSlideNotCreditedByASustainedNote(t *testing.T) {
 	}
 	if res[0].Event.Start != 0 {
 		t.Errorf("credited the expectation at tick %d, want the one actually played (tick 0)", res[0].Event.Start)
+	}
+}
+
+func TestBendsAndDeadNotesNeverMiss(t *testing.T) {
+	s := NewScorer(testConfig())
+	bend := wev(57, 960)
+	bend.Tech = score.TechBend
+	dead := wev(45, 1920)
+	dead.Tech = score.TechDead
+	plain := wev(40, 2880)
+	s.ExpectNote(bend, 1000)
+	s.ExpectNote(dead, 2000)
+	s.ExpectNote(plain, 3000)
+	rs := drain(s) // nothing was played
+	if st := s.Stats(); st.Miss != 1 || len(rs) != 1 || rs[0].Event.Key != 40 {
+		t.Fatalf("stats %+v, results %+v: want only the plain note missed", st, rs)
 	}
 }

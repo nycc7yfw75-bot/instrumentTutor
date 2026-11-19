@@ -193,11 +193,14 @@ type gpStaff struct {
 }
 
 type gpProperty struct {
-	Name    string   `xml:"name,attr"`
-	Pitches string   `xml:"Pitches"`
-	Fret    *int     `xml:"Fret"`
-	String  *int     `xml:"String"`
-	Pitch   *gpPitch `xml:"Pitch"`
+	Name    string    `xml:"name,attr"`
+	Pitches string    `xml:"Pitches"`
+	Fret    *int      `xml:"Fret"`
+	String  *int      `xml:"String"`
+	Pitch   *gpPitch  `xml:"Pitch"`
+	Float   *float64  `xml:"Float"`
+	Flags   *int      `xml:"Flags"`
+	Enable  *struct{} `xml:"Enable"`
 }
 
 type gpPitch struct {
@@ -232,6 +235,8 @@ func pitchKey(p *gpPitch) (int, bool) {
 type gpMasterBar struct {
 	Time string `xml:"Time"`
 	Bars string `xml:"Bars"`
+	// Section marks a named part (Intro, Verse) starting at this bar.
+	Section *gpSection `xml:"Section"`
 }
 
 type gpBar struct {
@@ -259,6 +264,7 @@ type gpNote struct {
 	ID         int          `xml:"id,attr"`
 	Properties []gpProperty `xml:"Properties>Property"`
 	Tie        *gpTie       `xml:"Tie"`
+	Vibrato    string       `xml:"Vibrato"`
 }
 
 type gpTie struct {
@@ -331,6 +337,7 @@ func (im *importer) run() (*score.Score, []string, error) {
 	}
 	s.Meters = meters
 	s.Tempos = im.tempos()
+	s.Sections = im.sections()
 	for i, ref := range order {
 		role := score.RoleBacking
 		if i == 0 {
@@ -554,6 +561,13 @@ type trackConv struct {
 
 	chords     int
 	mismatched int
+
+	// lastFret is the fret last played on each string, to tell a
+	// hammer-on (up) from a pull-off (down).
+	lastFret map[int]int
+	// slideNext marks strings whose last note slides into the next one;
+	// Guitar Pro marks the note slid from, this app the note slid to.
+	slideNext map[int]bool
 }
 
 func (im *importer) buildTrack(orig int, gt *gpTrack, role score.TrackRole) *score.Track {
@@ -963,6 +977,7 @@ func (im *importer) beatNotes(orig, mi int, gbt *gpBeat, tc *trackConv) []score.
 			continue
 		}
 		var gpString, fret *int
+		var t techProps
 		for _, p := range gn.Properties {
 			switch p.Name {
 			case "String":
@@ -972,7 +987,9 @@ func (im *importer) beatNotes(orig, mi int, gbt *gpBeat, tc *trackConv) []score.
 			case "ConcertPitch", "TransposedPitch":
 
 			default:
-				im.unknownProps[p.Name] = true
+				if !t.read(p) {
+					im.unknownProps[p.Name] = true
+				}
 			}
 		}
 		if gpString == nil || fret == nil {
@@ -1001,11 +1018,14 @@ func (im *importer) beatNotes(orig, mi int, gbt *gpBeat, tc *trackConv) []score.
 			continue
 		}
 		seen[str] = true
-		out = append(out, score.Note{
+		n := score.Note{
 			String: str,
 			Fret:   *fret,
 			Tied:   gn.Tie != nil && strings.EqualFold(gn.Tie.Destination, "true"),
-		})
+		}
+		t.vibrato = gn.Vibrato != ""
+		t.apply(&n, tc)
+		out = append(out, n)
 	}
 	return out
 }
@@ -1085,4 +1105,30 @@ func (im *importer) flushDeferredWarnings() {
 	for _, n := range names {
 		im.warnf("note property %q is not supported; ignored", n)
 	}
+}
+
+type gpSection struct {
+	Letter string `xml:"Letter"`
+	Text   string `xml:"Text"`
+}
+
+// sections turns the master bars' section markers into named sections at
+// each bar's start. An unnamed marker falls back to its letter ("A"); one
+// with neither is skipped.
+func (im *importer) sections() []score.Section {
+	var out []score.Section
+	for mi, mb := range im.doc.MasterBars {
+		if mb.Section == nil || mi >= len(im.barStarts) {
+			continue
+		}
+		name, _ := textfmt.CleanLabel(strings.Join(strings.Fields(mb.Section.Text), " "))
+		if name == "" {
+			name, _ = textfmt.CleanLabel(strings.TrimSpace(mb.Section.Letter))
+		}
+		if name == "" {
+			continue
+		}
+		out = append(out, score.Section{Tick: im.barStarts[mi], Name: name})
+	}
+	return out
 }

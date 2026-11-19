@@ -120,6 +120,8 @@ type App struct {
 	ph playhead
 
 	liveUI
+	marks map[noteKey]tabMark // technique marks, built on first draw
+
 	mixerUI
 	warnListUI
 	inputHintUI
@@ -275,6 +277,10 @@ func (a *App) handleKeys() error {
 		a.toggleMixer()
 	case inpututil.IsKeyJustPressed(ebiten.KeyI):
 		a.toggleWarnList()
+	case inpututil.IsKeyJustPressed(ebiten.KeyBracketLeft):
+		a.jumpSection(-1)
+	case inpututil.IsKeyJustPressed(ebiten.KeyBracketRight):
+		a.jumpSection(1)
 	case inpututil.IsKeyJustPressed(ebiten.KeyW):
 		if a.waitCtl {
 			a.toggleWait()
@@ -657,6 +663,8 @@ var practiceBindings = []practiceBinding{
 	{Group: "transport", Keys: "space", Hint: "space play/pause", Desc: "Start or pause playback"},
 	{Group: "transport", Keys: "left / right", Hint: "arrows seek", Desc: "Jump to the previous / next bar; inside a loop, right wraps to the loop start"},
 	{Group: "transport", Keys: "home / end", Desc: "Jump to the first / last bar"},
+	{Group: "transport", Keys: "[ / ]", Hint: "[ ] section", Desc: "Jump to the previous / next named section (Intro, Verse, Solo)",
+		Enabled: func(a *App) bool { return len(a.sc.Sections) > 0 }},
 	{Group: "transport", Keys: "click / drag", Desc: "On the notation or the timeline: move the playhead"},
 
 	{Group: "tempo", Keys: "up / down", Hint: "up/dn tempo", Desc: "Practice speed up / down by 5%"},
@@ -681,7 +689,7 @@ var practiceBindings = []practiceBinding{
 		Enabled: func(a *App) bool { return a.waitCtl },
 		Caveat:  liveInputCaveat(func(a *App) bool { return a.waitCtl })},
 
-	{Group: "view", Keys: "+ / -", Desc: "Zoom the notation in / out (or the wheel over it)"},
+	{Group: "practice", Keys: "+ / -", Desc: "Zoom the notation in / out (or the wheel over it)"},
 
 	{Group: "session", Keys: "S", Hint: "S settings", Desc: "Settings, without leaving the piece",
 		Enabled: func(a *App) bool { return a.settings != nil },
@@ -811,12 +819,16 @@ func (a *App) drawTab(screen *ebiten.Image) {
 					label = windNoteLabel(tr, n)
 				} else {
 					ny = float32(tabTop + (n.String-1)*stringGap)
-					label = fmt.Sprintf("%d", n.Fret)
+					mark := a.tabMarks()[noteKey{beat.Start, n.String}]
+					label = mark.pre + fmt.Sprintf("%d", n.Fret) + mark.post
 					if n.Tied {
 						label = "~" + label
 					}
 					if n.Tech&score.TechDead != 0 {
 						label = "x"
+					}
+					if mark.above != "" {
+						drawTextSmall(screen, mark.above, float64(nx), float64(ny)-24, colHint)
 					}
 				}
 				col, sounding := a.noteCue(beat.Start, beat.Dur, n.String, n.Inferred, pos, posTick, waiting)

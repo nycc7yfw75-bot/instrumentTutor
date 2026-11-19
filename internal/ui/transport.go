@@ -699,6 +699,8 @@ func (a *App) drawTimeline(dst *ebiten.Image, l practiceLayout, p pointer) {
 	}
 	drawPanel(dst, tl, colPanel, edge)
 
+	a.drawSections(dst, tl)
+
 	bars := a.displayed().Bars
 	step := 1
 	if len(bars) > 0 && tl.w/float64(len(bars)) < 3 {
@@ -724,8 +726,14 @@ func (a *App) drawTimeline(dst *ebiten.Image, l practiceLayout, p pointer) {
 		vector.StrokeLine(dst, float32(p.x), float32(tl.y+tl.h), float32(p.x), float32(tl.y+tl.h+4), 1, colDim, false)
 	}
 	drawTextMono(dst, a.positionCaption(), uiPadX, a.captionY(), colHUD)
-	hint := a.timelineHint()
-	drawTextSmall(dst, hint, screenW-uiPadX-textWSmall(hint), a.captionY()+2, colBarline)
+	hint, hintCol := a.timelineHint(), colBarline
+	if hover {
+		if i := a.sc.SectionAt(a.timelineTick(tl, p.x)); i >= 0 {
+			// Names too long for their stretch of timeline read in full here.
+			hint, hintCol = a.sc.Sections[i].Name+"   ·   click or drag to move   ·   [ ] jumps to a section start", colHUD
+		}
+	}
+	drawTextSmall(dst, hint, screenW-uiPadX-textWSmall(hint), a.captionY()+2, hintCol)
 }
 
 func (a *App) timelineHint() string {
@@ -745,6 +753,9 @@ func (a *App) positionCaption() string {
 	}
 	at := a.sc.Tempos.TimeAt(pos) / scale
 	total := a.sc.Tempos.TimeAt(a.pieceEnd()) / scale
+	if sec := a.currentSection(); sec != "" {
+		return fmt.Sprintf("bar %d of %d   %s     %s / %s", bar, len(bars), sec, clockText(at), clockText(total))
+	}
 	return fmt.Sprintf("bar %d of %d     %s / %s", bar, len(bars), clockText(at), clockText(total))
 }
 
