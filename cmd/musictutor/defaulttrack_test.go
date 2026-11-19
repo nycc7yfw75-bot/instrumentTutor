@@ -14,6 +14,11 @@ func tracksScore(t *testing.T, tracks ...*score.Track) *score.Score {
 		Tracks: tracks,
 	}
 	for _, tr := range tracks {
+		if tr.Drums {
+			kick, _ := score.DrumNote(36)
+			tr.AppendBar(4, 4).AddBeat(score.Whole, kick)
+			continue
+		}
 		tr.Tuning = score.StandardTuning
 		tr.AppendBar(4, 4).AddBeat(score.Whole, score.Note{String: 6, Fret: 0})
 	}
@@ -37,6 +42,8 @@ func TestDefaultTrackSkipsAVocalLineMarkedAsThePlayers(t *testing.T) {
 			{Name: "John Illsley | Fender Precision Bass", Role: score.RoleBacking}}, 1},
 		{"only vocals: keep the marked one", []*score.Track{
 			{Name: "Backing Vocals", Role: score.RoleBacking}, {Name: "Lead Vocals", Role: score.RoleUser}}, 1},
+		{"never the drum kit", []*score.Track{
+			{Name: "Lead Vocals", Role: score.RoleUser}, {Name: "Kit", Drums: true, Role: score.RoleBacking}, {Name: "Guitar", Role: score.RoleBacking}}, 2},
 	} {
 		if got := defaultTrack(tracksScore(t, c.tracks...)); got != c.want {
 			t.Errorf("%s: opened on track %d, want %d", c.name, got, c.want)

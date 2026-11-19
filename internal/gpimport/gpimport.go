@@ -156,6 +156,17 @@ type gpInstrumentRef struct {
 type gpInstrumentSet struct {
 	Name string `xml:"Name"`
 	Type string `xml:"Type"`
+	// Elements are a drum kit's pieces; their articulations, in order, are
+	// what a drum note's InstrumentArticulation counts through.
+	Elements []gpDrumElement `xml:"Elements>Element"`
+}
+
+type gpDrumElement struct {
+	Articulations []gpArticulation `xml:"Articulations>Articulation"`
+}
+
+type gpArticulation struct {
+	OutputMidiNumber *int `xml:"OutputMidiNumber"`
 }
 
 type gpGeneralMidi struct {
@@ -267,6 +278,8 @@ type gpNote struct {
 	Properties []gpProperty `xml:"Properties>Property"`
 	Tie        *gpTie       `xml:"Tie"`
 	Vibrato    string       `xml:"Vibrato"`
+	// InstrumentArticulation picks a drum note's sound from the kit.
+	InstrumentArticulation *int `xml:"InstrumentArticulation"`
 }
 
 type gpTie struct {
@@ -308,6 +321,8 @@ type importer struct {
 
 	unknownProps map[string]bool
 	graceSkipped int
+	// drumRefs are the percussion tracks, built as drum kits after the rest.
+	drumRefs []trackRef
 }
 
 func (im *importer) warnf(format string, args ...any) {
@@ -320,7 +335,7 @@ func (im *importer) run() (*score.Score, []string, error) {
 	if len(order) == 0 {
 		if len(im.doc.Tracks) > 0 {
 
-			return nil, im.warns, fmt.Errorf("no importable tracks: every track in the file is percussion")
+			return nil, im.warns, fmt.Errorf("no importable tracks: every track in the file is percussion, and drums alone cannot be practised")
 		}
 		return nil, im.warns, fmt.Errorf("no tracks in file")
 	}
@@ -348,6 +363,9 @@ func (im *importer) run() (*score.Score, []string, error) {
 		}
 
 		s.Tracks = append(s.Tracks, im.buildTrack(ref.orig, ref.gt, role))
+	}
+	for _, ref := range im.drumRefs {
+		s.Tracks = append(s.Tracks, im.buildDrumTrack(ref.orig, ref.gt))
 	}
 	im.flushDeferredWarnings()
 	if err := s.Validate(); err != nil {
@@ -412,9 +430,10 @@ func (im *importer) trackOrder() []trackRef {
 		if gt == nil {
 			continue
 		}
-		if perc, why := gt.percussion(); perc {
-			im.warnf("%s is a percussion part (%s); skipped, because drum notation has no string/fret spelling this importer can render",
-				trackLabel(gt, i), why)
+		if perc, _ := gt.percussion(); perc {
+			// Drums play along as backing; they are added after the
+			// stringed tracks and never become the part to practise.
+			im.drumRefs = append(im.drumRefs, trackRef{gt: gt, orig: i})
 			continue
 		}
 		order = append(order, trackRef{gt: gt, orig: i})
@@ -571,6 +590,12 @@ type trackConv struct {
 	// slideNext marks strings whose last note slides into the next one;
 	// Guitar Pro marks the note slid from, this app the note slid to.
 	slideNext map[int]bool
+
+	// drums is set on a drum kit track: notes are drum hits, sounded
+	// through kit (articulation index -> General MIDI drum key).
+	drums   bool
+	kit     []int
+	dropped int
 }
 
 func (im *importer) buildTrack(orig int, gt *gpTrack, role score.TrackRole) *score.Track {
@@ -980,6 +1005,9 @@ func (im *importer) rhythmDur(gbt *gpBeat) int64 {
 }
 
 func (im *importer) beatNotes(orig, mi int, gbt *gpBeat, tc *trackConv) []score.Note {
+	if tc.drums {
+		return im.drumBeatNotes(gbt, tc)
+	}
 	if tc.wind != nil {
 		return im.windBeatNotes(orig, mi, gbt, tc)
 	}

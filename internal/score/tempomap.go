@@ -109,7 +109,11 @@ func (s *Score) Validate() error {
 		}
 	}
 	for ti, tr := range s.Tracks {
-		if tr.Wind == nil && len(tr.Tuning) == 0 {
+		if tr.Drums {
+			if tr.Wind != nil || len(tr.Tuning) != 0 || tr.Capo != 0 {
+				return fmt.Errorf("track %d (%s): a drum kit has no strings, tuning or capo", ti, tr.Name)
+			}
+		} else if tr.Wind == nil && len(tr.Tuning) == 0 {
 			return fmt.Errorf("track %d (%s): no tuning", ti, tr.Name)
 		}
 		if tr.Wind != nil {
@@ -160,6 +164,10 @@ func (s *Score) Validate() error {
 						}
 						if n.Tech&(TechPull|TechDead) != 0 {
 							return fmt.Errorf("track %d bar %d: pull-offs and dead notes do not exist on %s", ti, bi, An(tr.Wind.Name))
+						}
+					} else if tr.Drums {
+						if n.String < 1 || n.String > MaxDrumKey-drumKeyBase || n.Fret != 0 || n.Tied || n.Tech != 0 {
+							return fmt.Errorf("track %d bar %d: not a drum hit (lane %d, fret %d)", ti, bi, n.String, n.Fret)
 						}
 					} else {
 						if n.String < 1 || n.String > len(tr.Tuning) {

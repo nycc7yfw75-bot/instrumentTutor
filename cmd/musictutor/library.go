@@ -96,6 +96,9 @@ func plural(n int, noun string) string {
 }
 
 func instrumentName(tr *score.Track) string {
+	if tr.Drums {
+		return "drums"
+	}
 	if tr.Wind != nil {
 		return tr.Wind.Name
 	}

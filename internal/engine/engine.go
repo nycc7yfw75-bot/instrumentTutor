@@ -176,7 +176,11 @@ func New(sc *score.Score, opts Options) *Engine {
 		e.trackGain[i] = 1
 	}
 	for i, tr := range sc.Tracks {
-		e.voices[i] = opts.Voices(sr, tr.Program)
+		program := tr.Program
+		if tr.Drums {
+			program = synth.DrumKitProgram
+		}
+		e.voices[i] = opts.Voices(sr, program)
 		e.artic[i], _ = e.voices[i].(synth.Articulator)
 		e.articRep[i], _ = e.voices[i].(synth.ContinuationReporter)
 		e.userTrack[i] = tr.Role == score.RoleUser

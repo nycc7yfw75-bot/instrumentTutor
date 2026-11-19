@@ -107,6 +107,9 @@ func (o *shellOpener) editPiece(path string) {
 	for _, w := range warns {
 		fmt.Fprintln(os.Stderr, "warning:", w)
 	}
+	if n := sc.WithoutDrums(); n > 0 {
+		fmt.Fprintln(os.Stderr, "note: the editor has no drum notation; the drum track is left out of this edit")
+	}
 	o.showEditor(sc, path)
 }
 

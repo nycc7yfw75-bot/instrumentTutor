@@ -50,8 +50,11 @@ type Track struct {
 	Program int
 
 	Wind *WindInstrument
-	Role TrackRole
-	Bars []*Bar
+	// Drums marks a drum kit: played as backing, never shown as tab or
+	// scored. Each note's String carries its drum (see DrumNote).
+	Drums bool
+	Role  TrackRole
+	Bars  []*Bar
 }
 
 type Tuning []int
@@ -95,6 +98,9 @@ func TuningName(t Tuning) string {
 }
 
 func (t *Track) Pitch(n Note) int {
+	if t.Drums {
+		return n.String + drumKeyBase
+	}
 	if t.Wind != nil {
 		return t.Wind.LowSounding + n.Fret
 	}

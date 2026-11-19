@@ -326,15 +326,34 @@ func (a *App) SetTrackSwitcher(fn func(track int)) { a.switchTrack = fn }
 
 // cycleTrack moves the shown-and-scored track by dir (wrapping) and hands it
 // to the switcher, which re-opens the piece so scoring follows the new track.
+// playableTracks counts the tracks that can be practised: all but drum kits.
+func (a *App) playableTracks() int {
+	n := 0
+	for _, tr := range a.sc.Tracks {
+		if !tr.Drums {
+			n++
+		}
+	}
+	return n
+}
+
 func (a *App) cycleTrack(dir int) {
 	n := len(a.sc.Tracks)
 	switch {
-	case n < 2:
-		a.setBPMMessage("this piece has only one track")
+	case a.playableTracks() < 2:
+		a.setBPMMessage("this piece has only one track to practise")
 	case a.switchTrack == nil:
 		a.setBPMMessage("start musicTutor without a file to switch tracks here")
 	default:
-		a.switchTrack(((a.track+dir)%n + n) % n)
+		// Step past drum kits: they play along but cannot be practised.
+		next := a.track
+		for {
+			next = ((next+dir)%n + n) % n
+			if !a.sc.Tracks[next].Drums {
+				break
+			}
+		}
+		a.switchTrack(next)
 	}
 }
 
@@ -678,7 +697,7 @@ var practiceBindings = []practiceBinding{
 	{Group: "tracks", Keys: "1..9", Hint: "1-9 mute", Desc: "Mute / unmute a track (or click its chip)"},
 	{Group: "tracks", Keys: "shift+1..9", Desc: "Solo a track; press again to release (or right-click it)"},
 	{Group: "tracks", Keys: "tab / shift+tab", Hint: "tab track", Desc: "Show and score the next / previous track",
-		Enabled: func(a *App) bool { return a.switchTrack != nil && len(a.sc.Tracks) > 1 }},
+		Enabled: func(a *App) bool { return a.switchTrack != nil && a.playableTracks() > 1 }},
 
 	{Group: "practice", Keys: "M", Hint: "M click", Desc: "Metronome click on / off"},
 	{Group: "practice", Keys: "V", Hint: "V mixer", Desc: "Volume mixer: master, metronome, backing track and each track"},

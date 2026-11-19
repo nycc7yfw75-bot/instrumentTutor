@@ -86,10 +86,10 @@ var practiceChips = []practiceChip{
 	{label: "BPM", key: "shift+B",
 		act: func(a *App) { a.openBPMEntry() }},
 	{label: "TRACK", key: "tab",
-		disabled: func(a *App) bool { return a.switchTrack == nil || len(a.sc.Tracks) < 2 },
+		disabled: func(a *App) bool { return a.switchTrack == nil || a.playableTracks() < 2 },
 		whenOff: func(a *App) string {
-			if len(a.sc.Tracks) < 2 {
-				return "this piece has only one track"
+			if a.playableTracks() < 2 {
+				return "this piece has only one track to practise"
 			}
 			return "start musicTutor without a file to switch tracks here"
 		},

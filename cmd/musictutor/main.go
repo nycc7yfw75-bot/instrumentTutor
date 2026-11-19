@@ -299,6 +299,9 @@ func runPlay(args []string) error {
 			return fmt.Errorf("-track %d: the piece has %d tracks", *track, len(sc.Tracks))
 		}
 		display = *track - 1
+		if sc.Tracks[display].Drums {
+			return fmt.Errorf("-track %d is the drum kit: it plays along but cannot be practised", *track)
+		}
 	} else {
 		display = defaultTrack(sc)
 	}
@@ -439,6 +442,9 @@ func defaultTrack(sc *score.Score) int {
 	}
 	first := -1
 	for i, t := range sc.Tracks {
+		if t.Drums {
+			continue
+		}
 		if t.Role != score.RoleUser {
 			continue
 		}
@@ -453,7 +459,7 @@ func defaultTrack(sc *score.Score) int {
 		return first
 	}
 	for i, t := range sc.Tracks {
-		if !vocal(t) && notes[i] > 0 {
+		if !t.Drums && !vocal(t) && notes[i] > 0 {
 			return i
 		}
 	}

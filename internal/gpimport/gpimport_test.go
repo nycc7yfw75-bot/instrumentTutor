@@ -686,6 +686,7 @@ func percNoteXML(id, element int) string {
 	return `<Note id="` + itoa(id) + `"><Properties>` +
 		`<Property name="Element"><Element>` + itoa(element) + `</Element></Property>` +
 		`<Property name="Variation"><Variation>0</Variation></Property>` +
+		`<Property name="Fret"><Fret>` + itoa(element) + `</Fret></Property>` +
 		`</Properties></Note>`
 }
 
@@ -715,7 +716,7 @@ func trackNames(s *score.Score) []string {
 	return names
 }
 
-func TestPercussionTrackSkipped(t *testing.T) {
+func TestPercussionTrackPlaysAsDrums(t *testing.T) {
 	s, warns, err := importDoc(t, percussionDoc(`<InstrumentSet><Name>Drumkit</Name><Type>drumKit</Type></InstrumentSet>`))
 	if err != nil {
 		t.Fatalf("Import: %v", err)
@@ -723,28 +724,51 @@ func TestPercussionTrackSkipped(t *testing.T) {
 	if err := s.Validate(); err != nil {
 		t.Fatalf("Validate: %v", err)
 	}
-	if len(s.Tracks) != 1 {
-		t.Fatalf("got %d tracks %v, want 1 (the drum track dropped)", len(s.Tracks), trackNames(s))
+	if len(s.Tracks) != 2 {
+		t.Fatalf("got %d tracks %v, want the guitar then the drums", len(s.Tracks), trackNames(s))
 	}
-	tr := s.Tracks[0]
-	if tr.Name != "G" || tr.Role != score.RoleUser {
-		t.Errorf("practice track = %q role %d, want G role %d — a percussion track must never be the user's part",
-			tr.Name, tr.Role, score.RoleUser)
+	if tr := s.Tracks[0]; tr.Name != "G" || tr.Role != score.RoleUser || tr.Drums {
+		t.Errorf("first track = %q role %d drums %v, want G as the part to practise", tr.Name, tr.Role, tr.Drums)
 	}
-	if len(warns) != 1 {
-		t.Fatalf("warnings = %v, want exactly one (per track, not per note)", warns)
+	if kit := s.Tracks[1]; !kit.Drums || kit.Role != score.RoleBacking {
+		t.Errorf("drum track = %+v, want a backing drum kit", kit)
 	}
-	if !hasWarning(warns, "percussion") || !hasWarning(warns, "Drums") {
-		t.Errorf("warning = %q, want one naming the track and saying it is percussion", warns[0])
+	if len(warns) != 0 {
+		t.Errorf("warnings = %v, want none: the drums now play", warns)
 	}
-	if hasWarning(warns, "String/Fret") {
-		t.Errorf("warnings = %v, want no per-note String/Fret complaints", warns)
+	var kick []int
+	for _, ev := range s.Events() {
+		if ev.Track == 1 {
+			kick = append(kick, ev.Key)
+		}
 	}
+	if len(kick) != 4 || kick[0] != 36 || kick[1] != 38 || kick[2] != 42 {
+		t.Errorf("the kit sounds %v, want kick, snare, hi-hat, snare (36 38 42 38)", kick)
+	}
+}
 
-	evs := s.Events()
-	if len(evs) != 1 || evs[0].Key != 45 || evs[0].String != 6 || evs[0].Fret != 5 {
-		t.Fatalf("events = %+v, want the guitar's single whole note (key 45, string 6 fret 5)", evs)
+func TestDrumSoundComesFromTheKitArticulation(t *testing.T) {
+	kit := `<InstrumentSet><Type>drumKit</Type><Elements>` +
+		`<Element><Articulations><Articulation><OutputMidiNumber>38</OutputMidiNumber></Articulation>` +
+		`<Articulation><OutputMidiNumber>38</OutputMidiNumber></Articulation></Articulations></Element>` +
+		`<Element><Articulations><Articulation><OutputMidiNumber>49</OutputMidiNumber></Articulation></Articulations></Element>` +
+		`</Elements></InstrumentSet>`
+	doc := percussionDoc(kit)
+	// The first drum note names articulation 2 (the crash), whatever its fret says.
+	doc = strings.Replace(doc, `<Note id="0"><Properties>`, `<Note id="0"><InstrumentArticulation>2</InstrumentArticulation><Properties>`, 1)
+	s, _, err := importDoc(t, doc)
+	if err != nil {
+		t.Fatalf("Import: %v", err)
 	}
+	for _, ev := range s.Events() {
+		if ev.Track == 1 {
+			if ev.Key != 49 {
+				t.Errorf("the first hit sounds %d, want the crash (49) its articulation names", ev.Key)
+			}
+			return
+		}
+	}
+	t.Fatal("no drum hits imported")
 }
 
 func TestPercussionMarkers(t *testing.T) {
@@ -767,15 +791,11 @@ func TestPercussionMarkers(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Import: %v", err)
 			}
-			wantTracks := 2
-			if tt.perc {
-				wantTracks = 1
+			if len(s.Tracks) != 2 {
+				t.Fatalf("got %d tracks %v, want 2", len(s.Tracks), trackNames(s))
 			}
-			if len(s.Tracks) != wantTracks {
-				t.Fatalf("got %d tracks %v, want %d", len(s.Tracks), trackNames(s), wantTracks)
-			}
-			if got := hasWarning(warns, "percussion"); got != tt.perc {
-				t.Errorf("percussion warning = %v, want %v (warnings %v)", got, tt.perc, warns)
+			if got := s.Tracks[len(s.Tracks)-1].Drums; got != tt.perc {
+				t.Errorf("drum kit = %v, want %v (warnings %v)", got, tt.perc, warns)
 			}
 		})
 	}
@@ -790,12 +810,9 @@ func TestAllPercussionTracksError(t *testing.T) {
 		`<Beat id="0"><Rhythm ref="0" /><Notes>0</Notes></Beat>`,
 		percNoteXML(0, 36),
 		`<Rhythm id="0"><NoteValue>Whole</NoteValue></Rhythm>`)
-	_, warns, err := importDoc(t, doc)
+	_, _, err := importDoc(t, doc)
 	if err == nil || !strings.Contains(err.Error(), "every track in the file is percussion") {
 		t.Fatalf("err = %v, want an all-percussion error", err)
-	}
-	if !hasWarning(warns, "percussion") {
-		t.Errorf("warnings = %v, want the per-track percussion warning kept alongside the error", warns)
 	}
 }
 
@@ -859,9 +876,11 @@ func TestPercussionFilterKeepsLaterTrackBars(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Import: %v", err)
 	}
-	if !hasWarning(warns, "percussion") {
-		t.Errorf("warnings = %v, want the percussion warning", warns)
+	_ = warns
+	if last := s.Tracks[len(s.Tracks)-1]; !last.Drums {
+		t.Fatalf("the drum track was not kept as a kit: %v", trackNames(s))
 	}
+	s.Tracks = s.Tracks[:len(s.Tracks)-1] // the drums go last; the rest keep their own bars
 	assertOwnBars(t, s)
 	if s.Tracks[0].Role != score.RoleUser {
 		t.Errorf("track A role = %d, want RoleUser %d", s.Tracks[0].Role, score.RoleUser)

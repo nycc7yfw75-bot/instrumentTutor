@@ -90,6 +90,9 @@ func (a *App) trackName(i int) string {
 		}
 	}
 	if name == "" {
+		if a.sc.Tracks[i].Drums {
+			return "drums"
+		}
 		if w := a.sc.Tracks[i].Wind; w != nil {
 			name = w.Name
 		} else {

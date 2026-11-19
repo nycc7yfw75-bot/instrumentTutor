@@ -46,6 +46,9 @@ func NewSoundFontFactory(sf *SoundFont) Factory {
 		return nil
 	}
 	return func(sampleRate, program int) Voice {
+		if program == DrumKitProgram {
+			return newSoundFontDrums(sf.sf, sampleRate)
+		}
 		return newSoundFontVoice(sf.sf, sampleRate, program)
 	}
 }

@@ -952,3 +952,20 @@ func TestCycleTrackWithoutSwitcherOnlyExplains(t *testing.T) {
 		t.Fatalf("track = %d, message %q: want the track unchanged and a reason shown", a.track, a.bpmMessage())
 	}
 }
+
+func TestCycleTrackStepsPastTheDrumKit(t *testing.T) {
+	a := newAppTracks(t, 3, 1)
+	a.sc.Tracks[1].Drums = true
+	var got []int
+	a.SetTrackSwitcher(func(track int) { got = append(got, track) })
+	a.cycleTrack(1)
+	a.cycleTrack(-1)
+	if want := []int{2, 2}; fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("from track 1 forward and back went to %v, want %v (the drums at index 1 skipped)", got, want)
+	}
+	a.sc.Tracks[2].Drums = true
+	a.cycleTrack(1)
+	if len(got) != 2 || a.bpmMessage() == "" {
+		t.Error("with only one practisable track left, Tab should explain, not switch")
+	}
+}

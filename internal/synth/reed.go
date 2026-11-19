@@ -320,6 +320,9 @@ func (r *reed) Render(left, right []float32) {
 }
 
 func NewBuiltin(sampleRate, program int) Voice {
+	if program == DrumKitProgram {
+		return NewDrumKit(sampleRate)
+	}
 	if program >= 56 && program <= 79 {
 		return NewReed(sampleRate, program)
 	}
