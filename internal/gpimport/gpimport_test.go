@@ -1477,3 +1477,62 @@ func TestTechniquesImport(t *testing.T) {
 		t.Errorf("bend-and-release shape = %+v, want up a full tone (4 quarter-tones) and back", b)
 	}
 }
+
+func TestPickupBarLeadsIntoBarOne(t *testing.T) {
+	doc := gpifDoc(
+		`<MasterBar><Time>4/4</Time><Bars>0</Bars></MasterBar>`+
+			`<MasterBar><Time>4/4</Time><Bars>1</Bars></MasterBar>`,
+		`<Bar id="0"><Voices>0 -1 -1 -1</Voices></Bar><Bar id="1"><Voices>1 -1 -1 -1</Voices></Bar>`,
+		`<Voice id="0"><Beats>0</Beats></Voice><Voice id="1"><Beats>1 2 3</Beats></Voice>`,
+		`<Beat id="0"><Rhythm ref="0" /><Notes>0</Notes></Beat>`+
+			`<Beat id="1"><Rhythm ref="0" /><Notes>1</Notes></Beat>`+
+			`<Beat id="2"><Rhythm ref="0" /><Notes>2</Notes></Beat>`+
+			`<Beat id="3"><Rhythm ref="0" /><Notes>3</Notes></Beat>`,
+		noteXML(0, 0, 3, "")+noteXML(1, 0, 5, "")+noteXML(2, 0, 7, "")+noteXML(3, 0, 8, ""),
+		`<Rhythm id="0"><NoteValue>Quarter</NoteValue></Rhythm>`,
+	)
+	doc = strings.Replace(doc, "</Automations>", "</Automations><Anacrusis/>", 1)
+	s, warns, err := importDoc(t, doc)
+	if err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+	if !s.Pickup || s.BarNumber(0) != 0 || s.BarNumber(1) != 1 {
+		t.Errorf("pickup %v, bars numbered %d and %d; want a pickup bar 0 then bar 1", s.Pickup, s.BarNumber(0), s.BarNumber(1))
+	}
+	evs := s.Events()
+	if len(evs) == 0 || evs[0].Start != 3*score.Quarter {
+		t.Fatalf("the pickup note starts at %d, want beat 4 (%d), leading into bar 1", evs[0].Start, 3*score.Quarter)
+	}
+	for _, w := range warns {
+		if strings.Contains(w, "padded with a rest") {
+			t.Errorf("a pickup and the short last bar completing it are expected, yet warned: %q", w)
+		}
+	}
+}
+
+func TestPaddedNamesImportWithoutWarnings(t *testing.T) {
+	doc := gpifDocTracks("0", trackXML(0, "\n  Lead | Guitar\n  ", ""),
+		`<MasterBar><Time>4/4</Time><Bars>0</Bars></MasterBar>`,
+		`<Bar id="0"><Voices>0 -1 -1 -1</Voices></Bar>`,
+		`<Voice id="0"><Beats>0</Beats></Voice>`,
+		`<Beat id="0"><Rhythm ref="0" /><Notes>0</Notes></Beat>`,
+		noteXML(0, 0, 0, ""),
+		`<Rhythm id="0"><NoteValue>Whole</NoteValue></Rhythm>`,
+	)
+	doc = strings.Replace(doc, "<Title>Test</Title>", "<Title>\n  Sultans\n  </Title>", 1)
+	s, warns, err := importDoc(t, doc)
+	if err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+	if s.Title != "Sultans" || s.Tracks[0].Name != "Lead | Guitar" {
+		t.Errorf("title %q, track %q: want the padding trimmed", s.Title, s.Tracks[0].Name)
+	}
+	if len(warns) != 0 {
+		t.Errorf("padding around a name raised warnings: %v", warns)
+	}
+
+	slashed := strings.Replace(doc, "<Title>\n  Sultans\n  </Title>", "<Title>AC//DC</Title>", 1)
+	if _, warns, _ := importDoc(t, slashed); !hasWarning(warns, "title") {
+		t.Error("a title with \"//\" inside, which a .gtab cannot hold, no longer warns")
+	}
+}

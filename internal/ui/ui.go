@@ -807,7 +807,7 @@ func (a *App) drawTab(screen *ebiten.Image) {
 		}
 		x := tickToX(bar.Start)
 		vector.StrokeLine(screen, x, tabTop-14, x, float32(bandBottom+14), 1, colBarline, false)
-		drawTextSmall(screen, fmt.Sprintf("%d", bi+1), float64(x)+4, tabTop-32, colHint)
+		drawTextSmall(screen, fmt.Sprintf("%d", a.sc.BarNumber(bi)), float64(x)+4, tabTop-32, colHint)
 
 		for _, beat := range bar.Beats {
 			for _, n := range beat.Notes {
@@ -819,23 +819,16 @@ func (a *App) drawTab(screen *ebiten.Image) {
 					label = windNoteLabel(tr, n)
 				} else {
 					ny = float32(tabTop + (n.String-1)*stringGap)
-					mark := a.tabMarks()[noteKey{beat.Start, n.String}]
-					label = mark.pre + fmt.Sprintf("%d", n.Fret) + mark.post
-					if n.Tied {
-						label = "~" + label
-					}
-					if n.Tech&score.TechDead != 0 {
-						label = "x"
-					}
-					if mark.above != "" {
-						drawTextSmall(screen, mark.above, float64(nx), float64(ny)-24, colHint)
-					}
+					label = fretLabel(n)
 				}
 				col, sounding := a.noteCue(beat.Start, beat.Dur, n.String, n.Inferred, pos, posTick, waiting)
 
 				w := float32(textWMono(label))
 				vector.DrawFilledRect(screen, nx-2, ny-9, w+4, 18, colNoteBG, false)
 				drawTextMono(screen, label, float64(nx), float64(ny)-9, col)
+				if !wind {
+					drawTechMark(screen, a.tabMarks()[noteKey{beat.Start, n.String}], nx, ny, w, tickToX)
+				}
 				if sounding {
 					vector.DrawFilledRect(screen, nx-2, ny+9, w+4, 2, colSounding, false)
 				}

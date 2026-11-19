@@ -26,6 +26,10 @@ type Score struct {
 	// Sections are named parts of the piece (Intro, Verse, Solo), in order
 	// of their start tick; empty when the file names none.
 	Sections []Section
+
+	// Pickup is true when the first bar is a pickup (anacrusis): it is
+	// numbered bar 0, so bar 1 is the first full bar, as in printed music.
+	Pickup bool
 }
 
 type TrackRole int

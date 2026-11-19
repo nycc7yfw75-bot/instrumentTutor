@@ -746,7 +746,8 @@ func (a *App) timelineHint() string {
 func (a *App) positionCaption() string {
 	bars := a.displayed().Bars
 	pos := a.posTick()
-	bar := a.barAt(pos) + 1
+	bar := a.sc.BarNumber(a.barAt(pos))
+	lastBar := a.sc.BarNumber(len(bars) - 1)
 	scale := a.eng.TempoScale()
 	if scale <= 0 {
 		scale = 1
@@ -754,9 +755,9 @@ func (a *App) positionCaption() string {
 	at := a.sc.Tempos.TimeAt(pos) / scale
 	total := a.sc.Tempos.TimeAt(a.pieceEnd()) / scale
 	if sec := a.currentSection(); sec != "" {
-		return fmt.Sprintf("bar %d of %d   %s     %s / %s", bar, len(bars), sec, clockText(at), clockText(total))
+		return fmt.Sprintf("bar %d of %d   %s     %s / %s", bar, lastBar, sec, clockText(at), clockText(total))
 	}
-	return fmt.Sprintf("bar %d of %d     %s / %s", bar, len(bars), clockText(at), clockText(total))
+	return fmt.Sprintf("bar %d of %d     %s / %s", bar, lastBar, clockText(at), clockText(total))
 }
 
 func clockText(sec float64) string {

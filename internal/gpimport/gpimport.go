@@ -127,6 +127,8 @@ type gpScoreInfo struct {
 type gpMasterTrack struct {
 	Tracks      string         `xml:"Tracks"`
 	Automations []gpAutomation `xml:"Automations>Automation"`
+	// Anacrusis marks the first bar as a pickup: its few beats lead into bar 1.
+	Anacrusis *struct{} `xml:"Anacrusis"`
 }
 
 type gpAutomation struct {
@@ -326,7 +328,7 @@ func (im *importer) run() (*score.Score, []string, error) {
 		return nil, im.warns, fmt.Errorf("no bars in file")
 	}
 
-	title, changed := textfmt.CleanLabel(im.doc.Score.Title)
+	title, changed := textfmt.CleanLabel(strings.TrimSpace(im.doc.Score.Title))
 	if changed {
 		im.warnf("title %q holds text a saved .gtab cannot (a line break or \"//\"); imported as %q", im.doc.Score.Title, title)
 	}
@@ -338,6 +340,7 @@ func (im *importer) run() (*score.Score, []string, error) {
 	s.Meters = meters
 	s.Tempos = im.tempos()
 	s.Sections = im.sections()
+	s.Pickup = im.doc.MasterTrack.Anacrusis != nil
 	for i, ref := range order {
 		role := score.RoleBacking
 		if i == 0 {
@@ -423,7 +426,7 @@ func trackLabel(gt *gpTrack, orig int) string {
 	if strings.TrimSpace(gt.Name) == "" {
 		return fmt.Sprintf("track %d", orig+1)
 	}
-	return fmt.Sprintf("track %d (%s)", orig+1, gt.Name)
+	return fmt.Sprintf("track %d (%s)", orig+1, strings.TrimSpace(gt.Name))
 }
 
 func (im *importer) ids(list, ctx string) []int {
@@ -573,7 +576,7 @@ type trackConv struct {
 func (im *importer) buildTrack(orig int, gt *gpTrack, role score.TrackRole) *score.Track {
 	tc := &trackConv{wind: im.classifyWind(orig, gt)}
 
-	name, changed := textfmt.CleanLabel(gt.Name)
+	name, changed := textfmt.CleanLabel(strings.TrimSpace(gt.Name))
 	if changed {
 		im.warnf("%s: the track name holds text a saved .gtab cannot (a line break or \"//\"); imported as %q", trackLabel(gt, orig), name)
 	}
@@ -826,6 +829,19 @@ func (im *importer) fillBar(orig, mi int, bar *score.Bar, tc *trackConv) {
 	barLen := bar.Len()
 	var filled int64
 	over := false
+	pickup := im.doc.MasterTrack.Anacrusis != nil
+	if pickup && mi == 0 {
+		// A pickup's beats are the end of the bar: the rest goes first, so
+		// the notes land on the beats that lead into bar 1.
+		var total int64
+		for _, bd := range beats {
+			total += bd.dur
+		}
+		if total < barLen {
+			bar.AddBeat(barLen - total)
+			filled = barLen - total
+		}
+	}
 	for _, bd := range beats {
 		if filled >= barLen {
 			over = true
@@ -844,7 +860,8 @@ func (im *importer) fillBar(orig, mi int, bar *score.Bar, tc *trackConv) {
 	}
 	if filled < barLen {
 		bar.AddBeat(barLen - filled)
-		if len(beats) > 0 {
+		// With a pickup, a short last bar completes it: expected, not a fault.
+		if len(beats) > 0 && !(pickup && mi == len(im.doc.MasterBars)-1) {
 			im.warnf("track %d bar %d: beats fill %d of %d ticks; padded with a rest", orig+1, mi+1, filled, barLen)
 		}
 	}

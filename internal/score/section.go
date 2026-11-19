@@ -9,6 +9,15 @@ type Section struct {
 	Name string
 }
 
+// BarNumber is the number printed for the bar at index i: from 0 when the
+// piece opens with a pickup, else from 1.
+func (s *Score) BarNumber(i int) int {
+	if s.Pickup {
+		return i
+	}
+	return i + 1
+}
+
 // SectionAt is the index of the section playing at tick, or -1 before the
 // first one (or when there are none).
 func (s *Score) SectionAt(tick int64) int {
