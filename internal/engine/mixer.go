@@ -91,3 +91,21 @@ func scaleBuf(buf []float32, g float64) {
 		buf[i] *= gf
 	}
 }
+
+// limitKnee is where the output limiter starts to bend the signal.
+const limitKnee = 0.9
+
+// limit keeps the output inside ±1. Below the knee nothing changes; above
+// it a tanh curve bends peaks smoothly toward 1, so a full band plus the
+// click never hard-clips (which is heard as crackle).
+func limit(buf []float32) {
+	const room = 1 - limitKnee
+	for i, s := range buf {
+		a := math.Abs(float64(s))
+		if a <= limitKnee {
+			continue
+		}
+		y := limitKnee + room*math.Tanh((a-limitKnee)/room)
+		buf[i] = float32(math.Copysign(y, float64(s)))
+	}
+}

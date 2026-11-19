@@ -477,6 +477,28 @@ type trackCarry struct {
 	loopOn bool
 }
 
+// switchTrack re-opens path showing and scoring track, carrying tempo,
+// playhead and loop over from eng. A failed re-open keeps the old choice.
+func (o *shellOpener) switchTrack(path string, eng *engine.Engine, track int) error {
+	lo, hi, on := eng.Loop()
+	o.carry = &trackCarry{scale: eng.TempoScale(), pos: eng.PosTick(), lo: lo, hi: hi, loopOn: on}
+	if o.trackFor == nil {
+		o.trackFor = map[string]int{}
+	}
+	prev, had := o.trackFor[path]
+	o.trackFor[path] = track
+	if _, err := o.shell.ReopenPiece(path); err != nil {
+		o.carry = nil
+		if had {
+			o.trackFor[path] = prev
+		} else {
+			delete(o.trackFor, path)
+		}
+		return err
+	}
+	return nil
+}
+
 func (o *shellOpener) Open(path string) (ui.Screen, []string, error) {
 
 	sc, warns, err := load(path)
@@ -497,15 +519,10 @@ func (o *shellOpener) Open(path string) (ui.Screen, []string, error) {
 		SampleRate:   sampleRate,
 		Voices:       fac,
 		CountInBeats: countIn,
+		Limit:        true,
 	})
 
-	display := 0
-	for i, t := range sc.Tracks {
-		if t.Role == score.RoleUser {
-			display = i
-			break
-		}
-	}
+	display := defaultTrack(sc)
 	if t, ok := o.trackFor[path]; ok && t < len(sc.Tracks) {
 		display = t
 	}
@@ -530,20 +547,7 @@ func (o *shellOpener) Open(path string) (ui.Screen, []string, error) {
 	})
 
 	app.SetTrackSwitcher(func(track int) {
-		lo, hi, on := eng.Loop()
-		o.carry = &trackCarry{scale: eng.TempoScale(), pos: eng.PosTick(), lo: lo, hi: hi, loopOn: on}
-		if o.trackFor == nil {
-			o.trackFor = map[string]int{}
-		}
-		prev, had := o.trackFor[path]
-		o.trackFor[path] = track
-		if _, err := o.shell.ReopenPiece(path); err != nil {
-			o.carry = nil
-			if had {
-				o.trackFor[path] = prev
-			} else {
-				delete(o.trackFor, path)
-			}
+		if err := o.switchTrack(path, eng, track); err != nil {
 			app.SetLiveWarning("could not switch track: " + err.Error())
 		}
 	})

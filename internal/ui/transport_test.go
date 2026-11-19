@@ -762,9 +762,21 @@ func TestTransportRowSharesOneHeight(t *testing.T) {
 
 func TestBackButtonLeavesLikeEsc(t *testing.T) {
 	a := newApp(t, 4)
-	a.handleMouse(pressAt(a.backRect()), false)
-	if !a.backPressed {
-		t.Fatal("clicking BACK did not ask to leave the piece")
+	if a.backChip() != escQuitChip {
+		t.Errorf("with nothing behind the piece the esc button reads %q, want QUIT", a.backChip().label)
+	}
+	a.SetQuitAll(func() {})
+	if a.backChip() != escBackChip {
+		t.Errorf("inside the app the esc button reads %q, want BACK", a.backChip().label)
+	}
+	p := pressAt(backButtonRect(a.backChip()))
+	if !escButtonPressed(a.backChip(), p) {
+		t.Fatal("a click on the esc button was not seen")
+	}
+	before := a.eng.PosTick()
+	a.handleMouse(p, false)
+	if a.eng.PosTick() != before || a.drag != dragNone {
+		t.Error("a click on the esc button reached the practice view under it")
 	}
 }
 

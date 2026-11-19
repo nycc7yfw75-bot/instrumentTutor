@@ -122,18 +122,14 @@ func (a *App) chipStates() []chipState {
 // backChip is the top-left button that does what esc does.
 func (a *App) backChip() chipState {
 	if a.quitAll == nil {
-		return chipState{label: "QUIT", key: "esc"}
+		return escQuitChip
 	}
-	return chipState{label: "BACK", key: "esc"}
-}
-
-func (a *App) backRect() rect {
-	return backButtonRect(a.backChip())
+	return escBackChip
 }
 
 // titleX is where the piece title starts, right of the back button.
 func (a *App) titleX() float64 {
-	r := a.backRect()
+	r := backButtonRect(a.backChip())
 	return r.x + r.w + 14
 }
 
@@ -432,7 +428,6 @@ func (a *App) continueLoopDraw(p pointer, l practiceLayout) {
 func (a *App) hitChrome(p pointer, l practiceLayout) bool {
 	spots := make([]hotspot, 0, len(l.transport)+len(l.chips)+len(l.tracks))
 	spots = append(spots,
-		hotspot{r: a.backRect(), on: func() { a.backPressed = true }},
 		hotspot{r: l.transport[0], on: func() { a.seekTo(0) }},
 		hotspot{r: l.transport[1], on: a.seekPrevBar},
 		hotspot{r: l.transport[2], on: a.togglePlay},
@@ -616,14 +611,7 @@ func (a *App) drawTrackStrip(dst *ebiten.Image, l practiceLayout, p pointer) {
 		if r.empty() {
 			continue
 		}
-		name := a.sc.Tracks[i].Name
-		if name == "" {
-			if w := a.sc.Tracks[i].Wind; w != nil {
-				name = w.Name
-			} else {
-				name = "guitar"
-			}
-		}
+		name := a.trackName(i)
 		muted := a.mutedAudibly(i)
 		fill, edge, col := colPanel, colPanelEdge, colNote
 		switch {

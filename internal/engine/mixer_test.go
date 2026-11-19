@@ -58,3 +58,25 @@ func TestSetMixClampsAndIgnoresAWrongTrackCount(t *testing.T) {
 		t.Errorf("a mix for 2 tracks changed this 1-track piece to %v", m.Tracks)
 	}
 }
+
+func TestLimiterKeepsTheOutputInsideFullScale(t *testing.T) {
+	buf := []float32{0.5, -0.89, 0.95, 1.4, -3, 100}
+	limit(buf)
+	if buf[0] != 0.5 || buf[1] != -0.89 {
+		t.Errorf("the limiter touched quiet samples: %v", buf[:2])
+	}
+	prev := float32(0.89)
+	for _, s := range buf[2:] {
+		a := float32(math.Abs(float64(s)))
+		if a > 1 {
+			t.Errorf("a peak left the limiter at %v, past full scale", s)
+		}
+		if a < prev && s > 0 {
+			t.Errorf("louder input came out quieter (%v after %v)", a, prev)
+		}
+		prev = a
+	}
+	if buf[4] >= 0 {
+		t.Errorf("the limiter flipped a negative peak to %v", buf[4])
+	}
+}

@@ -252,6 +252,7 @@ func setup(file, sf2 string, scale float64, met bool, countIn int) (*score.Score
 		Voices:       fac,
 		Metronome:    met,
 		CountInBeats: countIn,
+		Limit:        true,
 	})
 	eng.SetTempoScale(scale)
 	return sc, eng, nil
@@ -299,12 +300,7 @@ func runPlay(args []string) error {
 		}
 		display = *track - 1
 	} else {
-		for i, t := range sc.Tracks {
-			if t.Role == score.RoleUser {
-				display = i
-				break
-			}
-		}
+		display = defaultTrack(sc)
 	}
 
 	app := ui.New(eng, sc, display)
@@ -427,4 +423,42 @@ func renderAll(eng *engine.Engine, tailSec float64, maxFrames int) (left, right 
 		right = append(right, bufR[:n]...)
 	}
 	return left, right, nil
+}
+
+// defaultTrack picks the track a piece opens on: the first one marked as the
+// player's part, unless that is a vocal line (Guitar Pro files often mark the
+// singer's track), in which case the first instrument track with notes.
+func defaultTrack(sc *score.Score) int {
+	vocal := func(t *score.Track) bool {
+		n := strings.ToLower(t.Name)
+		return strings.Contains(n, "vocal") || strings.Contains(n, "voice")
+	}
+	notes := make([]int, len(sc.Tracks))
+	for _, ev := range sc.Events() {
+		notes[ev.Track]++
+	}
+	first := -1
+	for i, t := range sc.Tracks {
+		if t.Role != score.RoleUser {
+			continue
+		}
+		if first < 0 {
+			first = i
+		}
+		if !vocal(t) {
+			return i
+		}
+	}
+	if first >= 0 && !vocal(sc.Tracks[first]) {
+		return first
+	}
+	for i, t := range sc.Tracks {
+		if !vocal(t) && notes[i] > 0 {
+			return i
+		}
+	}
+	if first >= 0 {
+		return first
+	}
+	return 0
 }

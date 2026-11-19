@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image/color"
 	"math"
+	"strings"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
@@ -44,9 +45,6 @@ type mixerRow struct {
 	label string
 }
 
-// mixArg is the volume set the change callback receives.
-type mixArg = engine.Mix
-
 type mixerUI struct {
 	mixer       presence
 	mixerSel    int
@@ -73,8 +71,31 @@ func (a *App) mixerRows() []mixerRow {
 	return rows
 }
 
+// mixerHeadNote says how to close the mixer, and owns up to any tracks that
+// did not fit.
+func (a *App) mixerHeadNote(rows []mixerRow) string {
+	shown := 0
+	for _, r := range rows {
+		if r.kind == mixTrack {
+			shown++
+		}
+	}
+	if hidden := len(a.sc.Tracks) - shown; hidden > 0 {
+		return fmt.Sprintf("+%d more tracks not shown   V or esc closes", hidden)
+	}
+	return "V or esc closes"
+}
+
+// trackName is the short name a track chip and the mixer show. Guitar Pro
+// names read "Performer | Instrument | Part"; only the part tells tracks
+// apart in a narrow chip, so the last segment is kept.
 func (a *App) trackName(i int) string {
 	name := a.sc.Tracks[i].Name
+	if j := strings.LastIndex(name, "|"); j >= 0 {
+		if part := strings.TrimSpace(name[j+1:]); part != "" {
+			name = part
+		}
+	}
 	if name == "" {
 		if w := a.sc.Tracks[i].Wind; w != nil {
 			name = w.Name
@@ -222,7 +243,7 @@ func (a *App) drawMixer(screen *ebiten.Image) {
 	card := a.mixerCard(len(rows))
 	drawPanel(c, card, colPanel, colPanelEdge)
 	drawText(c, "MIXER", card.x+mixPadX, card.y+16, colInferred)
-	drawTextRight(c, "V or esc closes", card.x+card.w-mixPadX, card.y+16, colDim)
+	drawTextRight(c, a.mixerHeadNote(rows), card.x+card.w-mixPadX, card.y+16, colDim)
 
 	m := a.eng.Mix()
 	for i, r := range rows {
@@ -265,11 +286,4 @@ func (a *App) drawMixer(screen *ebiten.Image) {
 	op.ColorScale.ScaleAlpha(float32(v))
 	op.Filter = ebiten.FilterLinear
 	screen.DrawImage(c, op)
-}
-
-// SetMixerOpen opens or closes the mixer, as V does.
-func (a *App) SetMixerOpen(open bool) {
-	if a.mixer.open != open {
-		a.toggleMixer()
-	}
 }

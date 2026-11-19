@@ -21,6 +21,10 @@ type Options struct {
 	CountInBeats int
 
 	CountInEveryPass bool
+
+	// Limit bends output peaks above 0.9 so a loud mix never hard-clips.
+	// For playback to a device; tests that measure exact samples leave it off.
+	Limit bool
 }
 
 type RampConfig struct {
@@ -95,6 +99,7 @@ type Engine struct {
 	backOffset   float64
 	backGain     float64
 
+	limit      bool
 	masterGain float64
 	clickGain  float64
 	trackGain  []float64
@@ -155,6 +160,7 @@ func New(sc *score.Score, opts Options) *Engine {
 		metronome:        opts.Metronome,
 		scale:            1.0,
 		backGain:         1.0,
+		limit:            opts.Limit,
 		masterGain:       1.0,
 		clickGain:        1.0,
 		waitTrack:        -1,
@@ -424,6 +430,10 @@ func (e *Engine) RenderFrames(left, right []float32) {
 	e.render(left, right)
 	scaleBuf(left, e.masterGain)
 	scaleBuf(right, e.masterGain)
+	if e.limit {
+		limit(left)
+		limit(right)
+	}
 	e.publish()
 	e.mu.Unlock()
 }

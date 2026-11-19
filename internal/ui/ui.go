@@ -99,10 +99,6 @@ type App struct {
 	// nil when nothing can re-open it (the bare `play` command).
 	switchTrack func(track int)
 
-	// backPressed is set by the top-left BACK button; Update turns it into
-	// the same exit esc takes.
-	backPressed bool
-
 	anim animator
 
 	outLatency   func() time.Duration
@@ -184,7 +180,7 @@ func (a *App) Update() error {
 	a.stepPlayhead()
 	a.ptr = readPointer()
 
-	if a.bpmEntry || a.helpOpen {
+	if a.bpmEntry || a.helpOpen || a.mixer.open {
 
 		a.drag = dragNone
 	}
@@ -204,14 +200,13 @@ func (a *App) Update() error {
 		a.dismissWarning()
 		return nil
 	}
+	if escButtonPressed(a.backChip(), a.ptr) {
+		return errQuit
+	}
 	if err := a.handleKeys(); err != nil {
 		return err
 	}
 	a.handleMouse(a.ptr, a.shiftHeld())
-	if a.backPressed {
-		a.backPressed = false
-		return errQuit
-	}
 	return nil
 }
 
@@ -828,9 +823,8 @@ func (a *App) noteCue(start, dur int64, str int, inferred bool, pos float64, pos
 }
 
 func (a *App) drawHUD(screen *ebiten.Image, l practiceLayout) {
-	drawHeaderAt(screen, a.titleX(), a.pieceTitle(), a.statusLine(), a.statusColour())
-	br := a.backRect()
-	drawChip(screen, br, a.backChip(), a.anim.step("chip:back", a.ptr.over(br), a.ptr.down, uiFrameSeconds()))
+	x := drawEscButton(screen, a.backChip(), &a.anim, a.ptr)
+	drawHeaderAt(screen, x, a.pieceTitle(), a.statusLine(), a.statusColour())
 	a.drawTransport(screen, l, a.ptr)
 	a.drawTrackStrip(screen, l, a.ptr)
 	a.drawTimeline(screen, l, a.ptr)
