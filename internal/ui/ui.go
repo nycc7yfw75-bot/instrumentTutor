@@ -122,6 +122,7 @@ type App struct {
 	liveUI
 	mixerUI
 	warnListUI
+	inputHintUI
 }
 
 func New(eng *engine.Engine, sc *score.Score, track int) *App {

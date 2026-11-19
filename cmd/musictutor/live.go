@@ -396,6 +396,7 @@ func setupListen(eng *engine.Engine, app *ui.App, sc *score.Score, inQ, outQ str
 	app.SetLiveStatus(func() (float64, int64) {
 		return session.InputLevel(), session.DroppedSamples()
 	})
+	app.SetClipCounter(session.ClippedSamples)
 	app.SetWaitControl(true)
 	fmt.Printf("listening on %s (offset %d frames, calibrated: %v)\n", b.Name(), offset, calibrated)
 	wired = true

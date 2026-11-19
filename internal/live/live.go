@@ -32,6 +32,9 @@ type Session struct {
 	done    chan struct{}
 
 	level atomic.Uint64
+	// clipped counts input samples at or past clipLevel: the interface's
+	// converter running out of room, heard as distortion and read as noise.
+	clipped atomic.Int64
 }
 
 func Start(cfg Config) (*Session, error) {
@@ -193,13 +196,20 @@ func (a *analyzer) feedGap(n int64) {
 
 func (s *Session) publishLevel(samples []float32) {
 	var sum float64
+	var clips int64
 	for _, v := range samples {
 		sum += float64(v) * float64(v)
+		if v >= clipLevel || v <= -clipLevel {
+			clips++
+		}
 	}
 	rms := math.Sqrt(sum / float64(len(samples)))
 	db := -120.0
 	if rms > 0 {
 		db = 20 * math.Log10(rms)
+	}
+	if clips > 0 {
+		s.clipped.Add(clips)
 	}
 	prev := math.Float64frombits(s.level.Load())
 	if prev == 0 {
@@ -217,6 +227,12 @@ func (s *Session) InputLevel() float64 {
 }
 
 func (s *Session) DroppedSamples() int64 { return s.ringBuf.Dropped() }
+
+// clipLevel is where an input sample counts as clipped.
+const clipLevel = 0.98
+
+// ClippedSamples counts input samples that hit the top of the range.
+func (s *Session) ClippedSamples() int64 { return s.clipped.Load() }
 
 func (s *Session) Backlog() int64 { return s.ringBuf.buffered() }
 

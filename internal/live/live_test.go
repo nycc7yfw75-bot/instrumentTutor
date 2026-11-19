@@ -181,3 +181,11 @@ func TestAnalyzeDeliversStrums(t *testing.T) {
 		t.Error("no OnStrums call recorded")
 	}
 }
+
+func TestClippedSamplesCountsBothRails(t *testing.T) {
+	var s Session
+	s.publishLevel([]float32{0.1, 0.99, -1, 0.5, 0.97})
+	if got := s.ClippedSamples(); got != 2 {
+		t.Fatalf("ClippedSamples = %d, want 2 (0.99 and -1, not 0.97)", got)
+	}
+}

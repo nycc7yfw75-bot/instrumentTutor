@@ -165,6 +165,7 @@ func (a *App) syncLive() {
 	if status != nil {
 		a.levelDB, a.dropped = status()
 	}
+	a.updateInputHint()
 }
 
 func (a *App) verdictAt(start int64, str int, pos int64) (practice.Verdict, bool) {
@@ -226,9 +227,13 @@ func (a *App) drawLiveHUD(screen *ebiten.Image) {
 	} else if lv > 0 {
 		lv = 0
 	}
+	hint, hintCol := a.inputHint()
 	fc := colHit
-	if a.levelDB > -3 {
+	switch {
+	case a.levelDB > -3 || hintCol == colMiss:
 		fc = colMiss
+	case hint != "":
+		fc = colClose
 	}
 	vector.DrawFilledRect(screen, x0+1, y0+1, (meterW-2)*float32((lv+60)/60), meterH-2, fc, false)
 
@@ -237,7 +242,15 @@ func (a *App) drawLiveHUD(screen *ebiten.Image) {
 
 	drawTextRight(screen, liveStatsLine(a.stats), screenW-uiPadX, float64(y0)+18, colHUD)
 	if a.dropped > 0 {
-		drawTextRight(screen, fmt.Sprintf("dropped %d samples", a.dropped), screenW-uiPadX, float64(y0)+34, colMiss)
+		d := fmt.Sprintf("dropped %d samples", a.dropped)
+		if hint == "" {
+			hint, hintCol = d, colMiss
+		} else {
+			hint = d + "   " + hint
+		}
+	}
+	if hint != "" {
+		drawTextRight(screen, hint, screenW-uiPadX, float64(y0)+34, hintCol)
 	}
 }
 
