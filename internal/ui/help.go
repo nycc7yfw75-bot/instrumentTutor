@@ -78,7 +78,7 @@ func helpCard() rect {
 const (
 	editorHelpFootnote   = "rest the cursor on any toolbar symbol and it names itself, and gives its key"
 	browserHelpFootnote  = "tab and the arrow keys move between the three lists; the wheel scrolls whichever one the cursor is over"
-	practiceHelpFootnote = "track chips:  click to mute    right-click to solo    the blue edge marks the track the notation is showing"
+	practiceHelpFootnote = "track chips:  click to mute    right-click to solo    the blue edge marks your track    tab switches it"
 )
 
 type helpFlow struct {

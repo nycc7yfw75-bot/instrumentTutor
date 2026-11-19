@@ -931,3 +931,24 @@ func TestNewNarrowsWaitModeToTheDisplayedTrack(t *testing.T) {
 		t.Errorf("halted again at tick %d on track %d, want to play through track 1's note", evs[0].Start, evs[0].Track)
 	}
 }
+
+func TestCycleTrackWrapsBothWays(t *testing.T) {
+	a := newAppTracks(t, 3, 1)
+	var got []int
+	a.SetTrackSwitcher(func(track int) { got = append(got, track) })
+	a.cycleTrack(1)
+	a.cycleTrack(-1)
+	a.track = 2
+	a.cycleTrack(1)
+	if want := []int{1, 2, 0}; fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("switched to %v, want %v", got, want)
+	}
+}
+
+func TestCycleTrackWithoutSwitcherOnlyExplains(t *testing.T) {
+	a := newAppTracks(t, 3, 1)
+	a.cycleTrack(1)
+	if a.track != 0 || a.bpmMessage() == "" {
+		t.Fatalf("track = %d, message %q: want the track unchanged and a reason shown", a.track, a.bpmMessage())
+	}
+}

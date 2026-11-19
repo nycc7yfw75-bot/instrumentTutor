@@ -79,8 +79,21 @@ var practiceChips = []practiceChip{
 	{label: "TUNER", key: "T",
 		on:  func(a *App) bool { return a.tunerView },
 		act: func(a *App) { a.tunerView = !a.tunerView }},
+	{label: "SLOWER", key: "down",
+		act: func(a *App) { a.eng.SetTempoScale(a.eng.TempoScale() - 0.05) }},
+	{label: "FASTER", key: "up",
+		act: func(a *App) { a.eng.SetTempoScale(a.eng.TempoScale() + 0.05) }},
 	{label: "BPM", key: "shift+B",
 		act: func(a *App) { a.openBPMEntry() }},
+	{label: "TRACK", key: "tab",
+		disabled: func(a *App) bool { return a.switchTrack == nil || len(a.sc.Tracks) < 2 },
+		whenOff: func(a *App) string {
+			if len(a.sc.Tracks) < 2 {
+				return "this piece has only one track"
+			}
+			return "start musicTutor without a file to switch tracks here"
+		},
+		act: func(a *App) { a.cycleTrack(1) }},
 	{label: "SETTINGS", key: "S",
 		disabled: func(a *App) bool { return a.settings == nil },
 		whenOff:  func(a *App) string { return "settings need the full app — start musicTutor without a file" },
@@ -101,6 +114,24 @@ func (a *App) chipStates() []chipState {
 		}
 	}
 	return out
+}
+
+// backChip is the top-left button that does what esc does.
+func (a *App) backChip() chipState {
+	if a.quitAll == nil {
+		return chipState{label: "QUIT", key: "esc"}
+	}
+	return chipState{label: "BACK", key: "esc"}
+}
+
+func (a *App) backRect() rect {
+	return rect{uiPadX, uiHeaderY - 6, chipW(a.backChip()), chipH}
+}
+
+// titleX is where the piece title starts, right of the back button.
+func (a *App) titleX() float64 {
+	r := a.backRect()
+	return r.x + r.w + 14
 }
 
 type practiceLayout struct {
@@ -398,6 +429,7 @@ func (a *App) continueLoopDraw(p pointer, l practiceLayout) {
 func (a *App) hitChrome(p pointer, l practiceLayout) bool {
 	spots := make([]hotspot, 0, len(l.transport)+len(l.chips)+len(l.tracks))
 	spots = append(spots,
+		hotspot{r: a.backRect(), on: func() { a.backPressed = true }},
 		hotspot{r: l.transport[0], on: func() { a.seekTo(0) }},
 		hotspot{r: l.transport[1], on: a.seekPrevBar},
 		hotspot{r: l.transport[2], on: a.togglePlay},
@@ -417,6 +449,9 @@ func (a *App) hitChrome(p pointer, l practiceLayout) bool {
 			continue
 		}
 		spots = append(spots, hotspot{r: l.chips[i], on: func() { c.act(a) }})
+	}
+	if a.warningVisible() {
+		spots = append(spots, hotspot{r: warnRect(), on: a.dismissWarning})
 	}
 	for i := range l.tracks {
 		i := i
@@ -608,7 +643,11 @@ func (a *App) drawTrackStrip(dst *ebiten.Image, l practiceLayout, p pointer) {
 		if muted {
 			sub = colBarline
 		}
-		drawTextSmall(dst, a.trackStateText(i), r.x+9, r.y+20, sub)
+		state := a.trackStateText(i)
+		if i == a.track {
+			state = "you · " + state
+		}
+		drawTextSmall(dst, state, r.x+9, r.y+20, sub)
 	}
 	if n := a.hiddenTracks(l); n > 0 {
 		drawText(dst, a.hiddenTracksHint(len(l.tracks)-n, n), uiPadX, ptTracksY+chipH+4, colHint)

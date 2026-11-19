@@ -52,7 +52,13 @@ func drawTextRight(dst *ebiten.Image, s string, x, y float64, col color.RGBA) {
 }
 
 func drawHeader(dst *ebiten.Image, title, status string, statusCol color.RGBA) {
-	drawTextScaled(dst, title, uiPadX, uiHeaderY, uiTitleScl, colNote)
+	drawHeaderAt(dst, uiPadX, title, status, statusCol)
+}
+
+// drawHeaderAt is drawHeader with the title starting at x, leaving room
+// on the left for a button.
+func drawHeaderAt(dst *ebiten.Image, x float64, title, status string, statusCol color.RGBA) {
+	drawTextScaled(dst, title, x, uiHeaderY, uiTitleScl, colNote)
 	if status != "" {
 		drawTextRight(dst, status, screenW-uiPadX, uiHeaderY+8, statusCol)
 	}

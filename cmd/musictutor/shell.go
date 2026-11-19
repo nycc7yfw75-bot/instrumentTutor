@@ -447,6 +447,19 @@ type shellOpener struct {
 
 	player  *oto.Player
 	session *live.Session
+
+	// trackFor remembers, per piece path, the track the player switched to
+	// with Tab, so F5 and re-opening from the start screen keep it.
+	trackFor map[string]int
+	// carry hands tempo, playhead and loop across a track switch's re-open.
+	carry *trackCarry
+}
+
+type trackCarry struct {
+	scale  float64
+	pos    int64
+	lo, hi int64
+	loopOn bool
 }
 
 func (o *shellOpener) Open(path string) (ui.Screen, []string, error) {
@@ -478,8 +491,38 @@ func (o *shellOpener) Open(path string) (ui.Screen, []string, error) {
 			break
 		}
 	}
+	if t, ok := o.trackFor[path]; ok && t < len(sc.Tracks) {
+		display = t
+	}
+	if c := o.carry; c != nil {
+		o.carry = nil
+		eng.SetTempoScale(c.scale)
+		if c.loopOn {
+			eng.SetLoop(c.lo, c.hi)
+		}
+		eng.SeekTick(c.pos)
+	}
 	app := ui.New(eng, sc, display)
 	app.SetCountIn(countIn)
+
+	app.SetTrackSwitcher(func(track int) {
+		lo, hi, on := eng.Loop()
+		o.carry = &trackCarry{scale: eng.TempoScale(), pos: eng.PosTick(), lo: lo, hi: hi, loopOn: on}
+		if o.trackFor == nil {
+			o.trackFor = map[string]int{}
+		}
+		prev, had := o.trackFor[path]
+		o.trackFor[path] = track
+		if _, err := o.shell.ReopenPiece(path); err != nil {
+			o.carry = nil
+			if had {
+				o.trackFor[path] = prev
+			} else {
+				delete(o.trackFor, path)
+			}
+			app.SetLiveWarning("could not switch track: " + err.Error())
+		}
+	})
 
 	app.SetSettingsOpener(func() { o.showSettings(app) })
 	app.SetReloader(func() {

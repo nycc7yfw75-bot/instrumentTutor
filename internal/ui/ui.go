@@ -95,6 +95,14 @@ type App struct {
 
 	reload func()
 
+	// switchTrack re-opens the piece showing and scoring another track;
+	// nil when nothing can re-open it (the bare `play` command).
+	switchTrack func(track int)
+
+	// backPressed is set by the top-left BACK button; Update turns it into
+	// the same exit esc takes.
+	backPressed bool
+
 	anim animator
 
 	outLatency   func() time.Duration
@@ -193,6 +201,10 @@ func (a *App) Update() error {
 		return err
 	}
 	a.handleMouse(a.ptr, a.shiftHeld())
+	if a.backPressed {
+		a.backPressed = false
+		return errQuit
+	}
 	return nil
 }
 
@@ -243,6 +255,12 @@ func (a *App) handleKeys() error {
 		a.openSettings()
 	case inpututil.IsKeyJustPressed(ebiten.KeyF5):
 		a.reloadPiece()
+	case inpututil.IsKeyJustPressed(ebiten.KeyTab):
+		if a.shiftHeld() {
+			a.cycleTrack(-1)
+		} else {
+			a.cycleTrack(1)
+		}
 	case inpututil.IsKeyJustPressed(ebiten.KeyT):
 		a.tunerView = !a.tunerView
 	case inpututil.IsKeyJustPressed(ebiten.KeyW):
@@ -283,6 +301,22 @@ func (a *App) MarkSettingsChanged() { a.settingsTouched = a.reload != nil }
 func (a *App) openSettings() {
 	if a.settings != nil {
 		a.settings()
+	}
+}
+
+func (a *App) SetTrackSwitcher(fn func(track int)) { a.switchTrack = fn }
+
+// cycleTrack moves the shown-and-scored track by dir (wrapping) and hands it
+// to the switcher, which re-opens the piece so scoring follows the new track.
+func (a *App) cycleTrack(dir int) {
+	n := len(a.sc.Tracks)
+	switch {
+	case n < 2:
+		a.setBPMMessage("this piece has only one track")
+	case a.switchTrack == nil:
+		a.setBPMMessage("start musicTutor without a file to switch tracks here")
+	default:
+		a.switchTrack(((a.track+dir)%n + n) % n)
 	}
 }
 
@@ -594,13 +628,14 @@ var practiceBindings = []practiceBinding{
 	{Group: "tempo", Keys: "R", Desc: "Ramp the speed up 5% after each loop pass"},
 	{Group: "tempo", Keys: "C", Desc: "Count-in on / off for the next play"},
 
-	{Group: "loop", Keys: "A / B", Hint: "A/B loop", Desc: "Set the loop start / end at the current bar"},
-	{Group: "loop", Keys: "L", Desc: "Clear the loop"},
+	{Group: "loop", Keys: "A / B,  L", Hint: "A/B loop", Desc: "Set the loop start / end at the current bar; L clears the loop"},
 	{Group: "loop", Keys: "shift+drag", Desc: "Drag out a new loop on the notation or the timeline, snapped to beats"},
 	{Group: "loop", Keys: "drag an edge", Desc: "Move a loop end: snaps to the beat, shift for tick-exact"},
 
 	{Group: "tracks", Keys: "1..9", Hint: "1-9 mute", Desc: "Mute / unmute a track (or click its chip)"},
 	{Group: "tracks", Keys: "shift+1..9", Desc: "Solo a track; press again to release (or right-click it)"},
+	{Group: "tracks", Keys: "tab / shift+tab", Hint: "tab track", Desc: "Show and score the next / previous track",
+		Enabled: func(a *App) bool { return a.switchTrack != nil && len(a.sc.Tracks) > 1 }},
 
 	{Group: "practice", Keys: "M", Hint: "M click", Desc: "Metronome click on / off"},
 
@@ -783,7 +818,9 @@ func (a *App) noteCue(start, dur int64, str int, inferred bool, pos float64, pos
 }
 
 func (a *App) drawHUD(screen *ebiten.Image, l practiceLayout) {
-	drawHeader(screen, a.pieceTitle(), a.statusLine(), a.statusColour())
+	drawHeaderAt(screen, a.titleX(), a.pieceTitle(), a.statusLine(), a.statusColour())
+	br := a.backRect()
+	drawChip(screen, br, a.backChip(), a.anim.step("chip:back", a.ptr.over(br), a.ptr.down, uiFrameSeconds()))
 	a.drawTransport(screen, l, a.ptr)
 	a.drawTrackStrip(screen, l, a.ptr)
 	a.drawTimeline(screen, l, a.ptr)
@@ -812,7 +849,7 @@ func (a *App) pieceTitle() string {
 	}
 
 	const gap = 32.0
-	budget := screenW - 2*uiPadX - textW(a.statusLine()) - gap
+	budget := screenW - uiPadX - a.titleX() - textW(a.statusLine()) - gap
 	return truncateWScaled(a.sc.Title, budget, uiTitleScl)
 }
 

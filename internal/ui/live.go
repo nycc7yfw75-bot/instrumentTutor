@@ -257,7 +257,7 @@ const (
 	warnScale = 2.0
 
 	warnMinGapY = 2.0
-	warnHint    = "press D to dismiss"
+	warnHint    = "press D or click to dismiss"
 )
 
 func warnRect() rect {

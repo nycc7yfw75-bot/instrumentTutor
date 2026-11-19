@@ -759,3 +759,32 @@ func TestTransportRowSharesOneHeight(t *testing.T) {
 		}
 	}
 }
+
+func TestBackButtonLeavesLikeEsc(t *testing.T) {
+	a := newApp(t, 4)
+	a.handleMouse(pressAt(a.backRect()), false)
+	if !a.backPressed {
+		t.Fatal("clicking BACK did not ask to leave the piece")
+	}
+}
+
+func TestTempoButtonsStepByFivePercent(t *testing.T) {
+	a := newApp(t, 4)
+	a.handleMouse(pressAt(chipRect(t, a, "SLOWER")), false)
+	if got := a.eng.TempoScale(); got < 0.949 || got > 0.951 {
+		t.Fatalf("SLOWER left the tempo at %.3f, want 0.95", got)
+	}
+	a.handleMouse(pressAt(chipRect(t, a, "FASTER")), false)
+	if got := a.eng.TempoScale(); got < 0.999 || got > 1.001 {
+		t.Fatalf("FASTER left the tempo at %.3f, want 1.00", got)
+	}
+}
+
+func TestClickingTheBannerDismissesIt(t *testing.T) {
+	a := newApp(t, 4)
+	a.SetLiveWarning("something to read")
+	a.handleMouse(pressAt(warnRect()), false)
+	if a.warningVisible() {
+		t.Fatal("a click on the warning banner left it showing")
+	}
+}
