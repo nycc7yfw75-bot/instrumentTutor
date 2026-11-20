@@ -207,3 +207,22 @@ Opens automatically when a full run ends, and on demand for the last completed l
    - Open the pass review; hover dots; jump to a note.
 3. Run the MOTION.md §C checks for Part B1 (especially audio isolation: identical verdicts and offsets with animations on/off).
 4. Report: the onset finding from §1, every file added/changed, constants file location, anything you couldn't do and why. Do not claim untested behaviour works.
+
+---
+
+## 10. Owner's decisions (2026-11-20) — these override the defaults above
+
+Stage 1 checkpoint:
+- **Grace notes** are excluded from scoring, like dead notes and bends.
+- **Chords** are judged by majority of their judgeable strings: a hit when more than half were hits, a miss when more than half were missed, close otherwise. Timed from the strum.
+- **Wait mode is unscored**: notes confirmed by wait mode count neither for nor against, earn no XP and move no excitement; the HUD shows Unscored while WAIT is on.
+
+Progress saving (Stage 2):
+- **Song identity is a fingerprint of the song's contents** (its notes), not the file path: renaming or moving a file keeps its progress; editing its notes makes it a new song. The path and title are stored alongside for display. (Replaces §5 "Piece identity: file path for now".)
+- **Per-song practice setup stays shared** (track, tempo, loop, mixer, mutes in config.json, as today); only progress is per profile.
+- **Unscored passes are still logged**: the pass history and practice time record them, marked Unscored, with 0 XP.
+- **Progress is written after every pass**, atomically.
+- **A pass also ends when the player pauses** (not only on a loop wrap or the song's end): what was played since the last start counts as a pass for that bar range if it judged ≥ 8 notes.
+- **The first profile is named by the player on first launch** (a one-time prompt), and the name is editable later in Settings under a Profile section.
+- **Keep the last 3 copies** of progress.json (progress.json.1 → .2 → .3, rotated on each save).
+- **Practice time counts while the song is actually playing**, per day and per song; paused or idle time doesn't count. (Stored per profile, as the base for a future streak.)
