@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -13,17 +14,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
-const (
-	brwPaneGap   = 20.0
-	brwPaneHeadH = 30.0
-	brwRowH      = 42.0
-	brwActionH   = 44.0
-	brwNameScale = 1.2
-
-	brwStatusLines = 5
-
-	brwStatusWarnings = 2
-)
+const brwStatusWarnings = 2
 
 type browserPane int
 
@@ -31,15 +22,18 @@ const (
 	paneRecent browserPane = iota
 	paneCreated
 	paneLibrary
+	paneAll // every song above, each file once (REDESIGN §7)
 	paneCount
 )
 
-var paneTitles = [paneCount]string{"RECENT", "WRITTEN HERE", "YOUR LIBRARY"}
+// paneTitles are the SONGS list's filter tabs.
+var paneTitles = [paneCount]string{"Recent", "Written here", "Library", "All"}
 
 var paneEmpty = [paneCount]string{
-	"pieces you open will be listed here — or drop a file anywhere on this window",
-	"pieces you write here will be listed here",
-	"nothing in the folder yet — write a piece and it lands here",
+	"Songs you open are listed here — or drop a file anywhere on this window",
+	"Songs you write here are listed here",
+	"Nothing in the folder yet — write a song and it lands here",
+	"No songs yet — open one, or drop a file anywhere on this window",
 }
 
 var browserPieceExts = map[string]bool{
@@ -74,6 +68,8 @@ type browserEntry struct {
 
 	missing bool
 	problem bool
+
+	from browserPane // on the All tab: the list the row came from
 }
 
 type browserRecentRemover interface {
@@ -102,6 +98,7 @@ type Browser struct {
 
 	libErr      string
 	libScanning bool
+	libInfo     map[string]browserEntry // library rows by path key
 
 	forgotten map[string]bool
 
@@ -128,11 +125,15 @@ type Browser struct {
 
 	helpOpen bool
 
-	ptr       pointer
-	anim      animator
-	hoverIdx  int
-	hoverPane browserPane
-	wheelAcc  float64
+	ptr      pointer
+	anim     animator
+	hoverIdx int
+	wheelAcc float64
+	tip      tips
+
+	// The active tab's underline slides to a clicked tab (MOTION §A5).
+	slideFrom, underNow rect
+	slideT              float64
 
 	mu        sync.Mutex
 	pending   *dialogResult
@@ -143,12 +144,16 @@ type Browser struct {
 }
 
 func NewBrowser(sh *Shell) *Browser {
-	b := &Browser{sh: sh, forgotten: map[string]bool{}, hoverIdx: -1}
+	b := &Browser{sh: sh, forgotten: map[string]bool{}, hoverIdx: -1, slideT: durMove}
 	b.hintOpen = true
 	if pr := b.prefs(); pr != nil {
 		b.hintOpen = !pr.HintHidden()
 	}
 	b.reloadRecents()
+	// The SONGS list opens on Recent, or on the Library while that is empty.
+	if len(b.panes[paneRecent]) == 0 && b.hasLibrary() {
+		b.focus = paneLibrary
+	}
 	b.rescanLibrary()
 	return b
 }
@@ -267,10 +272,12 @@ func (b *Browser) reloadRecents() {
 	status := make(map[string]bool, len(known))
 	build := func(paths []string) []browserEntry {
 		var out []browserEntry
+		seen := map[string]bool{}
 		for _, p := range paths {
-			if b.forgotten[p] {
+			if b.forgotten[p] || seen[pathKey(p)] {
 				continue
 			}
+			seen[pathKey(p)] = true
 			missing, seen := status[p]
 			if !seen {
 				if missing, seen = known[p]; !seen {
@@ -295,7 +302,36 @@ func (b *Browser) reloadRecents() {
 	b.panes[paneRecent] = build(recents)
 	b.panes[paneCreated] = build(created)
 	b.recentStatus = status
+	b.rebuildAll()
 	b.setSel(b.sel)
+}
+
+// pathKey is what makes two rows the same file: the cleaned path, ignoring
+// case on Windows. The path only, no hashing (REDESIGN §7).
+func pathKey(p string) string {
+	p = filepath.Clean(p)
+	if runtime.GOOS == "windows" {
+		p = strings.ToLower(p)
+	}
+	return p
+}
+
+// rebuildAll fills the All tab: recent, written here, then the library,
+// each file once.
+func (b *Browser) rebuildAll() {
+	var all []browserEntry
+	seen := map[string]bool{}
+	for _, p := range []browserPane{paneRecent, paneCreated, paneLibrary} {
+		for _, e := range b.panes[p] {
+			if seen[pathKey(e.path)] {
+				continue
+			}
+			seen[pathKey(e.path)] = true
+			e.from = p
+			all = append(all, e)
+		}
+	}
+	b.panes[paneAll] = all
 }
 
 func (b *Browser) entries() []browserEntry { return b.panes[b.focus] }
@@ -306,9 +342,9 @@ func (b *Browser) hasLibrary() bool {
 
 func (b *Browser) paneOrder() []browserPane {
 	if b.hasLibrary() {
-		return []browserPane{paneRecent, paneCreated, paneLibrary}
+		return []browserPane{paneAll, paneRecent, paneCreated, paneLibrary}
 	}
-	return []browserPane{paneRecent, paneCreated}
+	return []browserPane{paneAll, paneRecent, paneCreated}
 }
 
 func (b *Browser) focusPane(p browserPane) {
@@ -368,17 +404,28 @@ func (b *Browser) drainLibrary() {
 	b.libScanning = false
 	b.libErr = res.err
 	b.panes[paneLibrary] = libraryEntries(res.pieces)
-	if b.focus == paneLibrary {
-		b.setSel(b.sel)
-	} else {
-		b.saved[paneLibrary].sel, b.saved[paneLibrary].top =
-			browserClamp(b.saved[paneLibrary].sel, len(b.panes[paneLibrary])), 0
+	b.libInfo = make(map[string]browserEntry, len(b.panes[paneLibrary]))
+	for _, e := range b.panes[paneLibrary] {
+		b.libInfo[pathKey(e.path)] = e
+	}
+	b.rebuildAll()
+	for _, p := range []browserPane{paneLibrary, paneAll} {
+		if b.focus == p {
+			b.setSel(b.sel)
+		} else {
+			b.saved[p].sel, b.saved[p].top = browserClamp(b.saved[p].sel, len(b.panes[p])), 0
+		}
 	}
 }
 
 func libraryEntries(pieces []PieceInfo) []browserEntry {
 	out := make([]browserEntry, 0, len(pieces))
+	seen := map[string]bool{}
 	for _, p := range pieces {
+		if seen[pathKey(p.Path)] {
+			continue
+		}
+		seen[pathKey(p.Path)] = true
 		name := strings.TrimSpace(p.Title)
 		if name == "" {
 			name = p.Name
@@ -517,8 +564,17 @@ func (b *Browser) openPath(path string) {
 	b.mu.Unlock()
 }
 
-func (b *Browser) forgetRecent() {
+// selFromLibrary reports a selected row that only the library lists.
+func (b *Browser) selFromLibrary() bool {
 	if b.focus == paneLibrary {
+		return true
+	}
+	e, ok := b.selected()
+	return b.focus == paneAll && ok && e.from == paneLibrary
+}
+
+func (b *Browser) forgetRecent() {
+	if b.selFromLibrary() {
 		b.errMsg = "the library lists what is in the folder; delete the file to remove it"
 		return
 	}
@@ -738,10 +794,10 @@ func (b *Browser) browserBindings() []helpBinding {
 			Desc: "Choose a piece with the system's own file dialog"},
 		{Group: "opening", Keys: "enter", Hint: "enter open", Desc: "Open the selected piece"},
 		{Group: "opening", Keys: "drag and drop", Desc: "Drop a piece on the window to open it; drop a folder to browse it in the file dialog"},
-		{Group: "opening", Keys: "del", Hint: "del forget", Off: b.focus == paneLibrary,
+		{Group: "opening", Keys: "del", Hint: "del forget", Off: b.selFromLibrary(),
 			Desc: "Forget the selected shortcut (the file is left alone)"},
 
-		{Group: "choosing", Keys: "tab / left / right", Hint: "tab list", Desc: "Move between recent, written here, and your library"},
+		{Group: "choosing", Keys: "tab / left / right", Hint: "tab list", Desc: "Move between the song lists: all, recent, written here, and your library"},
 		{Group: "choosing", Keys: "F5", Desc: "Re-read the library folder"},
 
 		{Group: "writing", Keys: "N", Hint: "N new piece", Off: b.newPiece == nil,
@@ -756,7 +812,7 @@ func (b *Browser) browserBindings() []helpBinding {
 
 		{Group: "session", Keys: "S", Hint: "S settings", Off: b.settings == nil,
 			Desc: "Audio devices, latency calibration, SoundFont and count-in"},
-		{Group: "session", Keys: "H", Desc: "Show or hide the getting-started strip"},
+		{Group: "session", Keys: "H", Desc: "Show or hide the getting-started card"},
 		{Group: "session", Keys: "? or F1", Hint: "? help", Desc: "This key-binding list"},
 		leave,
 		{Group: "session", Keys: "Q", Desc: "Quit HEADLINER"},
@@ -861,7 +917,7 @@ func (b *Browser) Update() error {
 	if b.queuedEdits() != queued || b.helpOpen {
 		return nil
 	}
-	if escButtonPressed(escQuitChip, b.ptr) {
+	if b.nested() && escButtonPressed(escBackChip, b.ptr) {
 		return errQuit
 	}
 	b.handleMouse(b.ptr)

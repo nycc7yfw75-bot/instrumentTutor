@@ -587,24 +587,24 @@ func TestBrowserHitTestAndClick(t *testing.T) {
 	b, paths := browserRecentsFixture(t, op, 3)
 
 	l := b.layout()
-	pane := l.panes[0]
-	rowY := func(row int) float64 { return pane.y + brwPaneHeadH + float64(row)*brwRowH + 4 }
+	list := l.list
+	rowY := func(row int) float64 { return list.y + float64(row)*listRowH + 4 }
 
-	if _, _, _, onPane := b.paneHit(l, pane.x+10, 20); onPane {
-		t.Error("the header hit-tested as a pane")
+	if _, onRow := b.rowAt(l, list.x+10, 20); onRow {
+		t.Error("the header hit-tested as a row")
 	}
 
-	if _, _, onRow, onPane := b.paneHit(l, pane.x+10, pane.y+4); onRow || !onPane {
-		t.Errorf("the pane heading hit-tested onRow=%v onPane=%v; want false, true", onRow, onPane)
+	if _, onRow := b.rowAt(l, list.x+10, l.songsY+4); onRow {
+		t.Error("the SONGS tabs hit-tested as a row")
 	}
 
-	if _, _, onRow, _ := b.paneHit(l, pane.x+10, rowY(b.listLen())); onRow {
+	if _, onRow := b.rowAt(l, list.x+10, rowY(b.listLen())); onRow {
 		t.Error("empty space below the rows hit-tested as a row")
 	}
 
-	p, i, ok, _ := b.paneHit(l, pane.x+10, rowY(2))
-	if !ok || i != 2 || p != paneRecent {
-		t.Fatalf("paneHit = pane %d row %d, %v; want the recent pane's row 2", p, i, ok)
+	i, ok := b.rowAt(l, list.x+10, rowY(2))
+	if !ok || i != 2 || b.focus != paneRecent {
+		t.Fatalf("rowAt = row %d, %v on tab %d; want the recent tab's row 2", i, ok, b.focus)
 	}
 
 	b.click(i)
@@ -634,17 +634,21 @@ func TestBrowserClickAcrossPanesSelectsBeforeOpening(t *testing.T) {
 		t.Fatalf("the fixture starts on pane %d, want the recent one", b.focus)
 	}
 
+	// The SONGS list shows one tab at a time: a click on the "Written
+	// here" tab switches to it and opens nothing; the next click on its
+	// (selected) row opens it.
 	l := b.layout()
-	over := l.panes[1]
-	press := pointer{x: over.x + 10, y: over.y + brwPaneHeadH + 4, pressed: true, down: true}
-	b.handleMouse(press)
+	tab := l.tabs[tabIndex(b, paneCreated)]
+	b.handleMouse(pointer{x: tab.x + 4, y: tab.y + 4, pressed: true, down: true})
 	if b.focus != paneCreated || b.sel != 0 {
-		t.Fatalf("the press landed on pane %d row %d, want the written pane's row 0", b.focus, b.sel)
+		t.Fatalf("the press landed on tab %d row %d, want the written tab's row 0", b.focus, b.sel)
 	}
 	if len(op.opened) != 0 {
-		t.Fatalf("one click on an unfocused pane opened %v; the first click may only select", op.opened)
+		t.Fatalf("one click on another tab opened %v; switching may only select", op.opened)
 	}
 
+	l = b.layout()
+	press := pointer{x: l.list.x + 10, y: l.list.y + 4, pressed: true, down: true}
 	b.handleMouse(press)
 	if len(op.opened) != 1 || op.opened[0] != pr.created[0] {
 		t.Errorf("clicking the row again opened %v, want [%q]", op.opened, pr.created[0])
@@ -1197,24 +1201,25 @@ func TestBrowserOKeyLaunchesDialog(t *testing.T) {
 
 func TestBrowserStatusStackClearsFooter(t *testing.T) {
 	b := browserFixture(t, &browserFakePrefs{}, &browserFakeOpener{})
-	for _, hint := range []bool{true, false} {
-		b.hintOpen = hint
-		l := b.layout()
-		worstBottom := l.statusY + 20 + 18 + brwStatusWarnings*18 + uiTextH
-		if worstBottom > uiFooterY {
-			t.Errorf("hint=%v: the status stack can reach y=%v, past the footer at y=%v",
-				hint, worstBottom, float64(uiFooterY))
-		}
-		for i, p := range l.panes {
-			if bottom := p.y + p.h; bottom > l.statusY {
-				t.Errorf("hint=%v: pane %d ends at y=%v, inside the status band at y=%v",
-					hint, i, bottom, l.statusY)
+	// The worst case: an error, a heading, and more warnings than shown.
+	b.errMsg = "cannot open x.gp: broken"
+	b.warns, b.warnsFrom = []string{"a", "b", "c", "d"}, "x.gp"
+	atEachSize(t, func(t *testing.T) {
+		for _, hint := range []bool{true, false} {
+			b.hintOpen = hint
+			l := b.layout()
+			lines, _ := b.statusLines()
+			if bottom := l.statusY + float64(len(lines))*brwLineH; bottom > screenH-pgMargin {
+				t.Errorf("hint=%v: the status stack reaches y=%v, past the bottom margin", hint, bottom)
+			}
+			if bottom := l.list.y + float64(l.rows)*listRowH; bottom > l.statusY {
+				t.Errorf("hint=%v: the rows end at y=%v, inside the status band at y=%v", hint, bottom, l.statusY)
+			}
+			if l.rows < 4 {
+				t.Errorf("hint=%v: only %d rows fit in the list", hint, l.rows)
 			}
 		}
-		if l.rows < 4 {
-			t.Errorf("hint=%v: only %d rows fit in a pane", hint, l.rows)
-		}
-	}
+	})
 }
 
 func TestBrowserStaleDialogResultDiscarded(t *testing.T) {
@@ -1398,8 +1403,8 @@ func TestBrowserLibraryPaneAbsentWithoutTheService(t *testing.T) {
 	if b.hasLibrary() {
 		t.Error("a build with no Library reports one")
 	}
-	if got := len(b.paneOrder()); got != 2 {
-		t.Errorf("got %d panes, want 2 without a library", got)
+	if got := len(b.paneOrder()); got != 3 { // All, Recent, Written here
+		t.Errorf("got %d tabs, want 3 without a library", got)
 	}
 
 	b.focusPane(paneLibrary)
@@ -1556,17 +1561,17 @@ func TestBrowserWheelScrollsThePaneUnderTheCursor(t *testing.T) {
 		created = append(created, filepath.Join(dir, name))
 	}
 	b := browserFixture(t, &browserFakePrefs{recents: recents, created: created}, &browserFakeOpener{})
+	b.focusPane(paneCreated)
 	l := b.layout()
 
-	over := l.panes[1]
 	for i := 0; i < 4; i++ {
-		b.handleMouse(pointer{x: over.x + 10, y: over.y + brwPaneHeadH + 4, wheel: -1})
+		b.handleMouse(pointer{x: l.list.x + 10, y: l.list.y + 4, wheel: -1})
 	}
 	if b.focus != paneCreated {
-		t.Fatalf("the wheel left the focus on pane %d, want the one under the cursor", b.focus)
+		t.Fatalf("the wheel moved the list to tab %d, want it left on the one shown", b.focus)
 	}
 	if b.top == 0 {
-		t.Error("the pane under the cursor did not scroll")
+		t.Error("the list under the cursor did not scroll")
 	}
 	if b.saved[paneRecent].top != 0 {
 		t.Errorf("the recent pane scrolled to %d without the cursor being over it", b.saved[paneRecent].top)

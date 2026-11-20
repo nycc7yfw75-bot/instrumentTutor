@@ -1,15 +1,6 @@
 package ui
 
-import (
-	"strconv"
-
-	"github.com/hajimehoshi/ebiten/v2"
-)
-
-const (
-	brwHintOpenH = 84.0
-	brwHintShutH = 26.0
-)
+import ()
 
 type onboardStep struct {
 	title  string
@@ -93,53 +84,5 @@ func (b *Browser) toggleHint() {
 		pr.SetHintHidden(!b.hintOpen)
 
 		_ = pr.Save()
-	}
-}
-
-func (b *Browser) drawHint(screen *ebiten.Image, l browserLayout) {
-	dt := motionDt()
-	if !b.hintOpen {
-		drawTextSmall(screen, "getting started", l.hint.x, l.hint.y+4, colHint)
-		av := b.anim.step("hint:toggle", b.ptr.over(l.hintBtn), b.ptr.down, dt)
-		drawButton(screen, l.hintBtn, glyphNone, "show  (H)", "", btnNormal, av)
-		return
-	}
-
-	drawPanel(screen, l.hint, colPanel, colPanelEdge)
-	drawText(screen, "GETTING STARTED", l.hint.x+12, l.hint.y+7, colInferred)
-	av := b.anim.step("hint:toggle", b.ptr.over(l.hintBtn), b.ptr.down, dt)
-	drawButton(screen, l.hintBtn, glyphNone, "hide  (H)", "", btnNormal, av)
-
-	steps := b.stepList()
-	for i, st := range steps {
-		if i >= len(l.steps) {
-			break
-		}
-		r := l.steps[i]
-		hovered := st.act != nil && b.ptr.over(r)
-		sv := b.anim.step("hint:step"+strconv.Itoa(i), hovered, b.ptr.down, dt)
-		fill, edge := colBG, colBarline
-		if st.act != nil {
-			fill = lerpCol(colBG, colHover, sv.hover)
-			edge = lerpCol(colPanelEdge, colDim, sv.hover)
-			fill = pressShade(fill, sv)
-		}
-		rr := sv.animate(r)
-		drawPanel(screen, rr, fill, edge)
-
-		mark, markCol := "○", colDim
-		if st.done {
-			mark, markCol = "●", colHit
-		}
-		if st.act == nil {
-			mark, markCol = "–", colBarline
-		}
-		titleCol := colNote
-		if st.done {
-			titleCol = colDim
-		}
-		drawText(screen, mark, rr.x+10, rr.y+2, markCol)
-		drawText(screen, truncateW(st.title, rr.w-42), rr.x+30, rr.y+2, titleCol)
-		drawTextSmall(screen, truncateW(st.detail, rr.w-42), rr.x+30, rr.y+21, colDim)
 	}
 }

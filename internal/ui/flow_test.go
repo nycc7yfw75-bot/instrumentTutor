@@ -504,6 +504,7 @@ func TestBindingsDescribeTheFocusedPane(t *testing.T) {
 	sh := NewShell(Services{Prefs: &settingsFakePrefs{}, Audio: newSettingsAudio(),
 		Library: stubLibrary{}}, nil)
 	b := NewBrowser(sh)
+	b.focusPane(paneRecent) // with no recents it opens on the Library (§7)
 	if !strings.Contains(b.hintLine(), "del forget") {
 		t.Errorf("the recent pane's footer omits Delete: %q", b.hintLine())
 	}

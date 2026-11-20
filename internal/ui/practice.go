@@ -96,8 +96,12 @@ var (
 // metadata, or the file name without extension, date suffix or "(1)", in
 // title case with the short words lower case. A "Band-Song" file name keeps
 // only the song.
-func CleanTitle(sc *score.Score, path string) string {
-	t := strings.TrimSpace(sc.Title)
+func CleanTitle(sc *score.Score, path string) string { return cleanPieceTitle(sc.Title, path) }
+
+// cleanPieceTitle is CleanTitle for a title the caller already has (the
+// library's metadata), or "" to derive it from the file name.
+func cleanPieceTitle(title, path string) string {
+	t := strings.TrimSpace(title)
 	if t == "" {
 		t = strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 		for {

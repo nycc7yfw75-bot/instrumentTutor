@@ -11,17 +11,15 @@ import (
 
 func TestButtonLabelBudgetIgnoresAbsentGlyphs(t *testing.T) {
 	b := browserFixture(t, &browserFakePrefs{}, &browserFakeOpener{})
-	for _, hint := range []bool{true, false} {
-		b.hintOpen = hint
-		r := b.layout().hintBtn
-		label := "hide  (H)"
-		if !hint {
-			label = "show  (H)"
-		}
-
-		if got := truncateW(label, r.w-22); got != label {
-			t.Errorf("the hint toggle draws %q instead of %q in a %.0f px button", got, label, r.w)
-		}
+	// The getting-started card closes with an × (a 40×40 target); once
+	// closed it is gone, and H brings it back (REDESIGN §7).
+	b.hintOpen = true
+	if r := b.layout().hintBtn; r.w < 40 || r.h < 40 {
+		t.Errorf("the card's × is %.0f×%.0f, want a ≥ 40×40 target", r.w, r.h)
+	}
+	b.hintOpen = false
+	if l := b.layout(); l.hintBtn.w != 0 || l.hint.h != 0 {
+		t.Errorf("a closed card still takes %+v", l.hint)
 	}
 }
 
