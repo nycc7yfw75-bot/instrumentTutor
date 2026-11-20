@@ -38,32 +38,6 @@ const bpmMsgFrames = 300
 
 const defaultCountInBeats = 4
 
-var (
-	colBG       = color.RGBA{18, 18, 24, 255}
-	colString   = color.RGBA{90, 90, 100, 255}
-	colBarline  = color.RGBA{60, 60, 72, 255}
-	colNote     = color.RGBA{235, 235, 235, 255}
-	colNoteBG   = color.RGBA{18, 18, 24, 255}
-	colSounding = color.RGBA{255, 200, 60, 255}
-	colInferred = color.RGBA{120, 200, 255, 255}
-	colPlayhead = color.RGBA{230, 70, 70, 255}
-
-	colLoop     = color.RGBA{21, 56, 32, 90}
-	colLoopEdge = color.RGBA{60, 160, 90, 255}
-	colHUD      = color.RGBA{200, 200, 210, 255}
-	colCountIn  = color.RGBA{255, 200, 60, 255}
-
-	colHit      = color.RGBA{80, 210, 120, 255}
-	colClose    = color.RGBA{240, 160, 50, 255}
-	colMiss     = color.RGBA{235, 80, 80, 255}
-	colWaitLo   = color.RGBA{180, 140, 40, 255}
-	colWaitHi   = color.RGBA{255, 245, 180, 255}
-	colTuneZone = color.RGBA{40, 90, 55, 255}
-
-	colHelpDim = color.RGBA{4, 4, 6, 200}
-	colWarnBG  = color.RGBA{58, 18, 18, 240}
-)
-
 type App struct {
 	eng   *engine.Engine
 	sc    *score.Score
@@ -142,9 +116,9 @@ func (a *App) Run() error {
 	ebiten.SetWindowSize(screenW, screenH)
 	title := a.sc.Title
 	if title == "" {
-		title = "musicTutor"
+		title = "HEADLINER"
 	} else {
-		title = "musicTutor — " + title
+		title = "HEADLINER — " + title
 	}
 	ebiten.SetWindowTitle(title)
 	err := ebiten.RunGame(a)
@@ -361,7 +335,7 @@ func (a *App) cycleTrack(dir int) {
 	case a.playableTracks() < 2:
 		a.setBPMMessage("this piece has only one track to practise")
 	case a.switchTrack == nil:
-		a.setBPMMessage("start musicTutor without a file to switch tracks here")
+		a.setBPMMessage("start HEADLINER without a file to switch tracks here")
 	default:
 		// Step past drum kits: they play along but cannot be practised.
 		next := a.track
@@ -734,7 +708,7 @@ var practiceBindings = []practiceBinding{
 		Enabled: func(a *App) bool { return a.settings != nil },
 		Caveat: func(a *App) string {
 			if a.settings == nil {
-				return "needs the full app — start musicTutor without a file"
+				return "needs the full app — start HEADLINER without a file"
 			}
 			return ""
 		}},
@@ -750,7 +724,7 @@ var practiceBindings = []practiceBinding{
 			}
 			return "esc back", "Leave this piece and go back"
 		}},
-	{Group: "session", Keys: "Q", Hint: "Q quit", Desc: "Quit musicTutor"},
+	{Group: "session", Keys: "Q", Hint: "Q quit", Desc: "Quit HEADLINER"},
 }
 
 func (a *App) helpRows() []helpBinding {
@@ -877,7 +851,7 @@ func (a *App) drawTab(screen *ebiten.Image) {
 					drawTechMark(screen, a.tabMarks()[noteKey{beat.Start, n.String}], nx, ny, w, tickToX)
 				}
 				if sounding {
-					vector.DrawFilledRect(screen, nx-2, ny+9, w+4, 2, colSounding, false)
+					vector.DrawFilledRect(screen, nx-2, ny+9, w+4, 2, colTabSounding, false)
 				}
 			}
 		}
@@ -898,7 +872,7 @@ func (a *App) drawTab(screen *ebiten.Image) {
 func (a *App) noteCue(start, dur int64, str int, inferred bool, pos float64, posTick int64, waiting map[noteKey]bool) (col color.RGBA, sounding bool) {
 	col = colNote
 	if inferred {
-		col = colInferred
+		col = colInferredNote
 	}
 	if v, ok := a.verdictAt(start, str, posTick); ok {
 		col = verdictColor(v)
@@ -945,7 +919,7 @@ func (a *App) drawHUD(screen *ebiten.Image, l practiceLayout) {
 
 func (a *App) pieceTitle() string {
 	if a.sc.Title == "" {
-		return "musicTutor"
+		return "HEADLINER"
 	}
 
 	const gap = 32.0
@@ -984,7 +958,7 @@ func (a *App) drawBPMEntry(screen *ebiten.Image) {
 	vector.DrawFilledRect(screen, float32(r.x), float32(r.y), float32(r.w), float32(r.h), colBG, false)
 	vector.StrokeRect(screen, float32(r.x), float32(r.y), float32(r.w), float32(r.h), 2, colSounding, false)
 	drawText(screen, "target BPM", r.x+16, r.y+12, colHUD)
-	drawTextScaled(screen, a.bpmDigits+"_", r.x+16, r.y+30, 2, colNote)
+	drawTextScaled(screen, a.bpmDigits+"_", r.x+16, r.y+30, dispL, colNote)
 	drawText(screen, "enter apply    esc or click away to cancel", r.x+16, r.y+64, colHint)
 }
 

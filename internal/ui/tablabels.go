@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"image/color"
 	"strings"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -120,8 +119,6 @@ func quarterToneText(q uint8) string {
 	}
 	return fmt.Sprintf("%d %s", whole, frac)
 }
-
-var colTechMark = color.RGBA{170, 170, 182, 255}
 
 func strokeCurve(dst *ebiten.Image, p *vector.Path) {
 	op := &vector.DrawPathOptions{AntiAlias: true}

@@ -54,9 +54,9 @@ const (
 	reviewStripH    = 190.0
 	reviewRangeMs   = 150.0
 	reviewSweepSecs = 0.600
-	reviewStagger   = 0.090
+	reviewStagger   = staggerPiece
 	reviewPieceIn   = 0.200
-	reviewTravel    = 0.350
+	reviewTravel    = durTravel
 	reviewBlinkStep = 0.100 // steps2, twice
 	reviewTabGap    = 22.0
 	reviewDotHit    = 12.0 // half the 24px hit zone
@@ -221,10 +221,10 @@ func (a *App) drawReview(screen *ebiten.Image) {
 		return
 	}
 	dt := uiFrameSeconds()
-	r.t += dt
+	r.t += motionDt() // stagger and sweep: whole at once under reduced motion
 	r.blinkT += dt
 	if r.viewT < 1 {
-		r.viewT = math.Min(1, r.viewT+dt/reviewTravel)
+		r.viewT = math.Min(1, r.viewT+motionDt()/reviewTravel)
 		r.view = r.viewA + (r.viewB-r.viewA)*curveMove.at(r.viewT)
 	}
 	card := reviewCard()

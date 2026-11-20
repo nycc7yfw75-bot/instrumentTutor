@@ -46,14 +46,6 @@ const (
 	edMsgFrames = 300
 )
 
-var (
-	colEdCursor = color.RGBA{60, 110, 170, 255}
-	colEdCaret  = color.RGBA{120, 190, 255, 255}
-	colEdRest   = color.RGBA{110, 110, 126, 255}
-
-	colTieArc = color.RGBA{150, 170, 200, 255}
-)
-
 type Editor struct {
 	sh  *Shell
 	doc *edit.Doc
@@ -1495,7 +1487,7 @@ func (e *Editor) drawLeavePrompt(screen *ebiten.Image) {
 	r := edPromptRect()
 	drawPanel(screen, r, colPanel, colSounding)
 	title := "This piece has unsaved changes"
-	drawTextScaled(screen, title, centreXScaled(title, r.x, r.w, 1.3), r.y+22, 1.3, colNote)
+	drawTextScaled(screen, title, centreXScaled(title, r.x, r.w, dispS), r.y+22, dispS, colNote)
 	sub := "Save it before leaving?"
 	drawText(screen, sub, centreX(sub, r.x, r.w), r.y+62, colHUD)
 

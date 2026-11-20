@@ -277,7 +277,7 @@ const (
 
 	warnBorderW = 2.0
 
-	warnScale = 2.0
+	warnScale = dispL
 
 	warnMinGapY = 2.0
 	warnHint    = "press D or click to dismiss"
@@ -300,7 +300,7 @@ type warnLayout struct {
 	msgY, hintY float64
 }
 
-func lineHeightOf(f *text.GoTextFace) float64 {
+func lineHeightOf(f text.Face) float64 {
 	m := f.Metrics()
 	return m.HAscent + m.HDescent
 }
@@ -320,7 +320,7 @@ func warnLayoutFor(msg string) warnLayout {
 	}}
 
 	bodyH := lineHeightOf(faceOf(srcBody, fontBody))
-	headH := lineHeightOf(faceOf(srcMedium, fontBody*warnScale))
+	headH := lineHeightOf(displayFace(warnScale))
 
 	budget := l.inner.h - bodyH - warnMinGapY
 
@@ -414,7 +414,7 @@ func (a *App) drawTuner(screen *ebiten.Image) {
 	}
 
 	name := fmt.Sprintf("%s %+.0fc", a.displayName(n.Key), n.Cents)
-	scale := 6.0
+	scale := dispX
 	drawTextScaled(screen, name, centreXScaled(name, 0, screenW, scale), 250, scale, col)
 
 	const barW, barH = 500, 20
@@ -443,9 +443,9 @@ func (a *App) drawTuner(screen *ebiten.Image) {
 
 func (a *App) tunerIdleLine() (string, float64) {
 	if !a.live {
-		return "no live input — " + a.liveRemedy(), 2
+		return "no live input — " + a.liveRemedy(), dispL
 	}
-	return "listening...", 3
+	return "listening...", dispX
 }
 
 func (a *App) liveRemedy() string {

@@ -18,7 +18,7 @@ var (
 	colExciteCold  = colString // text3
 	colExciteWarm  = colDim    // text2
 	colExciteHot   = colHit
-	colExciteFire2 = color.RGBA{160, 240, 190, 255} // the On-fire flicker's second tint
+	colExciteFire2 = colNote // the On-fire flicker's second tint
 	colBlockOff    = colPanelEdge
 	colXPFill      = colInferred
 )
@@ -34,17 +34,17 @@ const (
 	xpBlockH   = 6.0
 	xpBlockGap = 2.0
 
-	popSeconds       = 0.100 // a block lighting: steps2
-	sweepPerBlock    = 0.008 // band change re-tint, left to right
-	labelSwapSeconds = 0.200 // band label crossfade
-	flickerPeriod    = 0.600 // On fire
-	streakSeconds    = 0.300 // "+5" rising
-	moveSeconds      = 0.250 // XP bar fill
+	popSeconds       = 0.100        // a block lighting: steps2
+	sweepPerBlock    = 0.008        // band change re-tint, left to right
+	labelSwapSeconds = durCrossfade // band label crossfade
+	flickerPeriod    = 0.600        // On fire
+	streakSeconds    = 0.300        // "+5" rising
+	moveSeconds      = durMove      // XP bar fill
 
-	toastIn   = 0.240
+	toastIn   = durToastIn
 	toastHold = 1.200
-	toastOut  = 0.170
-	rollSecs  = 0.300
+	toastOut  = durToastOut
+	rollSecs  = durRoll
 )
 
 // exciteView animates the excitement bar.
@@ -66,7 +66,7 @@ func blocksLit(v float64) int {
 // note sees a judged note land; a jump of the streak bonus size starts a
 // "+5" pop.
 func (v *exciteView) note(before, after float64) {
-	if after-before >= scoring.StreakBonus {
+	if after-before >= scoring.StreakBonus && !reduceMotion {
 		v.streaks = append(v.streaks, v.clock)
 	}
 }
@@ -74,16 +74,19 @@ func (v *exciteView) note(before, after float64) {
 func (v *exciteView) frame(e *scoring.Excitement, playing bool) {
 	dt := uiFrameSeconds()
 	v.clock += dt
-	if playing {
+	if playing && !reduceMotion {
 		v.flicker += dt
 	}
 	lit := blocksLit(e.Value)
-	for i := v.lit; i < lit; i++ {
+	for i := v.lit; i < lit && !reduceMotion; i++ {
 		v.popUntil[i] = v.clock + popSeconds // a rise pops; a drain is instant
 	}
 	v.lit = lit
 	if b := e.Band(); b != v.band {
 		v.prevBand, v.band, v.bandSince = v.band, b, v.clock
+		if reduceMotion {
+			v.bandSince = -1 // no sweep, no crossfade
+		}
 	}
 	keep := v.streaks[:0]
 	for _, s := range v.streaks {
@@ -108,7 +111,7 @@ func (v *exciteView) draw(dst *ebiten.Image, x, y float64) float64 {
 			if v.clock-v.bandSince < float64(i)*sweepPerBlock {
 				col = bandColour(v.prevBand) // the re-tint has not reached this block yet
 			}
-			if v.band == scoring.OnFire && i >= v.lit-3 {
+			if v.band == scoring.OnFire && i >= v.lit-3 && !reduceMotion {
 				phase := v.flicker/flickerPeriod*2*math.Pi + float64(i)*0.9
 				if math.Sin(phase) > 0 {
 					col = colExciteFire2
@@ -164,7 +167,7 @@ func (x *xpBarView) aim(total int, leveledUp bool) {
 
 func (x *xpBarView) step() {
 	if x.t < 1 {
-		x.t = math.Min(1, x.t+uiFrameSeconds()/moveSeconds)
+		x.t = math.Min(1, x.t+motionDt()/moveSeconds)
 	}
 	x.shown = x.from + (x.to-x.from)*curveMove.at(x.t)
 }
@@ -193,6 +196,13 @@ func (t *xpToast) done() bool { return t.t >= toastIn+toastHold+toastOut }
 
 func (t *xpToast) draw(dst *ebiten.Image, right, y float64) {
 	t.t += uiFrameSeconds()
+	if reduceMotion && t.t < toastIn+rollSecs {
+		t.t = toastIn + rollSecs // shown whole at once
+	}
+	if reduceMotion && t.t > toastIn+toastHold {
+		t.t = toastIn + toastHold + toastOut // gone at once
+		return
+	}
 	alpha, lift := 1.0, 0.0
 	switch {
 	case t.t < toastIn:
@@ -242,6 +252,15 @@ func (c *levelCard) skip() {
 
 func (c *levelCard) draw(dst *ebiten.Image) {
 	c.t += uiFrameSeconds()
+	if reduceMotion {
+		if c.t < lvTitleAt+0.2 {
+			c.t = lvTitleAt + 0.2 // the end state, at once
+		}
+		if c.t > lvExitAt {
+			c.t = lvExitAt + lvExitFor
+			return
+		}
+	}
 	exit := 0.0
 	if c.t > lvExitAt {
 		exit = curveExit.at(math.Min(1, (c.t-lvExitAt)/lvExitFor))
@@ -263,9 +282,9 @@ func (c *levelCard) draw(dst *ebiten.Image) {
 	cx, cy := card.x+card.w/2, card.y+card.h/2
 	if c.t >= lvPopAt {
 		// "LEVEL 8" pops in three held steps.
-		scale := 2.0
+		scale := dispL
 		if step := int((c.t - lvPopAt) / lvStepFrame); step < 2 {
-			scale = []float64{2.6, 2.3}[step]
+			scale = []float64{dispX, dispX}[step]
 		}
 		txt := fmt.Sprintf("LEVEL %d", c.level)
 		drawTextScaled(dst, txt, centreXScaled(txt, card.x, card.w, scale), cy-30, scale, withAlpha(colInferred, alpha))

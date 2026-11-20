@@ -31,6 +31,8 @@ const (
 	srTap
 	// srProfile renames the player.
 	srProfile
+	// srMotion turns reduced motion on or off.
+	srMotion
 )
 
 type calPhase int
@@ -368,6 +370,9 @@ func (s *Settings) rebuild() {
 	if s.hasSyncTrim() {
 		s.rows = append(s.rows, srSyncTrim)
 	}
+	if s.motionPrefs() != nil {
+		s.rows = append(s.rows, srMotion)
+	}
 	if s.cur >= len(s.rows) {
 		s.cur = len(s.rows) - 1
 	}
@@ -523,6 +528,8 @@ func (s *Settings) adjust(d int) {
 		if d > 0 {
 			s.askName()
 		}
+	case srMotion:
+		s.setReduceMotion(d > 0)
 	}
 }
 
@@ -539,6 +546,8 @@ func (s *Settings) activate() {
 		s.startCalibrationKind(true)
 	case srProfile:
 		s.askName()
+	case srMotion:
+		s.setReduceMotion(!reduceMotion)
 	case srCapture, srPlayback:
 		s.notice = ""
 		if s.deviceStateOf(r) == devUnchosen {
@@ -1337,6 +1346,17 @@ func (s *Settings) items() []settingsItem {
 		b.reserveNote(1, "the app already subtracts the buffering it can measure; this trims what it cannot", colDim)
 	}
 
+	if s.motionPrefs() != nil {
+		value, label := "off", "turn on"
+		if reduceMotion {
+			value, label = "on  (screens change without animating)", "turn off"
+		}
+		b.addRow("reduce motion", value, colHUD, settingsButton{label: label, act: func(s *Settings) {
+			s.focusRow(srMotion)
+			s.setReduceMotion(!reduceMotion)
+		}})
+	}
+
 	return b.out
 }
 
@@ -1363,7 +1383,7 @@ func (s *Settings) rowIndex(kind settingsRow) int {
 func (s *Settings) settingsBindings() []helpBinding {
 	leave := helpBinding{Group: "session", Keys: "esc", Hint: "esc back", Desc: "Go back to where you came from"}
 	if s.sh != nil && s.sh.Depth() <= 1 {
-		leave = helpBinding{Group: "session", Keys: "esc", Hint: "esc quit", Desc: "Quit musicTutor"}
+		leave = helpBinding{Group: "session", Keys: "esc", Hint: "esc quit", Desc: "Quit HEADLINER"}
 	}
 	return []helpBinding{
 		{Group: "moving", Keys: "up / down", Hint: "up/dn select", Desc: "Move between settings"},
@@ -1538,4 +1558,25 @@ func (s *Settings) askName() {
 	if st := s.progress(); st != nil {
 		s.sh.Show(NewNamePrompt(s.sh, st))
 	}
+}
+
+// settingsMotioner is a store that keeps the Reduce motion choice.
+type settingsMotioner interface {
+	ReduceMotion() bool
+	SetReduceMotion(on bool)
+}
+
+func (s *Settings) motionPrefs() settingsMotioner {
+	m, _ := s.prefs().(settingsMotioner)
+	return m
+}
+
+func (s *Settings) setReduceMotion(on bool) {
+	m := s.motionPrefs()
+	if m == nil || on == reduceMotion {
+		return
+	}
+	m.SetReduceMotion(on)
+	SetReduceMotion(on)
+	s.save()
 }

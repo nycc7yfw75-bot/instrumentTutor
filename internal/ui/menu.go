@@ -21,8 +21,6 @@ const (
 	menuIconW     = 30.0
 )
 
-var colAccent = colInferred
-
 func menuItemW(label string) float64 { return textW(label) + 2*menuPadX }
 
 // underlineY is where an item's underline sits in its hit area.

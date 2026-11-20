@@ -197,7 +197,7 @@ func (b *Browser) Draw(screen *ebiten.Image) {
 	b.anim.tick()
 	l := b.layout()
 	x := drawEscButton(screen, escQuitChip, &b.anim, b.ptr)
-	drawHeaderAt(screen, x, "musicTutor", b.headerStatus(), colDim)
+	drawHeaderAt(screen, x, "HEADLINER", b.headerStatus(), colDim)
 	b.drawHint(screen, l)
 	b.drawActions(screen, l)
 	b.drawPanes(screen, l)
@@ -221,7 +221,7 @@ func (b *Browser) headerStatus() string {
 }
 
 func (b *Browser) drawActions(screen *ebiten.Image, l browserLayout) {
-	dt := uiFrameSeconds()
+	dt := motionDt()
 	for i, a := range b.actionList() {
 		if i >= len(l.actions) {
 			break

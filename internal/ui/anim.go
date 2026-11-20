@@ -2,6 +2,8 @@ package ui
 
 import (
 	"image/color"
+	"os"
+	"strconv"
 	"time"
 )
 
@@ -107,7 +109,7 @@ func measureFrame() {
 	if dt > 1.0/20 {
 		dt = 1.0 / 20
 	}
-	uiFrameDT = dt
+	uiFrameDT = dt * slowmo
 }
 
 func lerpCol(a, b color.RGBA, t float64) color.RGBA {
@@ -145,3 +147,12 @@ func (av animValues) animate(r rect) rect {
 func pressShade(c color.RGBA, av animValues) color.RGBA {
 	return lerpCol(c, colBG, 0.6*av.press)
 }
+
+// slowmo scales the UI animation clock for scrubbing motion (MOTION §A4):
+// HEADLINER_SLOWMO=0.1 runs every animation at 10%. It never touches audio.
+var slowmo = func() float64 {
+	if v, err := strconv.ParseFloat(os.Getenv("HEADLINER_SLOWMO"), 64); err == nil && v > 0 && v <= 1 {
+		return v
+	}
+	return 1
+}()

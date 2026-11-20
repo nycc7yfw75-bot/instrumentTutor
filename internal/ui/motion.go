@@ -1,20 +1,92 @@
 package ui
 
 import (
-	"image/color"
-
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
+	"math"
 )
 
-// Motion tokens for overlays that enter and leave (a modal-sized panel:
-// 200–300ms in on an ease-out, 20–30% shorter out on an ease-in).
+// Motion tokens (docs/MOTION.md §1), in seconds. Every animation uses these.
 const (
-	overlayInSeconds  = 0.24
-	overlayOutSeconds = 0.18
-	overlayFromScale  = 0.97
-	overlayScrimAlpha = 0.45
+	durPress      = 0.100
+	durHover      = 0.150
+	durTooltipIn  = 0.125
+	durTooltipOut = 0.090
+	durPopIn      = 0.200
+	durPopOut     = 0.140
+	durOverlayIn  = 0.260
+	durOverlayOut = 0.180
+	durToastIn    = 0.240
+	durToastOut   = 0.170
+	durMove       = 0.250
+	durTravel     = 0.350
+	durRoll       = 0.300
+	durRollBig    = 0.400
+	durMomentStep = 0.500
+	durMomentMax  = 2.500
+	durCrossfade  = 0.200 // replacement: old fades out while new fades in
+
+	staggerCopy  = 0.040
+	staggerPiece = 0.090
+
+	// A pixel step holds 3 frames at 60 fps (steps2/steps3/steps4).
+	stepHold = 0.050
 )
+
+const (
+	overlayInSeconds  = durOverlayIn
+	overlayOutSeconds = durOverlayOut
+	overlayFromScale  = 0.97
+	overlayScrimAlpha = 0.40
+)
+
+// stepIndex is the frame of a pixel-step animation (steps2..steps4) t
+// seconds in: 0..n-1, or n once it has finished.
+func stepIndex(t float64, n int) int {
+	if t < 0 {
+		return 0
+	}
+	return min(n, int(t/stepHold))
+}
+
+// reduceMotion skips every transition (MOTION §A4): end states appear at
+// once. The playhead and meters are time, not motion, and are unaffected.
+var reduceMotion bool
+
+// SetReduceMotion turns reduced motion on or off for the whole app.
+func SetReduceMotion(on bool) { reduceMotion = on }
+
+// ReduceMotion reports whether reduced motion is on.
+func ReduceMotion() bool { return reduceMotion }
+
+// motionDt is the frame's step for a transition: a whole transition at
+// once under reduced motion.
+func motionDt() float64 {
+	if reduceMotion {
+		return 1e6
+	}
+	return uiFrameSeconds()
+}
+
+// spring is a critically damped spring (MOTION §1): no bounce, settling in
+// about 500ms. Used for released drags.
+type spring struct{ x, v float64 }
+
+const springOmega = 13.3 // (1+ωt)e^(-ωt) = 1% at t = 500ms
+
+func (s *spring) step(target, dt float64) float64 {
+	if reduceMotion {
+		s.x, s.v = target, 0
+		return s.x
+	}
+	// Exact critically damped step: x(t) = target + (c1 + c2 t) e^{-ωt}.
+	c1 := s.x - target
+	c2 := s.v + springOmega*c1
+	e := math.Exp(-springOmega * dt)
+	s.x = target + (c1+c2*dt)*e
+	s.v = (c2 - springOmega*(c1+c2*dt)) * e
+	return s.x
+}
 
 // curve is a CSS-style cubic-bezier(x1, y1, x2, y2) timing function.
 type curve struct{ x1, y1, x2, y2 float64 }
@@ -115,12 +187,12 @@ type overlay struct {
 // draw advances the animation and, while visible, dims the screen and draws
 // the card that paint draws onto a full-screen canvas.
 func (o *overlay) draw(screen *ebiten.Image, card rect, paint func(c *ebiten.Image)) {
-	o.step(uiFrameSeconds())
+	o.step(motionDt())
 	if !o.visible() {
 		return
 	}
 	v := o.value
-	vector.DrawFilledRect(screen, 0, 0, screenW, screenH, withAlpha(color.RGBA{0, 0, 0, 255}, overlayScrimAlpha*v), false)
+	vector.DrawFilledRect(screen, 0, 0, screenW, screenH, withAlpha(colScrim, overlayScrimAlpha*v), false)
 	if o.canvas == nil {
 		o.canvas = ebiten.NewImage(screenW, screenH)
 	}

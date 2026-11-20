@@ -12,33 +12,12 @@ const (
 	uiHeaderY = 18.0
 
 	uiHeaderH  = 64.0
-	uiTitleScl = 2.0
+	uiTitleScl = dispL
 	uiFooterY  = screenH - 26.0
 	uiBodyTop  = uiHeaderH + 8.0
 	uiLineH    = 18.0
 	uiRowH     = 26.0
 	uiSectionH = 26.0
-)
-
-var (
-	colPanel     = color.RGBA{24, 24, 32, 255}
-	colPanelEdge = color.RGBA{46, 46, 60, 255}
-	colHover     = color.RGBA{38, 40, 52, 255}
-	colFocus     = color.RGBA{38, 66, 104, 255}
-	colDim       = color.RGBA{132, 132, 148, 255}
-
-	colHint   = color.RGBA{124, 124, 138, 255}
-	colOn     = color.RGBA{46, 96, 66, 255}
-	colOnEdge = color.RGBA{80, 200, 130, 255}
-
-	colOnHover = color.RGBA{62, 126, 88, 255}
-
-	colTipBG   = color.RGBA{14, 14, 20, 255}
-	colTipEdge = color.RGBA{78, 78, 96, 255}
-
-	colGroupCap = color.RGBA{110, 110, 128, 255}
-
-	colDisabled = color.RGBA{98, 98, 112, 255}
 )
 
 func centreX(s string, x, w float64) float64 { return x + (w-textW(s))/2 }
@@ -64,7 +43,7 @@ var (
 // drawEscButton draws a screen's esc button and returns where the title starts.
 func drawEscButton(dst *ebiten.Image, c chipState, an *animator, p pointer) float64 {
 	r := backButtonRect(c)
-	drawMenuItem(dst, r, c.label, false, false, an.step("chip:esc", p.over(r), p.down, uiFrameSeconds()))
+	drawMenuItem(dst, r, c.label, false, false, an.step("chip:esc", p.over(r), p.down, motionDt()))
 	vector.StrokeLine(dst, float32(r.x+r.w+12), float32(r.y+8), float32(r.x+r.w+12), float32(r.y+r.h-8), 1, colPanelEdge, false)
 	return r.x + r.w + 26
 }

@@ -48,6 +48,10 @@ type Config struct {
 
 	SyncTrimMS int `json:"syncTrimMS,omitempty"`
 
+	// ReduceMotion skips UI transitions (MOTION §A4); unset follows Windows'
+	// "Show animations" setting.
+	ReduceMotion *bool `json:"reduceMotion,omitempty"`
+
 	// Pieces remembers each piece's practice setup, keyed by file path.
 	Pieces map[string]PieceSetup `json:"pieces,omitempty"`
 }

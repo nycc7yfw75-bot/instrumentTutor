@@ -109,7 +109,7 @@ type Shell struct {
 }
 
 func NewShell(svc Services, root Screen) *Shell {
-	return &Shell{svc: svc, stack: []Screen{root}, title: "musicTutor"}
+	return &Shell{svc: svc, stack: []Screen{root}, title: "HEADLINER"}
 }
 
 func (s *Shell) Services() Services { return s.svc }
@@ -203,6 +203,7 @@ func (s *Shell) loadPiece(path string) (Screen, []string, error) {
 var errNoOpener = fmt.Errorf("no importer is available in this build")
 
 func (s *Shell) Update() error {
+	noteShotKey()
 	if len(s.stack) == 0 {
 		return errQuit
 	}
@@ -217,7 +218,7 @@ func (s *Shell) Update() error {
 
 		if _, isPractice := top.(*App); isPractice && s.svc.Opener != nil {
 			s.svc.Opener.CloseCurrent()
-			s.SetTitle("musicTutor")
+			s.SetTitle("HEADLINER")
 		}
 
 		if c, ok := top.(Closer); ok {
@@ -241,6 +242,7 @@ func (s *Shell) Update() error {
 func (s *Shell) Draw(dst *ebiten.Image) {
 	if n := len(s.stack); n > 0 {
 		s.stack[n-1].Draw(dst)
+		maybeShoot(dst, s.stack[n-1])
 	}
 }
 

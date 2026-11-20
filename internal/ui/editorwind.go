@@ -282,7 +282,7 @@ func (e *Editor) drawPicker(screen *ebiten.Image) {
 	if e.picker.purpose == pickAddTrack {
 		title = "What will the new track be played on?"
 	}
-	drawTextScaled(screen, title, centreXScaled(title, r.x, r.w, 1.3), r.y+18, 1.3, colNote)
+	drawTextScaled(screen, title, centreXScaled(title, r.x, r.w, dispS), r.y+18, dispS, colNote)
 
 	for i, name := range edPickerChoices {
 		row := rect{r.x + 16, r.y + 66 + float64(i)*edPickRowH, r.w - 32, edPickRowH}

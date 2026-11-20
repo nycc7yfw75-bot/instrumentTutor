@@ -327,7 +327,7 @@ func edPieceWidth(b edButton) float64 {
 }
 
 func (e *Editor) drawChrome(screen *ebiten.Image, l edToolbarLayout) {
-	dt := uiFrameSeconds()
+	dt := motionDt()
 	live := !e.modalUp()
 
 	paint := func(prefix string, b edButton, r rect, icon bool) {

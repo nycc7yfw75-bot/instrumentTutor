@@ -47,7 +47,7 @@ func pickSavePath(suggest string) (path, errMsg string) {
 	opts := []zenity.Option{
 		zenity.Title("Save the piece"),
 		zenity.ConfirmOverwrite(),
-		zenity.FileFilter{Name: "musicTutor tab (.gtab)", Patterns: []string{"*.gtab"}, CaseFold: true},
+		zenity.FileFilter{Name: "HEADLINER tab (.gtab)", Patterns: []string{"*.gtab"}, CaseFold: true},
 	}
 	if suggest != "" {
 		opts = append(opts, zenity.Filename(suggest))

@@ -15,7 +15,7 @@ const (
 	ptTransportY = 58.0
 	ptTracksY    = 100.0
 	ptWarnY      = 160.0
-	ptWarnH      = 56.0
+	ptWarnH      = 60.0
 	ptTimelineH  = 36.0
 
 	ptTabHeadroom = 34.0
@@ -88,7 +88,7 @@ var practiceChips = []practiceChip{
 		act: func(a *App) { a.toggleMixer() }},
 	{label: "Settings", key: "S", right: true,
 		disabled: func(a *App) bool { return a.settings == nil },
-		whenOff:  func(a *App) string { return "settings need the full app — start musicTutor without a file" },
+		whenOff:  func(a *App) string { return "settings need the full app — start HEADLINER without a file" },
 		act:      func(a *App) { a.openSettings() }},
 	{label: "Help", key: "?", right: true,
 		on:  func(a *App) bool { return a.helpOpen },
@@ -627,7 +627,7 @@ func (a *App) drawTransport(dst *ebiten.Image, l practiceLayout, p pointer) {
 	if a.eng.Playing() {
 		icons[2] = iconPause
 	}
-	dt := uiFrameSeconds()
+	dt := motionDt()
 	names := [4]string{"transport:start", "transport:prev", "transport:play", "transport:next"}
 	tipText := [4]string{"Back to the start", "Previous bar", "Play / pause", "Next bar"}
 	tipKey := [4]string{"home", "left", "space", "right"}
@@ -653,7 +653,7 @@ func (a *App) drawTrackStrip(dst *ebiten.Image, l practiceLayout, p pointer) {
 		}
 		// No boxes: two lines of text. Your track has a 2px accent edge and
 		// accent name; a muted one recedes; a solo reads in green.
-		av := a.anim.step(fmt.Sprintf("track:%d", i), p.over(r), p.down, uiFrameSeconds())
+		av := a.anim.step(fmt.Sprintf("track:%d", i), p.over(r), p.down, motionDt())
 		muted := a.mutedAudibly(i)
 		name, sub := lerpCol(colHUD, colNote, av.hover), colDim
 		switch {
@@ -799,6 +799,6 @@ func clockText(sec float64) string {
 }
 
 func (a *App) drawStateChip(dst *ebiten.Image, label string, col color.RGBA, y float64) {
-	x := screenW*playheadX - textWScaled(label, 1.5)/2
-	drawTextScaled(dst, label, x, y, 1.5, col)
+	x := screenW*playheadX - textWScaled(label, dispM)/2
+	drawTextScaled(dst, label, x, y, dispM, col)
 }

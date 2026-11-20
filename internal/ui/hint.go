@@ -97,7 +97,7 @@ func (b *Browser) toggleHint() {
 }
 
 func (b *Browser) drawHint(screen *ebiten.Image, l browserLayout) {
-	dt := uiFrameSeconds()
+	dt := motionDt()
 	if !b.hintOpen {
 		drawTextSmall(screen, "getting started", l.hint.x, l.hint.y+4, colHint)
 		av := b.anim.step("hint:toggle", b.ptr.over(l.hintBtn), b.ptr.down, dt)

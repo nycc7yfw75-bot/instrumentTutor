@@ -224,7 +224,7 @@ func (e *Editor) drawEntry(screen *ebiten.Image) {
 	r := edEntryRect()
 	drawPanel(screen, r, colPanel, colSounding)
 	drawText(screen, e.entry.prompt, r.x+16, r.y+12, colHUD)
-	drawTextScaled(screen, e.entry.buf+"_", r.x+16, r.y+34, 1.8, colNote)
+	drawTextScaled(screen, e.entry.buf+"_", r.x+16, r.y+34, dispM, colNote)
 	drawTextSmall(screen, e.entry.hint, r.x+16, r.y+76, colDim)
 	drawTextSmall(screen, "enter apply    esc cancel", r.x+16, r.y+94, colHint)
 }

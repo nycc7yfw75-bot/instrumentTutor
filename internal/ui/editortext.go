@@ -22,12 +22,6 @@ const (
 	gtGutter = 46.0
 )
 
-var (
-	colGtGutter = color.RGBA{70, 70, 84, 255}
-	colGtCaret  = color.RGBA{255, 220, 120, 255}
-	colGtOK     = color.RGBA{110, 200, 140, 255}
-)
-
 type gtabPane struct {
 	lines [][]rune
 	cx    int
@@ -397,7 +391,7 @@ func (p *gtabPane) clickAt(px, py float64) {
 	p.clampCaret()
 }
 
-const gtLegendW = 340.0
+const gtLegendW = 352.0
 
 func gtabPaneRect() rect {
 	return rect{uiPadX, edGridTop, screenW - 2*uiPadX - gtLegendW - 16, gridBottom() - edGridTop - 22}
@@ -443,7 +437,7 @@ var gtLegend = []struct{ example, means string }{
 	{"//", "a note to yourself"},
 }
 
-const gtLegendCol = 84.0
+const gtLegendCol = 96.0
 
 const (
 	gtLegendTop    = 34.0

@@ -33,6 +33,7 @@ func runShell(initialPath string) error {
 	}
 	seedLibrary()
 	prefs := &shellPrefs{cfg: cfg}
+	ui.SetReduceMotion(prefs.ReduceMotion())
 	opener := &shellOpener{prefs: prefs}
 	defer opener.CloseCurrent()
 
@@ -322,6 +323,22 @@ func (p *shellPrefs) SetSyncTrim(ms int) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.cfg.SyncTrimMS = ms
+}
+
+// ReduceMotion is the saved choice, or Windows' own setting until one is made.
+func (p *shellPrefs) ReduceMotion() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.cfg.ReduceMotion != nil {
+		return *p.cfg.ReduceMotion
+	}
+	return systemReducesMotion()
+}
+
+func (p *shellPrefs) SetReduceMotion(on bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.cfg.ReduceMotion = &on
 }
 
 func (p *shellPrefs) Devices() (string, string) {
@@ -750,7 +767,7 @@ func framesToDuration(frames int) time.Duration {
 
 func (o *shellOpener) setTitleFor(path string) {
 	if o.shell != nil {
-		o.shell.SetTitle("musicTutor — " + strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)))
+		o.shell.SetTitle("HEADLINER — " + strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)))
 	}
 }
 

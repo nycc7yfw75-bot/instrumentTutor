@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"image/color"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -42,8 +41,6 @@ var paneEmpty = [paneCount]string{
 	"pieces you write here will be listed here",
 	"nothing in the folder yet — write a piece and it lands here",
 }
-
-var colMissing = color.RGBA{150, 90, 90, 255}
 
 var browserPieceExts = map[string]bool{
 	".gtab":     true,
@@ -645,7 +642,7 @@ func (b *Browser) handleDrop(fsys fs.FS) {
 			return
 		}
 	}
-	b.errMsg = "dropped file is not a piece musicTutor can open: " + filepath.Base(paths[0])
+	b.errMsg = "dropped file is not a piece HEADLINER can open: " + filepath.Base(paths[0])
 	b.noteSkipped(skipped)
 }
 
@@ -731,7 +728,7 @@ func (b *Browser) handleKey(k ebiten.Key) error {
 }
 
 func (b *Browser) browserBindings() []helpBinding {
-	leave := helpBinding{Group: "session", Keys: "esc", Hint: "esc quit", Desc: "Quit musicTutor"}
+	leave := helpBinding{Group: "session", Keys: "esc", Hint: "esc quit", Desc: "Quit HEADLINER"}
 	if b.sh != nil && b.sh.Depth() > 1 {
 		leave = helpBinding{Group: "session", Keys: "esc", Hint: "esc back", Desc: "Go back to where you came from"}
 	}
@@ -762,7 +759,7 @@ func (b *Browser) browserBindings() []helpBinding {
 		{Group: "session", Keys: "H", Desc: "Show or hide the getting-started strip"},
 		{Group: "session", Keys: "? or F1", Hint: "? help", Desc: "This key-binding list"},
 		leave,
-		{Group: "session", Keys: "Q", Desc: "Quit musicTutor"},
+		{Group: "session", Keys: "Q", Desc: "Quit HEADLINER"},
 	}
 }
 

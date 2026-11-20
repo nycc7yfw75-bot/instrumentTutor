@@ -78,6 +78,9 @@ func ghostAlphaAt(gh ghost, pos int64) float64 {
 	if gh.fadeLen <= 0 || passed >= gh.fadeLen {
 		return 0
 	}
+	if reduceMotion {
+		return ghostAlpha // no fade: gone at the 2-bar mark
+	}
 	step := passed * ghostFadeSteps / gh.fadeLen // 0, 1, 2
 	return ghostAlpha * float64(ghostFadeSteps-step) / ghostFadeSteps
 }

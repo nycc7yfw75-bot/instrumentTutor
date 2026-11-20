@@ -813,8 +813,8 @@ func TestNoteCueKeepsBothChannels(t *testing.T) {
 	if col, sounding := a.noteCue(3840, 3840, 6, false, 0, 0, nil); col != colNote || sounding {
 		t.Errorf("an unjudged note ahead of the playhead = %v sounding=%v, want plain and silent", col, sounding)
 	}
-	if col, _ := a.noteCue(3840, 3840, 6, true, 0, 0, nil); col != colInferred {
-		t.Errorf("an inferred note = %v, want colInferred", col)
+	if col, _ := a.noteCue(3840, 3840, 6, true, 0, 0, nil); col != colInferredNote {
+		t.Errorf("an inferred note = %v, want colInferredNote", col)
 	}
 	if col, sounding := a.noteCue(0, 3840, 6, false, 100, 100, nil); col != colNote || !sounding {
 		t.Errorf("a sounding unjudged note = %v sounding=%v; the position cue lives on its own channel now", col, sounding)
