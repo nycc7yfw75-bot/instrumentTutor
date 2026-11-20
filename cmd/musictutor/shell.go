@@ -440,6 +440,23 @@ func (a *shellAudio) SetOffsetManually(captureID, playbackID string, frames int)
 	return a.prefs.StoreOffset(captureID, playbackID, frames, conf)
 }
 
+// TapCalibrate measures the offset from the player plucking along to clicks
+// and stores it for the pair, as a loopback calibration would.
+func (a *shellAudio) TapCalibrate(ctx context.Context, captureID, playbackID string, progress func(float64)) (int, float64, error) {
+	if !a.calibrating.CompareAndSwap(false, true) {
+		return 0, 0, errCalibrationBusy
+	}
+	defer a.calibrating.Store(false)
+	off, conf, err := tapCalibrationPass(ctx, a.backend, captureID, playbackID, progress)
+	if err != nil {
+		return off, conf, err
+	}
+	if err := a.prefs.StoreOffset(captureID, playbackID, off, conf); err != nil {
+		return off, conf, fmt.Errorf("measured %d frames but could not save it: %w", off, err)
+	}
+	return off, conf, nil
+}
+
 func (a *shellAudio) Calibrate(captureID, playbackID string, progress func(float64)) (int, float64, error) {
 	return a.CalibrateContext(context.Background(), captureID, playbackID, progress)
 }

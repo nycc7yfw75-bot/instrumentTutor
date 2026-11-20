@@ -24,6 +24,8 @@ const (
 	srSoundFont
 	srCountIn
 	srSyncTrim
+	// srTap starts a tap calibration (pluck along to clicks).
+	srTap
 )
 
 type calPhase int
@@ -43,11 +45,14 @@ type calSnap struct {
 	Err        error
 	CaptureID  string
 	PlaybackID string
+	// Tap is a tap calibration (pluck along) rather than a loopback one.
+	Tap bool
 }
 
 type calRun struct {
 	capID  string
 	playID string
+	tap    bool
 	cancel context.CancelFunc
 	done   chan struct{}
 
@@ -112,6 +117,7 @@ func (r *calRun) snapshot() calSnap {
 		Err:        r.err,
 		CaptureID:  r.capID,
 		PlaybackID: r.playID,
+		Tap:        r.tap,
 	}
 }
 
@@ -346,6 +352,9 @@ func (s *Settings) rebuild() {
 	s.rows = s.rows[:0]
 	if s.hasDevices() {
 		s.rows = append(s.rows, srCapture, srPlayback, srCalibrate)
+		if s.canTap() {
+			s.rows = append(s.rows, srTap)
+		}
 	}
 	s.rows = append(s.rows, srSoundFont, srCountIn)
 	if s.hasSyncTrim() {
@@ -397,7 +406,11 @@ type settingsOffsetSetter interface {
 	SetOffsetManually(captureID, playbackID string, frames int) error
 }
 
-const offsetNudgeMS = 5
+// The manual fine-tune: steps of offsetNudgeMS, within ±offsetMaxMS.
+const (
+	offsetNudgeMS = 2
+	offsetMaxMS   = 150
+)
 
 func (s *Settings) canNudgeOffset() bool {
 	_, ok := s.audio().(settingsOffsetSetter)
@@ -421,9 +434,7 @@ func (s *Settings) nudgeOffset(d int) {
 		rate = settingsDefaultRate
 	}
 	frames := s.offFrames + d*offsetNudgeMS*rate/1000
-	if frames < 0 {
-		frames = 0
-	}
+	frames = max(-offsetMaxMS*rate/1000, min(offsetMaxMS*rate/1000, frames))
 	capID, playID := s.selectedIDs()
 	if err := setter.SetOffsetManually(capID, playID, frames); err != nil {
 		s.notice = "could not save the offset: " + err.Error()
@@ -496,6 +507,10 @@ func (s *Settings) adjust(d int) {
 		s.setCountIn(s.countIn + d)
 	case srSyncTrim:
 		s.setSyncTrim(s.syncTrim + d*syncTrimStepMS)
+	case srTap:
+		if d > 0 {
+			s.startCalibrationKind(true)
+		}
 	}
 }
 
@@ -508,6 +523,8 @@ func (s *Settings) activate() {
 		return
 	}
 	switch r {
+	case srTap:
+		s.startCalibrationKind(true)
 	case srCapture, srPlayback:
 		s.notice = ""
 		if s.deviceStateOf(r) == devUnchosen {
@@ -677,9 +694,26 @@ func (s *Settings) save() {
 	s.saveErr = p.Save()
 }
 
-func (s *Settings) startCalibration() bool {
+func (s *Settings) startCalibration() bool { return s.startCalibrationKind(false) }
+
+// settingsTapper is the audio service's tap calibration: the player plucks
+// along to clicks, for interfaces that cannot loop their output back in.
+type settingsTapper interface {
+	TapCalibrate(ctx context.Context, captureID, playbackID string, progress func(float64)) (frames int, confidence float64, err error)
+}
+
+func (s *Settings) canTap() bool {
+	_, ok := s.audio().(settingsTapper)
+	return ok && s.hasDevices()
+}
+
+func (s *Settings) startCalibrationKind(tap bool) bool {
 	a := s.audio()
 	if a == nil || !s.hasDevices() {
+		return false
+	}
+	tapper, _ := a.(settingsTapper)
+	if tap && tapper == nil {
 		return false
 	}
 	if s.calibrating() {
@@ -698,6 +732,7 @@ func (s *Settings) startCalibration() bool {
 	run := &calRun{
 		capID:  capID,
 		playID: playID,
+		tap:    tap,
 		cancel: cancel,
 		done:   make(chan struct{}),
 		phase:  calRunning,
@@ -710,7 +745,14 @@ func (s *Settings) startCalibration() bool {
 
 		defer close(run.done)
 		defer cancel()
-		frames, conf, err := calibrateWith(ctx, a, capID, playID, run.setProgress)
+		var frames int
+		var conf float64
+		var err error
+		if tap {
+			frames, conf, err = tapper.TapCalibrate(ctx, capID, playID, run.setProgress)
+		} else {
+			frames, conf, err = calibrateWith(ctx, a, capID, playID, run.setProgress)
+		}
 		run.finish(frames, conf, err)
 	}()
 	return true
@@ -1187,7 +1229,8 @@ func (s *Settings) items() []settingsItem {
 	sn := s.calSnapshot()
 	if s.hasDevices() {
 		txt, col := s.calibrationText(sn)
-		running := sn.Phase == calRunning && s.snapIsCurrent(sn)
+		running := sn.Phase == calRunning && s.snapIsCurrent(sn) && !sn.Tap
+		tapping := sn.Phase == calRunning && s.snapIsCurrent(sn) && sn.Tap
 		label := "calibrate now"
 		if running {
 			label = "measuring..."
@@ -1198,8 +1241,8 @@ func (s *Settings) items() []settingsItem {
 		}}}
 		if s.canNudgeOffset() {
 			buttons = append(buttons,
-				settingsButton{label: "-", disabled: running, act: func(s *Settings) { s.nudgeOffset(-1) }},
-				settingsButton{label: "+", disabled: running, act: func(s *Settings) { s.nudgeOffset(+1) }})
+				settingsButton{label: "‹", disabled: running || tapping, act: func(s *Settings) { s.nudgeOffset(-1) }},
+				settingsButton{label: "›", disabled: running || tapping, act: func(s *Settings) { s.nudgeOffset(+1) }})
 		}
 		b.addRow("round-trip offset", txt, col, buttons...)
 		if running {
@@ -1208,6 +1251,22 @@ func (s *Settings) items() []settingsItem {
 			b.y += float64(settingsCalHintLines-1) * settingsLineH
 		} else {
 			b.reserveNote(settingsCalHintLines, calSetupHint, colBarline)
+		}
+		if s.canTap() {
+			txt, col := s.tapText(sn)
+			tapLabel := "tap now"
+			if tapping {
+				tapLabel = "listening..."
+			}
+			b.addRow("tap calibrate", txt, col, settingsButton{label: tapLabel, disabled: running || tapping, act: func(s *Settings) {
+				s.focusRow(srTap)
+				s.startCalibrationKind(true)
+			}})
+			if tapping {
+				b.progress(sn.Progress)
+			} else {
+				b.reserveNote(1, tapHint, colBarline)
+			}
 		}
 	} else {
 		b.note("unavailable without a capture and playback device", colBarline)
@@ -1405,3 +1464,36 @@ func (s *Settings) drawItemRow(dst *ebiten.Image, it settingsItem) {
 }
 
 func settingsBtnTextY(r rect) float64 { return r.y + (r.h-uiTextH)/2 }
+
+const tapHint = "for an interface that can't loop back (a Marshall CODE): pluck a palm-muted string on each of 16 clicks"
+
+// tapText reports a tap calibration in plain words.
+func (s *Settings) tapText(sn calSnap) (string, color.RGBA) {
+	if !sn.Tap || !s.snapIsCurrent(sn) {
+		return "pluck along to clicks to measure the delay", colDim
+	}
+	switch sn.Phase {
+	case calRunning:
+		return "listening — pluck a muted string right on each click", colSounding
+	case calDone:
+		word := "rough"
+		switch {
+		case sn.Confidence >= 0.9:
+			word = "steady"
+		case sn.Confidence >= 0.7:
+			word = "good"
+		}
+		return fmt.Sprintf("Offset %.0f ms · %s", s.framesMS(sn.Frames), word), colHit
+	case calFailed:
+		return calFailureAdvice(sn.Err), colMiss
+	}
+	return "", colDim
+}
+
+func (s *Settings) framesMS(frames int) float64 {
+	rate := s.rate
+	if rate <= 0 {
+		rate = settingsDefaultRate
+	}
+	return float64(frames) * 1000 / float64(rate)
+}

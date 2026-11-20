@@ -441,7 +441,17 @@ func calibrationPass(ctx context.Context, b audio.Backend, inID, outID string, p
 		return 0, 0, fmt.Errorf("%w: %w", errCalibrationCanceled, err)
 	}
 	train := latency.ClickTrain(sampleRate, calClicks, calSpacing)
+	captured, err := playAndCapture(ctx, b, inID, outID, train, 20*time.Second, progress)
+	if err != nil {
+		return 0, 0, err
+	}
+	return latency.Estimate(sampleRate, train, captured, calSpacing, calClicks)
+}
 
+// playAndCapture plays train through the playback device while recording
+// the capture device, frame-aligned with it, for the train's length plus
+// a second.
+func playAndCapture(ctx context.Context, b audio.Backend, inID, outID string, train []float32, timeout time.Duration, progress func(float64)) ([]float32, error) {
 	capLen := len(train) + sampleRate
 	captured := make([]float32, 0, capLen)
 	pos := 0
@@ -478,30 +488,29 @@ func calibrationPass(ctx context.Context, b audio.Backend, inID, outID string, p
 		PlaybackDevice: outID,
 	}, handler)
 	if err != nil {
-		return 0, 0, fmt.Errorf("opening duplex stream: %w", err)
+		return nil, fmt.Errorf("opening duplex stream: %w", err)
 	}
 	if err := stream.Start(); err != nil {
 		stream.Close()
-		return 0, 0, fmt.Errorf("starting stream: %w", err)
+		return nil, fmt.Errorf("starting stream: %w", err)
 	}
 
-	deadline := time.NewTimer(20 * time.Second)
+	deadline := time.NewTimer(timeout)
 	defer deadline.Stop()
 	select {
 	case <-done:
 	case <-ctx.Done():
 		stream.Stop()
 		stream.Close()
-		return 0, 0, fmt.Errorf("%w: %w", errCalibrationCanceled, ctx.Err())
+		return nil, fmt.Errorf("%w: %w", errCalibrationCanceled, ctx.Err())
 	case <-deadline.C:
 		stream.Stop()
 		stream.Close()
-		return 0, 0, fmt.Errorf("calibration timed out — no audio flowed (check the devices with 'musictutor devices')")
+		return nil, fmt.Errorf("calibration timed out — no audio flowed (check the devices with 'musictutor devices')")
 	}
 	stream.Stop()
 	stream.Close()
-
-	return latency.Estimate(sampleRate, train, captured, calSpacing, calClicks)
+	return captured, nil
 }
 
 func rememberDevices(cfg *appconfig.Config, inID, outID string, inFell, outFell bool) {
@@ -567,4 +576,44 @@ func runCalibrate(args []string) error {
 		fmt.Println("your saved device preference was kept; reconnect it and calibrate again.")
 	}
 	return nil
+}
+
+// tapCalibrationPass plays tap clicks while recording the player plucking
+// a muted string on each, then measures how late the plucks land: for an
+// interface that cannot loop its output back in.
+func tapCalibrationPass(ctx context.Context, b audio.Backend, inID, outID string, progress func(float64)) (int, float64, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return 0, 0, fmt.Errorf("%w: %w", errCalibrationCanceled, err)
+	}
+	spacing := latency.TapSpacingFrames(sampleRate)
+	train := latency.ClickTrain(sampleRate, latency.TapClicks, spacing)
+	captured, err := playAndCapture(ctx, b, inID, outID, train, 40*time.Second, progress)
+	if err != nil {
+		return 0, 0, err
+	}
+	clicks := make([]int64, latency.TapClicks)
+	for i := range clicks {
+		clicks[i] = int64(i * spacing)
+	}
+	return latency.TapEstimate(sampleRate, clicks, pickAttacks(captured))
+}
+
+// pickAttacks finds the pick attacks in a recording, as the scorer does:
+// the detector's onset frames, corrected to the attack itself.
+func pickAttacks(captured []float32) []int64 {
+	cfg := pitch.DefaultConfig(sampleRate)
+	d := pitch.NewDetector(cfg)
+	lag := int64(cfg.Window/2 - cfg.Hop/2)
+	var out []int64
+	for pos := 0; pos+cfg.Hop <= len(captured); pos += cfg.Hop {
+		for _, f := range d.Process(captured[pos : pos+cfg.Hop]) {
+			if f.Onset {
+				out = append(out, f.Frame+lag)
+			}
+		}
+	}
+	return out
 }
