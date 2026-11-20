@@ -68,9 +68,10 @@ func (s *Session) Flush() []Judgement {
 	return out
 }
 
-// judgeChord makes one judgement of a chord (§4.1): a hit when every
-// judgeable string rang, a miss when none did, close otherwise; timed from
-// the strum, which every matched string of the chord shares.
+// judgeChord makes one judgement of a chord (§4.1) by majority of its
+// judgeable strings: a hit when more than half were hits, a miss when more
+// than half were missed, close otherwise (an even split, or mostly close).
+// It is timed from the strum, which every matched string shares.
 func (s *Session) judgeChord(members []practice.NoteResult) Judgement {
 	var hits, misses, judgeable int
 	var strum *practice.NoteResult
@@ -96,9 +97,9 @@ func (s *Session) judgeChord(members []practice.NoteResult) Judgement {
 	chord := members[0]
 	chord.Event.Tech = 0 // the chord as a whole; its excluded strings were skipped above
 	switch {
-	case misses == judgeable:
+	case 2*misses > judgeable:
 		chord.Verdict, chord.Matched, chord.Timed = practice.VerdictMiss, false, false
-	case hits == judgeable:
+	case 2*hits > judgeable:
 		chord.Verdict = practice.VerdictHit
 	default:
 		chord.Verdict = practice.VerdictClose

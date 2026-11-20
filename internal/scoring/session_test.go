@@ -50,7 +50,9 @@ func TestAChordIsOneJudgementTimedFromTheStrum(t *testing.T) {
 		want    practice.Verdict
 	}{
 		{"every note rang", []practice.Verdict{practice.VerdictHit, practice.VerdictHit, practice.VerdictHit}, practice.VerdictHit},
-		{"one string missing", []practice.Verdict{practice.VerdictHit, practice.VerdictMiss, practice.VerdictHit}, practice.VerdictClose},
+		{"two of three rang", []practice.Verdict{practice.VerdictHit, practice.VerdictMiss, practice.VerdictHit}, practice.VerdictHit},
+		{"one of three rang", []practice.Verdict{practice.VerdictMiss, practice.VerdictHit, practice.VerdictMiss}, practice.VerdictMiss},
+		{"hit, close, miss", []practice.Verdict{practice.VerdictHit, practice.VerdictClose, practice.VerdictMiss}, practice.VerdictClose},
 		{"nothing heard", []practice.Verdict{practice.VerdictMiss, practice.VerdictMiss, practice.VerdictMiss}, practice.VerdictMiss},
 	}
 	for _, c := range cases {
