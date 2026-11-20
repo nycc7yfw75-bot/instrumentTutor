@@ -8,6 +8,8 @@ Save as `docs/SCORING.md` in the repo. Re-read at the start of every stage and a
 
 Build: per-note scoring with timing, accuracy %, tightness (rush/drag), excitement bar, XP, levels with titles, timing ghosts (live + review), tap calibration, persistence of progress.
 
+Also build: a minimal **player profile store** (see §5) with one default profile, so Battles can add 2–4 local players later without migrating data. No profile-switching UI yet beyond renaming the default profile in Settings.
+
 Do NOT build: venues, career ladder, venue gating logic, cosmetics/unlocks, achievements, streaks, leaderboards, note highway. Store the player's level so venues can read it later; nothing gates on it yet.
 
 Do NOT change: pitch detection, the matching window, hit/close/miss pitch rules, playback, the audio engine, file formats. Scoring reads results the scorer already produces.
@@ -145,7 +147,9 @@ Level and title are stored for the future venue ladder; nothing is gated now.
 
 - `progress.json` beside the existing `config.json` (same directory helper). Do not touch `config.json`.
 - Atomic write (temp file + rename), versioned schema (`"version": 1`).
-- Holds: total XP, level, per-piece+track bests (best accuracy, best tightness mean, best tempo), today's section pass counts, a capped log of the last 200 passes (date, piece, track, bars, tempo, accuracy, tightness, xp).
+- **Everything is stored per profile.** Top level: `{"version":1, "activeProfile":"<id>", "profiles":{"<id>":{...}}}`. Create one profile on first run: id = random 8-char, name "Player 1" (renamable in Settings). Every read/write goes through the active profile — no global XP anywhere.
+- Each profile holds: name, created date, total XP, level, per-piece+track bests (best accuracy, best tightness mean, best tempo), today's section pass counts, a capped log of the last 200 passes (date, piece, track, bars, tempo, accuracy, tightness, xp).
+- **Best-pass replays** (needed later by Battles' "your own ghost" opponent): for each (piece, track, bar range) keep the per-note results of that profile's best-accuracy pass — note index, verdict, timing offset ms. Cap at 300 stored ranges per profile (drop least-recently-used).
 - Piece identity: file path for now (hashing comes later); store the title alongside.
 - Corrupt file → rename aside to `progress.json.bad-<timestamp>` and start fresh; never crash a session over it.
 
