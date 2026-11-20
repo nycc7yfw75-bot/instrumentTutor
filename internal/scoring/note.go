@@ -15,7 +15,7 @@ const (
 	TierPerfect             // |offset| <= PerfectMs
 	TierGood                // <= GoodMs
 	TierLoose               // <= LooseMs (and anything past it: the match window caps it)
-	TierUntimed             // matched with no timing measured (wait mode): pitch credit only
+	TierUntimed             // matched with no timing measured (a slide's arrival): pitch credit only
 )
 
 func (t Tier) String() string {
@@ -43,7 +43,9 @@ const unjudgeable = score.TechDead | score.TechBend | score.TechGrace
 // Judge scores one result from the practice scorer.
 func Judge(r practice.NoteResult, sampleRate int) Judgement {
 	j := Judgement{Event: r.Event, Verdict: r.Verdict}
-	if r.Event.Tech&unjudgeable != 0 {
+	// Wait mode holds the song for each note: nothing to judge (owner's
+	// choice: wait mode is practice, unscored).
+	if r.Waited || r.Event.Tech&unjudgeable != 0 {
 		j.Excluded = true
 		return j
 	}

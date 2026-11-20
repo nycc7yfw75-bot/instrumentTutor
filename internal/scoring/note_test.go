@@ -67,10 +67,18 @@ func TestUnjudgeableNotesAreExcluded(t *testing.T) {
 
 func TestUntimedHitsScoreOnPitchAlone(t *testing.T) {
 	r := result(practice.VerdictHit, 0)
-	r.Timed = false // wait mode: the note was confirmed with no timing
+	r.Timed = false // a slide's arrival: matched, but with no pick to time
 	j := Judge(r, sr)
 	if j.Tier != TierUntimed || j.Score != 1 {
 		t.Errorf("untimed hit: tier %v score %.2f, want untimed, full pitch credit", j.Tier, j.Score)
+	}
+}
+
+func TestWaitModeNotesAreUnscored(t *testing.T) {
+	r := result(practice.VerdictHit, 0)
+	r.Timed, r.Waited = false, true
+	if j := Judge(r, sr); !j.Excluded {
+		t.Errorf("a wait-mode note was scored (%+v); wait mode is practice and counts neither way", j)
 	}
 }
 

@@ -37,6 +37,10 @@ type NoteResult struct {
 	// result carries no timing at all (wait mode, slides).
 	OnsetErrFrames int64
 	Timed          bool
+	// Waited marks a note confirmed by wait mode, which held the song until
+	// it was played: there is no timing to judge, and the game layer leaves
+	// it unscored.
+	Waited bool
 }
 
 type Stats struct{ Hit, Close, Miss int }
@@ -173,6 +177,7 @@ func (s *Scorer) ExpectNote(ev score.NoteEvent, outFrame int64) {
 				Verdict:  p.verdict,
 				Matched:  true,
 				ErrCents: p.errCents,
+				Waited:   true,
 			})
 			last := len(s.preMatch) - 1
 			s.preMatch[i] = s.preMatch[last]

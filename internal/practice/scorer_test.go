@@ -822,3 +822,14 @@ func TestTimingComesFromThePickAttack(t *testing.T) {
 		t.Errorf("legato note: attack error %d, want the start-based 600 when no pick was heard", r.OnsetErrFrames)
 	}
 }
+
+func TestWaitConfirmedNotesAreMarkedWaited(t *testing.T) {
+	s := NewScorer(testConfig())
+	e := wev(40, 960)
+	s.WaitConfirmed([]score.NoteEvent{e}, []pitch.Note{det(1000, 40, 0)})
+	s.ExpectNote(e, 2000)
+	rs := drain(s)
+	if len(rs) != 1 || !rs[0].Waited || rs[0].Timed {
+		t.Fatalf("results %+v, want one wait-confirmed note marked Waited and untimed", rs)
+	}
+}
