@@ -188,8 +188,9 @@ func (x *xpBarView) draw(dst *ebiten.Image, right, y float64) float64 {
 
 // xpToast is the quiet "+42 XP" after a pass (MOTION §B1.5).
 type xpToast struct {
-	xp int
-	t  float64
+	xp    int
+	label string // a badge message instead of XP
+	t     float64
 }
 
 func (t *xpToast) done() bool { return t.t >= toastIn+toastHold+toastOut }
@@ -214,6 +215,9 @@ func (t *xpToast) draw(dst *ebiten.Image, right, y float64) {
 	}
 	shown := int(math.Round(float64(t.xp) * curveEnter.at(math.Min(1, t.t/rollSecs))))
 	s := fmt.Sprintf("+%d XP", shown)
+	if t.label != "" {
+		s = t.label
+	}
 	drawTextRight(dst, s, right, y+lift, withAlpha(colXPFill, alpha))
 }
 

@@ -52,6 +52,10 @@ type Profile struct {
 	Practice Practice `json:"practice"`
 	// Songs remembers where each song was last seen and what it is called.
 	Songs map[string]SongInfo `json:"songs,omitempty"`
+	// Badges earned, and when (set-only: never removed).
+	Badges map[string]time.Time `json:"badges,omitempty"`
+	// Totals are the counters the badges read.
+	Totals Totals `json:"totals"`
 }
 
 // Best is a song track's best scored results.
@@ -114,6 +118,10 @@ type Store struct {
 	path string
 	f    File
 	now  func() time.Time
+
+	// sessionSecs is this run of the app's playing time (Five More
+	// Minutes); it is not saved.
+	sessionSecs float64
 }
 
 // Path is where progress.json lives: beside config.json.

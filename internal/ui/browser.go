@@ -125,6 +125,8 @@ type Browser struct {
 
 	helpOpen bool
 
+	badgesOpen bool // the every-badge overlay (B)
+
 	ptr      pointer
 	anim     animator
 	hoverIdx int
@@ -708,7 +710,7 @@ var browserKeys = []ebiten.Key{
 	ebiten.KeyEnter, ebiten.KeyNumpadEnter,
 	ebiten.KeyLeft, ebiten.KeyRight, ebiten.KeyTab,
 	ebiten.KeyO, ebiten.KeyDelete, ebiten.KeyS, ebiten.KeyN, ebiten.KeyE,
-	ebiten.KeyH, ebiten.KeyF5,
+	ebiten.KeyH, ebiten.KeyF5, ebiten.KeyB,
 	ebiten.KeyF1, ebiten.KeySlash,
 	ebiten.KeyEscape, ebiten.KeyQ,
 }
@@ -756,6 +758,10 @@ func (b *Browser) handleKey(k ebiten.Key) error {
 		}
 	case ebiten.KeyH:
 		b.toggleHint()
+	case ebiten.KeyB:
+		if b.hasCard() {
+			b.badgesOpen = true
+		}
 	case ebiten.KeyF5:
 		b.reloadRecents()
 		b.rescanLibrary()
@@ -813,6 +819,7 @@ func (b *Browser) browserBindings() []helpBinding {
 		{Group: "session", Keys: "S", Hint: "S settings", Off: b.settings == nil,
 			Desc: "Audio devices, latency calibration, SoundFont and count-in"},
 		{Group: "session", Keys: "H", Desc: "Show or hide the getting-started card"},
+		{Group: "session", Keys: "B", Off: !b.hasCard(), Desc: "Every badge: the ones you have, and how to earn the rest"},
 		{Group: "session", Keys: "? or F1", Hint: "? help", Desc: "This key-binding list"},
 		leave,
 		{Group: "session", Keys: "Q", Desc: "Quit HEADLINER"},
@@ -902,6 +909,12 @@ func (b *Browser) Update() error {
 	if b.helpOpen {
 		if helpDismissed(b.ptr) {
 			b.helpOpen = false
+		}
+		return nil
+	}
+	if b.badgesOpen {
+		if helpDismissed(b.ptr) || inpututil.IsKeyJustPressed(ebiten.KeyB) {
+			b.badgesOpen = false
 		}
 		return nil
 	}

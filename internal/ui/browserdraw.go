@@ -40,6 +40,10 @@ type browserLayout struct {
 	empty   rect // the empty tab's button (zero when the tab has rows)
 
 	statusY float64
+
+	card    rect   // the player card (zero without a progress store)
+	medals  []rect // its badge tiles
+	addName rect   // its "Add your name" button, before there is a profile
 }
 
 const (
@@ -83,15 +87,36 @@ func (b *Browser) layout() browserLayout {
 	var l browserLayout
 	y := float64(pgMargin)
 
-	// Header: Settings and Help as menu items at the right.
-	x := screenW - pgMargin + menuPadX
-	for i := len(browserMenu) - 1; i >= 0; i-- {
-		m := browserMenu[i]
-		w := kitMenuItemW(m.icon, m.label)
-		x -= w
-		l.menu = append([]rect{{x, y - sp1, w, zItemH}}, l.menu...)
+	// Header: Settings and Help as menu items at the right, or in the
+	// player card's corner when there is one.
+	if b.hasCard() {
+		b.layoutCard(&l)
+	} else {
+		x := screenW - pgMargin + menuPadX
+		for i := len(browserMenu) - 1; i >= 0; i-- {
+			m := browserMenu[i]
+			w := kitMenuItemW(m.icon, m.label)
+			x -= w
+			l.menu = append([]rect{{x, y - sp1, w, zItemH}}, l.menu...)
+		}
 	}
 	y += sizeDisplayL + sp1 + uiTextH + sp6 // wordmark, tagline, gap
+
+	// Actions under the wordmark: Open song (primary), Write new, Edit.
+	x := float64(pgMargin)
+	for _, a := range b.actionList() {
+		kind := kitSecondary
+		if a.primary {
+			kind = kitPrimary
+		}
+		w := kitButtonW(a.label, kind, true)
+		l.actions = append(l.actions, rect{x, y, w, btnHPrimary})
+		x += w + sp3
+	}
+	y += btnHPrimary + sp6
+	if l.card.h > 0 {
+		y = math.Max(y, l.card.y+l.card.h+sp6)
+	}
 
 	// The getting-started card.
 	if b.hintOpen {
@@ -108,19 +133,6 @@ func (b *Browser) layout() browserLayout {
 		}
 		y += h + sp6
 	}
-
-	// Actions: Open song (primary), Write new, Edit.
-	x = pgMargin
-	for _, a := range b.actionList() {
-		kind := kitSecondary
-		if a.primary {
-			kind = kitPrimary
-		}
-		w := kitButtonW(a.label, kind, true)
-		l.actions = append(l.actions, rect{x, y, w, btnHPrimary})
-		x += w + sp3
-	}
-	y += btnHPrimary + sp6
 
 	// SONGS and its filter tabs on one line.
 	l.songsY = y
@@ -253,6 +265,16 @@ func (b *Browser) handleMouse(pt pointer) {
 		}
 		return
 	}
+	if l.addName.w > 0 && pt.over(l.addName) {
+		b.sh.Show(NewNamePrompt(b.sh, b.store()))
+		return
+	}
+	for _, r := range l.medals {
+		if pt.over(r) {
+			b.badgesOpen = true
+			return
+		}
+	}
 	for i, r := range l.menu {
 		if !pt.over(r) {
 			continue
@@ -281,12 +303,16 @@ func (b *Browser) Draw(screen *ebiten.Image) {
 	l := b.layout()
 	dt := motionDt()
 	b.drawBrowserHeader(screen, l, dt)
+	b.drawPlayerCard(screen, l, dt)
 	b.drawHint(screen, l, dt)
 	b.drawActions(screen, l, dt)
 	b.drawSongs(screen, l, dt)
 	b.drawStatus(screen, l)
 	b.tip.draw(screen)
 
+	if b.badgesOpen {
+		b.drawBadges(screen)
+	}
 	if b.helpOpen {
 		drawHelpOverlay(screen, "START SCREEN KEYS", b.browserBindings(), browserHelpFootnote)
 	}
@@ -299,6 +325,9 @@ func (b *Browser) drawBrowserHeader(screen *ebiten.Image, l browserLayout, dt fl
 	}
 	drawWordmark(screen, x, pgMargin)
 	drawTextSmall(screen, "Open mic to arena", x, pgMargin+sizeDisplayL+sp1, colDim)
+	if b.hasCard() {
+		return // Settings and Help are in the player card
+	}
 
 	for i, r := range l.menu {
 		m := browserMenu[i]

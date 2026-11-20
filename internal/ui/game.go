@@ -9,6 +9,7 @@ import (
 
 	"github.com/S95F/musicTutor/internal/practice"
 	"github.com/S95F/musicTutor/internal/progress"
+	"github.com/S95F/musicTutor/internal/score"
 	"github.com/S95F/musicTutor/internal/scoring"
 )
 
@@ -36,8 +37,10 @@ type gameUI struct {
 	passStart   int64 // tick the pass began
 	passLoops   int   // the engine's loop pass count at its start
 	passSecs    float64
-	passDrop    int64 // dropped samples at its start
-	passWaited  bool  // wait mode was on at some point
+	passSlow    float64 // of passSecs, at 75% speed or slower
+	passClick   float64 // of passSecs, with the metronome on
+	passDrop    int64   // dropped samples at its start
+	passWaited  bool    // wait mode was on at some point
 	passJudges  []scoring.Judgement
 	lastFrames  int64
 	wasPlaying  bool
@@ -47,7 +50,7 @@ type gameUI struct {
 	// level-up card (MOTION §B1.5, §B1.6).
 	askName func() // opens the name prompt
 
-	toasts  []int
+	toasts  []xpToast
 	levelUp *levelCard
 	toast   *xpToast
 
@@ -169,6 +172,12 @@ func (a *App) gameStep() {
 		g.sess.Tick(secs, transport)
 		if transport == scoring.Playing {
 			g.passSecs += secs
+			if a.eng.TempoScale() <= 0.75+1e-9 {
+				g.passSlow += secs
+			}
+			if a.metronome {
+				g.passClick += secs
+			}
 		}
 	}
 	g.excite.frame(&g.sess.Excitement, transport == scoring.Playing)
@@ -179,6 +188,7 @@ func (a *App) startPass(tick int64) {
 	g.passOn, g.passStart = true, tick
 	g.passLoops = a.eng.PassCount()
 	g.passSecs, g.passDrop = 0, a.dropped
+	g.passSlow, g.passClick = 0, 0
 	g.passWaited = a.wait
 	g.passJudges = g.passJudges[:0]
 	g.ghosts = g.ghosts[:0] // a new pass starts with a clean tab
@@ -216,6 +226,8 @@ func (a *App) endPass(tick int64) {
 		TempoScale: a.eng.TempoScale(), Difficulty: g.difficulty,
 		Summary: sum, Judgements: append([]scoring.Judgement(nil), g.passJudges...),
 		NoteIndex: g.noteIndex, Credible: credible, Seconds: g.passSecs,
+		SlowSeconds: g.passSlow, ClickSeconds: g.passClick,
+		FullRun: passFrom <= a.firstTick() && passTo >= a.sc.End()-1,
 	})
 	if err != nil {
 		a.setBPMMessage("could not save your progress: " + err.Error())
@@ -228,7 +240,12 @@ func (a *App) endPass(tick int64) {
 		rv.xp, rv.scored = rec.XP, credible
 	}
 	if rec.XP > 0 {
-		g.toasts = append(g.toasts, rec.XP)
+		g.toasts = append(g.toasts, xpToast{xp: rec.XP})
+	}
+	for _, id := range rec.NewBadges {
+		if d, ok := progress.BadgeByID(id); ok {
+			g.toasts = append(g.toasts, xpToast{label: "Badge earned: " + d.Name})
+		}
 	}
 	if rec.LeveledUp {
 		_, xp, _ := g.store.Active()
@@ -320,7 +337,8 @@ func (a *App) drawGameHUD(screen *ebiten.Image) {
 	}
 	a.drawReview(screen)
 	if g.toast == nil && len(g.toasts) > 0 {
-		g.toast = &xpToast{xp: g.toasts[0]}
+		t := g.toasts[0]
+		g.toast = &t
 		g.toasts = g.toasts[1:]
 	}
 	if g.toast != nil {
@@ -386,4 +404,14 @@ func (a *App) Close() {
 	}
 	defer func() { _ = recover() }() // leaving must never fail
 	a.endPass(a.eng.PosTick())
+}
+
+// firstTick is where the practised track's first bar starts, with a beat
+// of slack, so a run from the very start counts as the whole song.
+func (a *App) firstTick() int64 {
+	tr := a.displayed()
+	if len(tr.Bars) == 0 {
+		return score.PPQ
+	}
+	return tr.Bars[0].Start + score.PPQ
 }

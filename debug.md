@@ -8,7 +8,7 @@ Work down the list. For each test:
   (what you clicked, what you expected, what you saw). That's all I need to fix it.
 - If you skip one, write "skipped" in Notes.
 
-Last updated: 2026-11-21 (after redesign Stage 5: every other screen).
+Last updated: 2026-11-21 (after redesign Stage 5, the player card and badges).
 
 ---
 
@@ -197,7 +197,35 @@ A day counts when the song has been **playing** for 5 minutes or more that day. 
   Notes:
 - [ ] Day 2, before playing: the line says "1-day streak, 5 min to go today". After 5 minutes of playing it changes to "2-day streak".
   Notes:
-- [ ] Skip a whole day, then play: the streak starts again from 1. Nothing else is taken away (level, XP, bests stay).
+- [ ] **Freezes:** skip one whole day, then play. The streak does **not** break; the start screen's card shows one fewer freeze ("1 freeze").
+  Notes:
+- [ ] You start with 2 freezes. Seven days in a row earns one back, up to 3.
+  Notes:
+- [ ] Skip more days than you have freezes, then play: the streak starts again at **1** (never 0). "N days practised" on the card never goes down. Level, XP, bests and badges all stay.
+  Notes:
+
+---
+
+## 8c. Player card and badges (start screen)
+
+- [ ] Top right of the start screen there's a card with your **name**, **LV 1 · Bedroom Player**, "10 / 100 XP" and an amber XP bar. Settings (cog) and Help (?) are in its top-right corner and still open Settings and Help.
+  Notes:
+- [ ] Under the XP bar is a row of 7 **badge tiles** and "0 / 11". Badges you don't have yet are grey with a small padlock. Hover one: it says "Not yet: …" and how to earn it.
+  Notes:
+- [ ] The bottom line of the card reads like "No practice days yet · 2 freezes · 5 min to go today", and after some practice "3 days practised · 2-day streak · 2 freezes".
+  Notes:
+- [ ] Press **B** (or click any badge tile): a "Badges" card lists all 11, with how to earn each, and "Earned 21 Nov 2026" on the ones you have. B, Esc or a click closes it.
+  Notes:
+- [ ] When you earn a badge, a message "Badge earned: …" appears above the timeline after you stop playing, and the badge turns amber on the start screen card (newest first).
+  Notes:
+- [ ] Badges to try (each should appear once, and never disappear):
+  - **Five More Minutes**: play for 20 minutes in one sitting, scored or not.
+  - **Slow and Clean**: a scored loop at 70% speed or slower with 95%+ accuracy (calibrated, Wait off).
+  - **Section Mastered**: the same loop 3 times in a row at 100% speed, 95%+ each time.
+  - **Up to Speed**: start a loop at 70% with Ramp on, keep 90%+ until it reaches 100%.
+  - **Nailed It**: play First Steps start to finish at 100% speed with 98%+.
+  Notes:
+- [ ] If you've never entered a name, the card shows **Add your name** instead; clicking it opens the name box.
   Notes:
 
 ---

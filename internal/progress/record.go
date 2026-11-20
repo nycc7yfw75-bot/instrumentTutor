@@ -22,14 +22,18 @@ type Pass struct {
 	NoteIndex           map[NoteKey]int // NoteIndex(sc, Track), for the replay
 	Credible            bool            // the credibility gate (scoring.Credible) and not wait mode
 	Seconds             float64         // time the song was playing during the pass
+	SlowSeconds         float64         // of those, at 75% speed or slower
+	ClickSeconds        float64         // of those, with the metronome on
+	FullRun             bool            // the pass ran the whole song, start to end
 }
 
 // Recorded is what a pass earned.
 type Recorded struct {
 	XP        int
 	LeveledUp bool
-	Logged    bool // a pass long enough to judge (>= 8 notes) went into the history
-	NewBest   bool // it set the song track's best accuracy
+	Logged    bool     // a pass long enough to judge (>= 8 notes) went into the history
+	NewBest   bool     // it set the song track's best accuracy
+	NewBadges []string // badges this pass earned (IDs)
 }
 
 // RecordPass files a finished pass under the active profile and saves. It
@@ -50,13 +54,16 @@ func (s *Store) RecordPass(p Pass) (Recorded, error) {
 		prof.Songs = map[string]SongInfo{}
 	}
 	prof.Songs[p.SongID] = SongInfo{Title: p.Title, Path: p.Path}
+	today := now.Local().Format(dayFormat)
+	firstToday, lastBefore := prof.Practice.Days[today] == 0 && p.Seconds > 0, lastDayBefore(prof.Practice.Days, today)
 	if p.Seconds > 0 {
 		if prof.Practice.Days == nil {
 			prof.Practice.Days, prof.Practice.Songs = map[string]float64{}, map[string]float64{}
 		}
-		prof.Practice.Days[now.Local().Format("2006-01-02")] += p.Seconds
+		prof.Practice.Days[today] += p.Seconds
 		prof.Practice.Songs[p.SongID] += p.Seconds
 	}
+	out.NewBadges = s.evalBadges(prof, p, now, lastBefore, firstToday)
 
 	if p.Summary.Judged >= scoring.MinJudgedNotes {
 		bars := fmt.Sprintf("%d-%d", p.FromBar, p.ToBar)
@@ -162,4 +169,15 @@ func (s *Store) Replay(songID string, track, fromBar, toBar int) (Replay, bool) 
 	cp := *r
 	cp.Notes = append([]ReplayNote(nil), r.Notes...)
 	return cp, true
+}
+
+// lastDayBefore is the latest day before today with any playing, or "".
+func lastDayBefore(days map[string]float64, today string) string {
+	last := ""
+	for d, secs := range days {
+		if secs > 0 && d < today && d > last {
+			last = d
+		}
+	}
+	return last
 }

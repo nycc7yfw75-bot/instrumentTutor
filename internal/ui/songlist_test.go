@@ -4,6 +4,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/hajimehoshi/ebiten/v2"
+
+	"github.com/S95F/musicTutor/internal/progress"
 )
 
 // tabIndex is where pane p sits among the SONGS filter tabs.
@@ -102,5 +106,79 @@ func TestStartScreenHasNoQuitOrFooter(t *testing.T) {
 		if m.label == "Quit" {
 			t.Error("Quit is back in the header")
 		}
+	}
+}
+
+func cardBrowser(t *testing.T, name string) *Browser {
+	t.Helper()
+	st := tempStore(t, name)
+	return NewBrowser(NewShell(Services{Prefs: &browserFakePrefs{}, Progress: st}, nil))
+}
+
+func TestPlayerCardSitsTopRightClearOfEverything(t *testing.T) {
+	atEachSize(t, func(t *testing.T) {
+		b := cardBrowser(t, "Aarsh")
+		b.hintOpen = true
+		b.errMsg = "cannot open x.gp: broken"
+		b.warns, b.warnsFrom = []string{"a", "b", "c", "d"}, "x.gp"
+		l := b.layout()
+		c := l.card
+		if c.x+c.w > screenW-pgMargin+1 || c.y < 0 {
+			t.Errorf("the card %+v leaves the page", c)
+		}
+		for _, a := range l.actions {
+			if a.x+a.w > c.x {
+				t.Errorf("an action button %+v runs under the card %+v", a, c)
+			}
+		}
+		if l.hint.y < c.y+c.h || l.songsY < c.y+c.h {
+			t.Errorf("the getting-started card (%.0f) or SONGS (%.0f) starts inside the player card (ends %.0f)", l.hint.y, l.songsY, c.y+c.h)
+		}
+		if l.rows < 4 {
+			t.Errorf("only %d song rows fit with the player card", l.rows)
+		}
+		for _, m := range l.medals {
+			if m.x+m.w > c.x+c.w-cardPad {
+				t.Errorf("a medal %+v leaves the card", m)
+			}
+		}
+	})
+}
+
+func TestCardShowsEveryBadgeEarnedFirst(t *testing.T) {
+	b := cardBrowser(t, "Aarsh")
+	ms := b.cardMedals()
+	if len(ms) != len(progress.Badges) {
+		t.Fatalf("the card knows %d badges, want all %d", len(ms), len(progress.Badges))
+	}
+	for _, m := range ms {
+		if m.earned {
+			t.Errorf("a new player already has %s", m.def.Name)
+		}
+		if _, ok := badgeIcon[m.def.ID]; !ok {
+			t.Errorf("badge %s has no medal icon", m.def.Name)
+		}
+	}
+}
+
+func TestBKeyOpensTheBadges(t *testing.T) {
+	b := cardBrowser(t, "Aarsh")
+	if err := b.handleKey(ebiten.KeyB); err != nil {
+		t.Fatal(err)
+	}
+	if !b.badgesOpen {
+		t.Error("B did not open the badges")
+	}
+	noCard := browserFixture(t, &browserFakePrefs{}, &browserFakeOpener{})
+	noCard.handleKey(ebiten.KeyB)
+	if noCard.badgesOpen {
+		t.Error("B opened badges with no progress store")
+	}
+}
+
+func TestStreakLineLeadsWithDaysPractised(t *testing.T) {
+	s := streakLine(progress.Streak{Days: 3, TotalDays: 12, Freezes: 2, TodayDone: true})
+	if s != "12 days practised · 3-day streak · 2 freezes" {
+		t.Errorf("streak line %q", s)
 	}
 }

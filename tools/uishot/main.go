@@ -15,8 +15,10 @@ import (
 	"github.com/S95F/musicTutor/internal/engine"
 	"github.com/S95F/musicTutor/internal/pitch"
 	"github.com/S95F/musicTutor/internal/practice"
+	"github.com/S95F/musicTutor/internal/progress"
 	"github.com/S95F/musicTutor/internal/score"
 	"github.com/S95F/musicTutor/internal/score/textfmt"
+	"github.com/S95F/musicTutor/internal/scoring"
 	"github.com/S95F/musicTutor/internal/synth"
 	"github.com/S95F/musicTutor/internal/ui"
 )
@@ -84,7 +86,11 @@ func build(which, piece string) (ui.Screen, error) {
 			lib.dir = dir
 			lib.pieces = shotPieces(dir)
 		}
-		sh, browser := ui.NewBrowserShell(ui.Services{Prefs: prefs, Audio: fakeAudio{}, Library: lib})
+		svc := ui.Services{Prefs: prefs, Audio: fakeAudio{}, Library: lib}
+		if which == "start" {
+			svc.Progress = shotProgress()
+		}
+		sh, browser := ui.NewBrowserShell(svc)
 		browser.SetSettingsOpener(func() {})
 		browser.SetOpenDialog(func(string) {})
 		browser.SetNewPiece(func() {})
@@ -336,4 +342,31 @@ func shotPieces(dir string) []ui.PieceInfo {
 		{Path: filepath.Join(dir, "broken.gtab"), Name: "broken",
 			Problem: "line 7, column 14 — bar underfull: the notes add up to 3 of the 4 beats a 4/4 bar holds"},
 	}
+}
+
+// shotProgress is a sample player for the start screen's card: some XP,
+// a few badges and a short streak, in a throwaway file.
+func shotProgress() *progress.Store {
+	dir, err := os.MkdirTemp("", "uishot-progress")
+	if err != nil {
+		return nil
+	}
+	st, err := progress.OpenFile(filepath.Join(dir, "progress.json"))
+	if err != nil {
+		return nil
+	}
+	if _, err := st.CreateProfile("Aarsh"); err != nil {
+		return nil
+	}
+	pass := func(tempo, acc float64, secs float64) {
+		st.RecordPass(progress.Pass{SongID: "riff", FromBar: 1, ToBar: 4, TempoScale: tempo, Credible: true,
+			Seconds: secs, SlowSeconds: secs, Difficulty: scoring.Medium,
+			Summary: scoring.Summary{Judged: 40, SumScore: 40 * acc}})
+	}
+	pass(0.6, 0.97, 600)
+	pass(0.8, 0.93, 400)
+	pass(1, 0.96, 300)
+	pass(1, 0.96, 300)
+	pass(1, 0.96, 300)
+	return st
 }
