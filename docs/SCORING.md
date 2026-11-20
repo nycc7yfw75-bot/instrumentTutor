@@ -14,7 +14,7 @@ Do NOT build: venues, career ladder, venue gating logic, cosmetics/unlocks, achi
 
 Do NOT change: pitch detection, the matching window, hit/close/miss pitch rules, playback, the audio engine, file formats. Scoring reads results the scorer already produces.
 
-Visual work follows `docs/REDESIGN.md` tokens and pixel kit if that redesign has landed; otherwise use the existing theme and keep everything easy to restyle (no literal colours).
+Visual work follows `docs/REDESIGN.md` tokens and pixel kit if that redesign has landed; otherwise use the existing theme and keep everything easy to restyle (no literal colours). **All motion follows `docs/MOTION.md` Part B1** (excitement bar, ghosts, XP bar, XP toast, level up, pass review, tap calibration) and its tokens; where this file and MOTION.md disagree on motion, MOTION.md wins.
 
 ---
 
@@ -162,7 +162,8 @@ In the practice view's HUD area (track bar right side, per REDESIGN §6.7):
 - **Accuracy %** (display font) and the existing hit/close/miss counts.
 - **Excitement**: 20-block pixel segmented bar; blocks fill with the band colour (Cold `text3` → Warm `text2` → Hot `hit` → On fire `hit` + 2-frame stepped shimmer). Band name in pixel font beside it. Never amber, never red.
 - **Level + XP**: "LV 7 · Garage Player" + thin 12-block XP bar to next level.
-- XP gain: after each completed pass, a pixel toast "+42 XP" (stepped animation, 1.5 s). Level up: larger toast "LEVEL 8 — Garage Player".
+- XP gain: "+42 XP" toast after each completed pass, queued until the pass ends (MOTION §B1.5). Level up: the choreographed level card (MOTION §B1.6), never while playing.
+- Excitement bar motion (block pops, stepped drain, band sweep, On-fire flicker, +5 streak): MOTION §B1.2.
 - Unscored state replaces excitement + XP with "Unscored — calibrate to earn XP" (clickable → opens Tap calibrate).
 
 ---
@@ -176,7 +177,7 @@ On the tab, for each judged note whose timing tier is **not** Perfect:
 - Direction without colour: early ghost gets a small pixel `‹` on its left; late ghost a `›` on its right.
 - Perfect notes get no ghost (keeps the tab clean; the verdict fill already says "good").
 - Misses get no ghost (there's no onset to place). Wrong-pitch notes still get a timing ghost if they had an onset.
-- Ghosts fade out over 2 bars after the playhead passes them (stepped fade, 3 frames).
+- Ghosts appear instantly when judged and fade out across the 2 bars after the playhead passes (MOTION §B1.3).
 - Ghost drawing must not read engine state beyond what the tab renderer already reads.
 
 ---
@@ -204,4 +205,5 @@ Opens automatically when a full run ends, and on demand for the last completed l
    - Play the same loop 6 times: XP per pass shrinks, never below 25%.
    - Quit and reopen: level and XP persist.
    - Open the pass review; hover dots; jump to a note.
-3. Report: the onset finding from §1, every file added/changed, constants file location, anything you couldn't do and why. Do not claim untested behaviour works.
+3. Run the MOTION.md §C checks for Part B1 (especially audio isolation: identical verdicts and offsets with animations on/off).
+4. Report: the onset finding from §1, every file added/changed, constants file location, anything you couldn't do and why. Do not claim untested behaviour works.

@@ -2,7 +2,7 @@
 
 Save as `docs/BATTLES.md` in the repo. Re-read at the start of every stage and after any context compaction.
 
-**Prerequisites (stop and tell me if any is missing):** `docs/REDESIGN.md` landed (tokens, pixel kit) · `docs/SCORING.md` landed (`internal/scoring`, per-profile `progress.json`, best-pass replays, tap calibration, ghosts). Battles reuse all of it — do not duplicate scoring logic.
+**Prerequisites (stop and tell me if any is missing):** `docs/REDESIGN.md` landed (tokens, pixel kit) · `docs/SCORING.md` landed (`internal/scoring`, per-profile `progress.json`, best-pass replays, tap calibration, ghosts). Battles reuse all of it — do not duplicate scoring logic. **All battle motion follows `docs/MOTION.md` Part B2** (setup, VS intro, turn banner, scoreboard, result card chain, lead-change crown, crowd meter, final results, confirms); where this file and MOTION.md disagree on motion, MOTION.md wins.
 
 ---
 
@@ -45,7 +45,7 @@ If the section is shorter than `phraseBars × exchanges`, reduce exchanges to fi
 
 ## 3. Stage 1 — Profiles and sound check
 
-- Profiles live in `progress.json` (already per-profile from SCORING.md). Add UI: **Profiles** in Settings and in battle setup — create (name, max 20 chars), rename, delete (confirm dialog naming the profile and stating its XP/records will be lost), set active.
+- Profiles live in `progress.json` (already per-profile from SCORING.md). Add UI: **Profiles** in Settings and in battle setup — create (name, max 20 chars), rename, delete (confirm dialog naming the profile and stating its XP/records will be lost; Cancel has default focus; button reads "Delete profile" — MOTION §A6), set active.
 - Each profile shows: pixel guitar icon tinted by a per-profile colour picked from 6 fixed, non-token-clashing tints (not `brand`, not verdict colours — add them as tokens `p1..p6`), name, level + title, battle record.
 - **Sound check** (per human participant, before their first turn): "Play your open strings" — 3 s window showing the existing input level as the segmented meter. Pass = level rose above the detector's existing gate on ≥ 3 distinct onsets. Fail → "Can't hear you — turn your guitar volume up" + retry. This checks level only; it does not change calibration or detection.
 - Calibration is per device pair (shared rig), done once via Tap calibrate. If the rig is uncalibrated, battles still run but every human turn is **Unscored** and the battle can't produce a winner — block "Start battle" with a button to Tap calibrate.
@@ -147,11 +147,12 @@ Start screen gets a **Battles** item (pixel crossed-picks icon) next to Open son
   1. Banner: "EXCHANGE 2 / 4 — PLAYER: Aaditya" (+ "pass the guitar" if the previous turn was a different human).
   2. Human: "Ready" (Space) → sound check if first turn → count-in 1 bar → play phrase → result card.
   3. Bot: 1 s "Rusher Rex is up…" → plays → result card.
-  4. **Result card** (3 s or Space): turn accuracy, tightness label, turnScore, crowd swing animation (stepped).
+  4. **Result card**: turn accuracy, tightness label, turnScore, then crowd swing and total — chained, never simultaneous (MOTION §B2.5). Space jumps to the end; auto-advance 3 s after the last step.
+  - Battle start plays the VS intro (MOTION §B2.2); lead changes move the crown (§B2.6).
 - No pausing a turn mid-phrase except Esc (abandon prompt). Wait mode and looping are off in battles.
 
 ### 6.4 Results screen
-Winner banner (pixel trophy, stepped reveal), final totals, per-exchange table (rows = exchanges, columns = participants, cells = turnScore + accuracy), tiebreak note if used, XP awarded per human profile, buttons: **Rematch** (same setup), **New battle**, **Done**. Then "Review a turn" opens SCORING.md's pass review for any human turn.
+Choreographed per MOTION §B2.8 (rows → totals → trophy drop → XP → buttons; Space skips). Winner banner (pixel trophy), final totals, per-exchange table (rows = exchanges, columns = participants, cells = turnScore + accuracy), tiebreak note if used, XP awarded per human profile, buttons: **Rematch** (same setup), **New battle**, **Done**. Then "Review a turn" opens SCORING.md's pass review for any human turn.
 
 ---
 
@@ -184,4 +185,5 @@ Winner banner (pixel trophy, stepped reveal), final totals, per-exchange table (
    - Force a tie (e.g. two ghosts of the same pass) and confirm the tiebreak / draw.
    - Esc mid-battle: no record saved.
    - Quit and reopen: records and XP persist per profile.
-3. Report: every file added/changed, whether bot misses are audible (§5.3), anything skipped and why. Don't claim untested behaviour works.
+3. Run the MOTION.md §C checks for Part B2.
+4. Report: every file added/changed, whether bot misses are audible (§5.3), anything skipped and why. Don't claim untested behaviour works.
