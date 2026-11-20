@@ -67,6 +67,9 @@ func runShell(initialPath string) error {
 	if store != nil && store.NeedsProfile() {
 		sh.Show(ui.NewNamePrompt(sh, store))
 	}
+	if ui.KitRequested() {
+		sh.Show(ui.NewKitScreen())
+	}
 
 	if initialPath != "" {
 		browser.OfferDialogResult(initialPath, "")
@@ -668,6 +671,7 @@ func (o *shellOpener) Open(path string) (ui.Screen, []string, error) {
 	o.closeAudio()
 
 	var conds []string
+	var listenIn, listenOut string // the devices in use, once listening
 
 	if captureID != "" {
 		session, cond, err := setupListen(eng, app, sc, "", "", o.prefs.snapshot())
@@ -676,6 +680,7 @@ func (o *shellOpener) Open(path string) (ui.Screen, []string, error) {
 			conds = append(conds, "live input unavailable: "+err.Error())
 		} else {
 			o.session = session
+			listenIn, listenOut = cond.inID, cond.outID
 			conds = append(conds, cond.notes...)
 			if cond.uncalibrated {
 				conds = append(conds, uncalibratedShellWarning)
@@ -704,9 +709,11 @@ func (o *shellOpener) Open(path string) (ui.Screen, []string, error) {
 		app.SetLiveWarning(msg)
 	}
 	if o.store != nil {
-		capID, playID := o.prefs.Devices()
-		conf, ok := o.prefs.confidenceFor(capID, playID)
-		_, hasOff := o.prefs.offsetFor(capID, playID)
+		// Calibration of the devices in use: a missing interface falls back
+		// to others that need calibrating in their own right.
+		conf, ok := o.prefs.confidenceFor(listenIn, listenOut)
+		_, hasOff := o.prefs.offsetFor(listenIn, listenOut)
+		ok = ok && o.session != nil
 		app.SetProgress(o.store, progress.SongID(sc), sc.Title, path, ok && hasOff && conf >= scoring.CredibleConfidence)
 		app.SetNameAsker(func() { o.shell.Show(ui.NewNamePrompt(o.shell, o.store)) })
 	}

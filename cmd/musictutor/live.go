@@ -332,6 +332,8 @@ type liveConditions struct {
 	notes []string
 
 	uncalibrated bool
+	// inID and outID are the devices actually listened on (after any fallback).
+	inID, outID string
 }
 
 func setupListen(eng *engine.Engine, app *ui.App, sc *score.Score, inQ, outQ string, cfg appconfig.Config) (session *live.Session, cond liveConditions, err error) {
@@ -348,6 +350,7 @@ func setupListen(eng *engine.Engine, app *ui.App, sc *score.Score, inQ, outQ str
 		fmt.Fprintln(os.Stderr, "warning:", n)
 	}
 	offset, calibrated := calibratedOffset(cfg, inID, outID)
+	cond.inID, cond.outID = inID, outID
 	cond.uncalibrated = !calibrated
 	if !calibrated {
 		fmt.Fprintln(os.Stderr, "warning: no latency calibration for these devices — run 'musictutor calibrate'.")

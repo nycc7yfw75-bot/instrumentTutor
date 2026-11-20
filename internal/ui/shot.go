@@ -41,6 +41,8 @@ func screenName(sc Screen) string {
 		return "editor"
 	case *NamePrompt:
 		return "name"
+	case *KitScreen:
+		return "kit"
 	}
 	n := fmt.Sprintf("%T", sc)
 	return strings.ToLower(n[strings.LastIndex(n, ".")+1:])
