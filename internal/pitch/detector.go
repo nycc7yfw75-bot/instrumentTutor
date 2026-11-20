@@ -285,6 +285,7 @@ func (d *Detector) finishStrum() {
 	}
 	d.strums = append(d.strums, Strum{
 		Frame:   d.accFrame,
+		Attack:  d.accFrame + int64(d.cfg.Window/2-d.cfg.Hop/2),
 		Chroma:  normalizeChroma(acc),
 		RMS:     d.accRMS,
 		Clarity: d.accClarity,

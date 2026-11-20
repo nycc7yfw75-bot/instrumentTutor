@@ -799,3 +799,26 @@ func TestGraceNotesNeverMiss(t *testing.T) {
 		t.Fatalf("an unplayed grace note scored %+v", rs)
 	}
 }
+
+func TestTimingComesFromThePickAttack(t *testing.T) {
+	s := NewScorer(testConfig())
+	picked := wev(40, 960)
+	s.ExpectNote(picked, 10000)
+	// Recognised 1000 frames (~21 ms) late, but picked 480 frames (10 ms) late.
+	n := det(11000, 40, 0)
+	n.Onset, n.HasOnset = 10480, true
+	s.Detected([]pitch.Note{n})
+	legato := wev(43, 1920)
+	s.ExpectNote(legato, 20000)
+	s.Detected([]pitch.Note{det(20600, 43, 0)}) // a hammer-on: no pick attack
+	rs := drain(s)
+	if len(rs) != 2 {
+		t.Fatalf("got %d results, want 2", len(rs))
+	}
+	if r := rs[0]; !r.Timed || r.OnsetErrFrames != 480 || r.ErrFrames != 1000 {
+		t.Errorf("picked note: timed %v, attack error %d, recognition error %d; want 480 from the attack", r.Timed, r.OnsetErrFrames, r.ErrFrames)
+	}
+	if r := rs[1]; !r.Timed || r.OnsetErrFrames != 600 {
+		t.Errorf("legato note: attack error %d, want the start-based 600 when no pick was heard", r.OnsetErrFrames)
+	}
+}

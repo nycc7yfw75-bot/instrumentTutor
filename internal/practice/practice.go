@@ -30,6 +30,13 @@ type NoteResult struct {
 	ErrCents float64
 
 	ErrFrames int64
+
+	// OnsetErrFrames is the timing error measured from the pick attack (+ late,
+	// - early), what timing judgements use: ErrFrames runs late on low strings
+	// because pitch takes longer to recognise there. Timed is false when the
+	// result carries no timing at all (wait mode, slides).
+	OnsetErrFrames int64
+	Timed          bool
 }
 
 type Stats struct{ Hit, Close, Miss int }
@@ -110,6 +117,7 @@ type expectation struct {
 	onset       bool
 	onsetProm   float64
 	onsetFrames int64
+	onsetAttack int64 // the strongest strum's attack, relative to the note
 }
 
 type preMatch struct {
@@ -226,12 +234,14 @@ func (s *Scorer) Detected(notes []pitch.Note) {
 			v = VerdictHit
 		}
 		s.finalize(NoteResult{
-			Event:     exp.ev,
-			OutFrame:  exp.outFrame,
-			Verdict:   v,
-			Matched:   true,
-			ErrCents:  n.Cents,
-			ErrFrames: detOut - exp.outFrame,
+			Event:          exp.ev,
+			OutFrame:       exp.outFrame,
+			Verdict:        v,
+			Matched:        true,
+			ErrCents:       n.Cents,
+			ErrFrames:      detOut - exp.outFrame,
+			OnsetErrFrames: attackOut(n, off) - exp.outFrame,
+			Timed:          true,
 		})
 	}
 
@@ -316,6 +326,7 @@ func (s *Scorer) DetectedStrum(st pitch.Strum) {
 		if !exp.onset || p > exp.onsetProm {
 			exp.onsetProm = p
 			exp.onsetFrames = stOut - exp.outFrame
+			exp.onsetAttack = st.Attack - off - exp.outFrame
 		}
 		exp.onset = true
 	}
@@ -398,6 +409,8 @@ func (s *Scorer) verifyChord(st pitch.Strum, stOut, start, outFrame int64, stats
 
 			r.Matched = true
 			r.ErrFrames = stOut - exp.outFrame
+			r.OnsetErrFrames = stOut + (st.Attack - st.Frame) - exp.outFrame
+			r.Timed = true
 		}
 		s.finalize(r)
 	}
@@ -512,6 +525,8 @@ func (s *Scorer) deadlineResult(exp expectation) NoteResult {
 		r.Verdict = VerdictClose
 		r.Matched = true
 		r.ErrFrames = exp.onsetFrames
+		r.OnsetErrFrames = exp.onsetAttack
+		r.Timed = true
 	}
 	return r
 }
@@ -792,4 +807,13 @@ func ConfirmsSlide(n pitch.Note, ev score.NoteEvent, cfg Config) bool {
 		return false
 	}
 	return settledAt(&n, ev.Key, cfg.withDefaults().CentsTolerance)
+}
+
+// attackOut is when a detected note was picked, on the output clock: its
+// pick attack when one was heard, else when its pitch was recognised.
+func attackOut(n *pitch.Note, off int64) int64 {
+	if n.HasOnset {
+		return n.Onset - off
+	}
+	return n.Start - off
 }

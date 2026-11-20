@@ -19,6 +19,10 @@ const (
 	trackerJumpCents = 80
 
 	trackerEndHops = 5
+
+	// onsetMaxLeadMs is how long after a pick attack a note may be recognised
+	// and still be credited to it (low strings take ~25 ms).
+	onsetMaxLeadMs = 60
 )
 
 type Tracker struct {
@@ -53,6 +57,13 @@ type Tracker struct {
 
 	unvoicedRun int
 
+	// lastOnset is the latest pick attack, corrected to the attack itself;
+	// the next note to open within onsetMaxLead of it takes it.
+	lastOnset int64
+	pendOnset bool
+	onset     int64
+	hasOnset  bool
+
 	medScratch []float64
 	notes      []Note
 }
@@ -71,6 +82,10 @@ func (t *Tracker) Feed(frames []Frame) []Note {
 
 func (t *Tracker) feedOne(f *Frame) {
 	if f.Onset {
+		// A frame is stamped at the centre of its window, but the onset test
+		// looks at its newest hop: the attack is that far later.
+		t.lastOnset = f.Frame + int64(t.cfg.Window/2-t.cfg.Hop/2)
+		t.pendOnset = true
 
 		if t.open {
 			t.closeNote(t.lastVoiced)
@@ -157,6 +172,8 @@ func (t *Tracker) Current() (Note, bool) {
 	lo, hi, end := t.trajectory()
 	return Note{
 		Start:    t.start,
+		Onset:    t.onset,
+		HasOnset: t.hasOnset,
 		Key:      t.key,
 		Cents:    median(&t.medScratch, t.cents),
 		MinCents: lo,
@@ -180,6 +197,11 @@ func (t *Tracker) Flush() []Note {
 
 func (t *Tracker) openNote(key int, start, last int64, cents, clar []float64) {
 	t.open = true
+	t.hasOnset = false
+	if lead := start - t.lastOnset; t.pendOnset && lead >= -int64(t.cfg.Hop) && lead <= int64(t.cfg.SampleRate)*onsetMaxLeadMs/1000 {
+		t.onset, t.hasOnset = t.lastOnset, true
+	}
+	t.pendOnset = false
 	t.key = key
 	t.start = start
 	t.lastVoiced = last
@@ -192,6 +214,8 @@ func (t *Tracker) closeNote(end int64) {
 	lo, hi, last := t.trajectory()
 	t.notes = append(t.notes, Note{
 		Start:    t.start,
+		Onset:    t.onset,
+		HasOnset: t.hasOnset,
 		End:      end,
 		Key:      t.key,
 		Cents:    median(&t.medScratch, t.cents),

@@ -119,6 +119,10 @@ type Chroma [PitchClasses]float32
 type Strum struct {
 	Frame int64
 
+	// Attack is the strum's pick attack: Frame is stamped at the centre of
+	// the onset window, the attack is in its newest hop.
+	Attack int64
+
 	Chroma Chroma
 
 	RMS float64
@@ -136,6 +140,13 @@ func ChromaOf(key int) int { return ((key % PitchClasses) + PitchClasses) % Pitc
 
 type Note struct {
 	Start, End int64
+
+	// Onset is the pick attack that began the note, when one was heard
+	// (HasOnset): the time to judge timing by. Start is when the pitch was
+	// first recognised, later by up to ~25 ms on low strings. A note begun
+	// without a pick (hammer-on, slide) has no onset.
+	Onset    int64
+	HasOnset bool
 
 	Key int
 
