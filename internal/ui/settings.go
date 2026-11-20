@@ -1227,7 +1227,7 @@ func (s *Settings) items() []settingsItem {
 		value, label := "not set yet", "add name"
 		if ok {
 			lvl := xp.Level()
-			value, label = fmt.Sprintf("%s  ·  level %d, %s", name, lvl, scoring.Title(lvl)), "rename"
+			value, label = fmt.Sprintf("%s  ·  level %d, %s", name, lvl, scoring.Title(lvl))+streakLabel(st.Streak()), "rename"
 		}
 		b.addRow("player", value, colHUD, settingsButton{label: label, act: func(s *Settings) {
 			s.focusRow(srProfile)

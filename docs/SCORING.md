@@ -226,3 +226,7 @@ Progress saving (Stage 2):
 - **The first profile is named by the player on first launch** (a one-time prompt), and the name is editable later in Settings under a Profile section.
 - **Keep the last 3 copies** of progress.json (progress.json.1 → .2 → .3, rotated on each save).
 - **Practice time counts while the song is actually playing**, per day and per song; paused or idle time doesn't count. (Stored per profile, as the base for a future streak.)
+
+Owner's decisions (2026-11-21):
+- **Slow practice earns more** (ground rule 5 wins over §4.5's tempoFactor): the tempo factor is 1 at full speed or faster, rising in a straight line to **1.5× at half speed**, capped at 1.5× below that (`scoring.TempoFactor`; constants `SlowBonusMax`, `SlowBonusAt`).
+- **Practice streak is built** (ground rule 2): a day counts with ≥ 5 minutes of the song actually playing, scored or not, listening or not (`progress.Streak`). Today not counting yet doesn't break the streak until the day is over. Shown after the level on the practice screen ("LV 1 · Bedroom Player · 3-day streak, 2 min to go today") and in Settings → Profile.

@@ -56,14 +56,27 @@ func DifficultyOf(sc *score.Score, track int) Difficulty {
 }
 
 // PassXP is a completed pass's XP before the repeat factor:
-// PassBaseXP + Σ noteScore × difficulty × min(tempo, 1). A pass of fewer
-// than MinJudgedNotes earns nothing. A miss adds 0 to Σ noteScore, so it
-// never lowers XP.
+// PassBaseXP + Σ noteScore × difficulty × TempoFactor(tempo). A pass of
+// fewer than MinJudgedNotes earns nothing. A miss adds 0 to Σ noteScore, so
+// it never lowers XP.
 func PassXP(s Summary, d Difficulty, tempoScale float64) float64 {
 	if s.Judged < MinJudgedNotes {
 		return 0
 	}
-	return PassBaseXP + s.SumScore*d.Mult()*max(0, min(tempoScale, 1))
+	return PassBaseXP + s.SumScore*d.Mult()*TempoFactor(tempoScale)
+}
+
+// TempoFactor rewards slow practice (owner's ground rule 5): 1 at full
+// speed or faster, rising in a straight line to SlowBonusMax at half speed,
+// and staying there below it.
+func TempoFactor(tempoScale float64) float64 {
+	switch {
+	case tempoScale >= 1:
+		return 1
+	case tempoScale <= SlowBonusAt:
+		return SlowBonusMax
+	}
+	return 1 + (SlowBonusMax-1)*(1-tempoScale)/(1-SlowBonusAt)
 }
 
 // RepeatFactor shrinks XP for playing the same section again today: the

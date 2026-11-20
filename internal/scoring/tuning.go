@@ -52,6 +52,11 @@ const (
 const (
 	PassBaseXP = 10.0
 
+	// Slow practice earns more (owner's ground rule 5): the tempo factor
+	// rises from 1 at full speed to SlowBonusMax at SlowBonusAt and below.
+	SlowBonusMax = 1.5
+	SlowBonusAt  = 0.5
+
 	EasyBelowNPS   = 2.0 // notes per second at full tempo
 	MediumBelowNPS = 4.0
 	HardBelowNPS   = 7.0

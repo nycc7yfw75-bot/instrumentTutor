@@ -28,8 +28,10 @@ func TestPassXPFormula(t *testing.T) {
 	}{
 		{Easy, 1.0, 10 + 10*1.0},
 		{Medium, 1.0, 10 + 10*1.25},
-		{Hard, 0.6, 10 + 10*1.5*0.6}, // 60% speed earns 60%
-		{Expert, 1.5, 10 + 10*2.0},   // faster than written earns no more than 100%
+		{Hard, 0.6, 10 + 10*1.5*1.4}, // 60% speed earns 1.4× (slow practice earns more)
+		{Easy, 0.5, 10 + 10*1.5},     // half speed: the full 1.5×
+		{Easy, 0.25, 10 + 10*1.5},    // slower still: capped at 1.5×
+		{Expert, 1.5, 10 + 10*2.0},   // faster than written earns no bonus
 	}
 	for _, c := range cases {
 		if got := PassXP(s, c.d, c.tempo); math.Abs(got-c.want) > 1e-9 {

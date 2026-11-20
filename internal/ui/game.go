@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
@@ -251,9 +252,23 @@ func (a *App) levelLabel() string {
 	}
 	if _, xp, ok := a.game.store.Active(); ok {
 		lvl := xp.Level()
-		return fmt.Sprintf("LV %d · %s", lvl, scoring.Title(lvl))
+		return fmt.Sprintf("LV %d · %s", lvl, scoring.Title(lvl)) + streakLabel(a.game.store.Streak())
 	}
 	return ""
+}
+
+// streakLabel is " · 3-day streak", with how long is left today while
+// today does not count yet; "" with no streak.
+func streakLabel(st progress.Streak) string {
+	if st.Days == 0 {
+		return ""
+	}
+	s := fmt.Sprintf(" · %d-day streak", st.Days)
+	if !st.TodayDone {
+		left := int(math.Ceil((progress.StreakDaySeconds - st.TodaySecs) / 60))
+		s += fmt.Sprintf(", %d min to go today", left)
+	}
+	return s
 }
 
 // gameHUDRight is where the excitement bar (or the reason) ends: left of
