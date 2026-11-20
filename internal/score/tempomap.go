@@ -166,7 +166,8 @@ func (s *Score) Validate() error {
 							return fmt.Errorf("track %d bar %d: pull-offs and dead notes do not exist on %s", ti, bi, An(tr.Wind.Name))
 						}
 					} else if tr.Drums {
-						if n.String < 1 || n.String > MaxDrumKey-drumKeyBase || n.Fret != 0 || n.Tied || n.Tech != 0 {
+						// A drum hit carries no technique, but may be a grace (a flam).
+						if n.String < 1 || n.String > MaxDrumKey-drumKeyBase || n.Fret != 0 || n.Tied || n.Tech&^TechGrace != 0 {
 							return fmt.Errorf("track %d bar %d: not a drum hit (lane %d, fret %d)", ti, bi, n.String, n.Fret)
 						}
 					} else {

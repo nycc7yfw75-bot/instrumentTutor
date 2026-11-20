@@ -71,3 +71,16 @@ func TestTiedBendsKeepEachSegmentsBend(t *testing.T) {
 		t.Errorf("bends = %+v, want one at beat 2 and one at beat 3 (a half note long)", got)
 	}
 }
+
+func TestDrumFlamsAreValidButTechniquesAreNot(t *testing.T) {
+	s := drumScore(t, 38)
+	kit := s.Tracks[1]
+	kit.Bars[0].Beats[0].Notes[0].Tech = TechGrace // a flam: a grace hit before the snare
+	if err := s.Validate(); err != nil {
+		t.Fatalf("a drum flam failed validation: %v", err)
+	}
+	kit.Bars[0].Beats[0].Notes[0].Tech = TechBend
+	if err := s.Validate(); err == nil {
+		t.Error("a bent drum hit passed validation")
+	}
+}
