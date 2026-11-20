@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 )
 
@@ -53,10 +52,10 @@ func TestBannerClickOpensTheListWhenThereAreWarnings(t *testing.T) {
 	a := appWithWarnings(t, 3)
 	a.SetLiveWarning("imported with 3 warnings")
 	a.syncLive()
-	if !strings.Contains(a.warnBannerHint(), "all 3 import warnings") {
-		t.Errorf("banner hint %q does not offer the list", a.warnBannerHint())
+	if more := len(a.warnItems()) - 1; more != 3 {
+		t.Errorf("the banner offers %d more, want the 3 import warnings", more)
 	}
-	a.handleMouse(pressAt(warnRect()), false)
+	a.handleMouse(pressAt(bannerRect()), false)
 	if !a.warnList.open {
 		t.Fatal("a click on the banner did not open the warnings list")
 	}
@@ -64,10 +63,10 @@ func TestBannerClickOpensTheListWhenThereAreWarnings(t *testing.T) {
 	plain := newApp(t, 4)
 	plain.SetLiveWarning("timing is not calibrated")
 	plain.syncLive()
-	if plain.warnBannerHint() != warnHint {
-		t.Errorf("a banner with no import warnings offers %q", plain.warnBannerHint())
+	if more := len(plain.warnItems()) - 1; more != 0 {
+		t.Errorf("a banner with nothing else to list offers %d more", more)
 	}
-	plain.handleMouse(pressAt(warnRect()), false)
+	plain.handleMouse(pressAt(bannerRect()), false)
 	if plain.warnList.open || plain.warningVisible() {
 		t.Error("with no import warnings a banner click should just dismiss it")
 	}

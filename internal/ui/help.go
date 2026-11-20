@@ -115,7 +115,7 @@ func overlayDesc(b helpBinding) string {
 
 func drawHelpOverlay(dst *ebiten.Image, title string, rows []helpBinding, footnote string) {
 
-	vector.DrawFilledRect(dst, 0, 0, screenW, screenH, colHelpDim, false)
+	vector.DrawFilledRect(dst, 0, 0, float32(screenW), float32(screenH), colHelpDim, false)
 	drawPanel(dst, helpCard(), colPanel, colPanelEdge)
 	drawTextScaled(dst, title, helpX, 24, uiTitleScl, colNote)
 

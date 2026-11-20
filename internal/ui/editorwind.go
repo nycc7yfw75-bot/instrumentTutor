@@ -275,7 +275,7 @@ func (e *Editor) pickerSpots(out *int) []hotspot {
 }
 
 func (e *Editor) drawPicker(screen *ebiten.Image) {
-	vector.DrawFilledRect(screen, 0, 0, screenW, screenH, colHelpDim, false)
+	vector.DrawFilledRect(screen, 0, 0, float32(screenW), float32(screenH), colHelpDim, false)
 	r := edPickerRect()
 	drawPanel(screen, r, colPanel, colSounding)
 	title := "What will this piece be played on?"

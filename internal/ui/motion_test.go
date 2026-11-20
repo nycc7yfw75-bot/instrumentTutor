@@ -76,7 +76,7 @@ func TestReduceMotionRowSavesAndEverythingStillFits(t *testing.T) {
 	items := s.items()
 	last := items[len(items)-1]
 	if last.y+settingsRowH > screenH-68 {
-		t.Errorf("with every row showing, Settings runs to y=%.0f, into the footer at %d", last.y+settingsRowH, screenH-68)
+		t.Errorf("with every row showing, Settings runs to y=%.0f, into the footer at %.0f", last.y+settingsRowH, screenH-68)
 	}
 }
 

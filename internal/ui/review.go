@@ -390,6 +390,6 @@ func (a *App) paintReviewTab(c *ebiten.Image, p *passReview) {
 	}
 	for _, gh := range p.ghosts {
 		ny := float32(top + float64(gh.str-1)*reviewTabGap)
-		drawGhost(clip, gh, ghostAlpha, tickToX(gh.start), tickToX(gh.start+gh.offTicks), ny)
+		drawGhost(clip, gh, ghostAlpha, tickToX(gh.start), tickToX(gh.start+gh.offTicks), ny, sizeMono)
 	}
 }

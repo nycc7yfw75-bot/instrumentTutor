@@ -26,7 +26,6 @@ const (
 
 	edLabelW = 26.0
 	edGridX  = uiPadX + edLabelW
-	edGridW  = screenW - 2*uiPadX - edLabelW
 
 	edStringGap = 22.0
 
@@ -447,7 +446,7 @@ func (e *Editor) clampScroll(systems []edSystem) {
 
 func (e *Editor) drawGrid(dst *ebiten.Image) {
 
-	screen := dst.SubImage(image.Rect(0, int(edGridTop)-2, screenW, int(gridBottom()))).(*ebiten.Image)
+	screen := dst.SubImage(image.Rect(0, int(edGridTop)-2, int(screenW), int(gridBottom()))).(*ebiten.Image)
 
 	systems := e.layoutSystems()
 	e.clampScroll(systems)
@@ -1483,7 +1482,7 @@ func (e *Editor) leavePromptSpots(out *edLeaveChoice) []hotspot {
 func edPromptRect() rect { return rect{screenW/2 - 280, screenH/2 - 90, 560, 180} }
 
 func (e *Editor) drawLeavePrompt(screen *ebiten.Image) {
-	vector.DrawFilledRect(screen, 0, 0, screenW, screenH, colHelpDim, false)
+	vector.DrawFilledRect(screen, 0, 0, float32(screenW), float32(screenH), colHelpDim, false)
 	r := edPromptRect()
 	drawPanel(screen, r, colPanel, colSounding)
 	title := "This piece has unsaved changes"
@@ -1563,3 +1562,5 @@ func (e *Editor) hintLine() string {
 	}
 	return hintLineOf(e.editorBindings())
 }
+
+var edGridW = screenW - 2*uiPadX - edLabelW

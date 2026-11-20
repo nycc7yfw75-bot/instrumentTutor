@@ -1,6 +1,10 @@
 package ui
 
 import (
+	"image/color"
+	"math"
+	"strings"
+
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
@@ -47,26 +51,50 @@ func (a *App) jumpSection(dir int) {
 	a.seekTo(0)
 }
 
-// drawSections marks each section on the timeline: a divider where it
-// starts and its name in the space up to the next one.
-func (a *App) drawSections(dst *ebiten.Image, tl rect) {
+// drawSections draws each section as a solid segment of the timeline
+// (§6.6): shaded by its kind, the current one in brand at 35%, with its
+// name only where the whole name fits.
+func (a *App) drawSections(dst *ebiten.Image, tl rect, p pointer) {
 	secs := a.sc.Sections
 	cur := a.sc.SectionAt(a.posTick())
 	for i, s := range secs {
-		x0 := a.timelineX(tl, s.Tick)
+		x0 := math.Round(a.timelineX(tl, s.Tick))
 		x1 := tl.x + tl.w
 		if i+1 < len(secs) {
-			x1 = a.timelineX(tl, secs[i+1].Tick)
+			x1 = math.Round(a.timelineX(tl, secs[i+1].Tick)) - 2 // a 2px gap between segments
 		}
-		if i > 0 || s.Tick > 0 {
-			vector.StrokeLine(dst, float32(x0), float32(tl.y+1), float32(x0), float32(tl.y+tl.h-1), 1, colDim, false)
+		if x1 <= x0 {
+			continue
 		}
-		col := colBarline
+		fill, ink := sectionTint(s.Name), colDim
 		if i == cur {
-			col = colHUD
+			fill, ink = withAlpha(tokBrand, 0.35), tokBrand
 		}
-		if room := x1 - x0 - 8; room > 12 {
-			drawTextSmall(dst, truncateW(s.Name, room), x0+4, tl.y+3, col)
+		seg := rect{x0, tl.y, x1 - x0, tl.h}
+		if i == 0 || i == len(secs)-1 {
+			notchedFill(dst, seg, fill)
+		} else {
+			vector.FillRect(dst, float32(seg.x), float32(seg.y), float32(seg.w), float32(seg.h), fill, false)
+		}
+		label := strings.ToUpper(s.Name)
+		if w := textWScaled(label, dispS); w+2*sp1 <= seg.w {
+			drawTextScaled(dst, label, seg.x+sp1, seg.y+(seg.h-sizeDisplayS)/2-1, dispS, ink)
 		}
 	}
+}
+
+// sectionTint tells section kinds apart by lightness (§6.6).
+func sectionTint(name string) color.RGBA {
+	n := strings.ToLower(name)
+	switch {
+	case strings.Contains(n, "solo"):
+		return tokLine
+	case strings.Contains(n, "chorus"):
+		return lerpCol(tokRaised, tokLine, 0.66)
+	case strings.Contains(n, "verse"):
+		return lerpCol(tokRaised, tokLine, 0.33)
+	case strings.Contains(n, "intro"), strings.Contains(n, "outro"):
+		return tokRaised
+	}
+	return lerpCol(tokRaised, tokLine, 0.5)
 }

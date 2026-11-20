@@ -323,7 +323,7 @@ func TestEveryScreenHasACompleteControlTable(t *testing.T) {
 			t.Errorf("%s has an empty footer hint", c.name)
 		}
 		if w := uiPadX + textW(c.hint); w > screenW {
-			t.Errorf("%s footer hint is %.0f px wide, past the %d px window", c.name, w, screenW)
+			t.Errorf("%s footer hint is %.0f px wide, past the %.0f px window", c.name, w, screenW)
 		}
 		if len(helpSections(c.rows)) == 0 {
 			t.Errorf("%s help overlay has no sections", c.name)

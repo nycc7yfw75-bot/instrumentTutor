@@ -4,11 +4,9 @@ import (
 	"fmt"
 	"image/color"
 	"math"
-	"strings"
 	"sync"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/text/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 
 	"github.com/S95F/musicTutor/internal/pitch"
@@ -216,184 +214,6 @@ func lerpRGBA(c0, c1 color.RGBA, t float64) color.RGBA {
 	return color.RGBA{l(c0.R, c1.R), l(c0.G, c1.G), l(c0.B, c1.B), 255}
 }
 
-func (a *App) drawLiveHUD(screen *ebiten.Image) {
-	const meterW, meterH = 180, 10
-	x0 := float32(screenW - meterW - uiPadX)
-	y0 := float32(ptTracksY + 6)
-
-	drawText(screen, "in", float64(x0)-22, float64(y0)-3, colHUD)
-	vector.StrokeRect(screen, x0, y0, meterW, meterH, 1, colString, false)
-	lv := a.levelDB
-	if lv < -60 {
-		lv = -60
-	} else if lv > 0 {
-		lv = 0
-	}
-	hint, hintCol := a.inputHint()
-	fc := colHit
-	switch {
-	case a.levelDB > -3 || hintCol == colMiss:
-		fc = colMiss
-	case hint != "":
-		fc = colClose
-	}
-	vector.DrawFilledRect(screen, x0+1, y0+1, (meterW-2)*float32((lv+60)/60), meterH-2, fc, false)
-
-	tx := x0 + meterW*float32(57.0/60.0)
-	vector.StrokeLine(screen, tx, y0-2, tx, y0+meterH+2, 1, colBarline, false)
-
-	line := liveStatsLine(a.stats)
-	if a.game.sess != nil {
-		pass := a.game.sess.Pass()
-		if !a.game.passOn {
-			pass = a.game.lastSummary
-		}
-		line = gameStatsLine(a.stats, pass)
-	}
-	drawTextRight(screen, line, screenW-uiPadX, float64(y0)+18, colHUD)
-	if a.dropped > 0 {
-		d := fmt.Sprintf("dropped %d samples", a.dropped)
-		if hint == "" {
-			hint, hintCol = d, colMiss
-		} else {
-			hint = d + "   " + hint
-		}
-	}
-	if hint != "" {
-		drawTextRight(screen, hint, screenW-uiPadX, float64(y0)+34, hintCol)
-	}
-}
-
-func liveStatsLine(st practice.Stats) string {
-	if st.Hit+st.Close+st.Miss == 0 {
-		return "Hit 0   Close 0   Miss 0"
-	}
-	return fmt.Sprintf("Hit %d   Close %d   Miss %d   ·   %.0f%%", st.Hit, st.Close, st.Miss, st.Accuracy()*100)
-}
-
-const (
-	warnInsetX = 16.0
-	warnPadX   = 16.0
-
-	warnBorderW = 2.0
-
-	warnScale = dispL
-
-	warnMinGapY = 2.0
-	warnHint    = "press D or click to dismiss"
-)
-
-func warnRect() rect {
-	x := uiPadX + warnInsetX
-	return rect{x, ptWarnY, screenW - 2*x, ptWarnH}
-}
-
-type warnLayout struct {
-	inner rect
-
-	lines []string
-
-	heading bool
-
-	lineH float64
-
-	msgY, hintY float64
-}
-
-func lineHeightOf(f text.Face) float64 {
-	m := f.Metrics()
-	return m.HAscent + m.HDescent
-}
-
-func (l warnLayout) width(s string) float64 {
-	if l.heading {
-		return textWScaled(s, warnScale)
-	}
-	return textW(s)
-}
-
-func warnLayoutFor(msg string) warnLayout {
-	r := warnRect()
-	l := warnLayout{inner: rect{
-		r.x + warnPadX, r.y + warnBorderW,
-		r.w - 2*warnPadX, r.h - 2*warnBorderW,
-	}}
-
-	bodyH := lineHeightOf(faceOf(srcBody, fontBody))
-	headH := lineHeightOf(displayFace(warnScale))
-
-	budget := l.inner.h - bodyH - warnMinGapY
-
-	if textWScaled(msg, warnScale) <= l.inner.w && headH <= budget {
-		l.heading, l.lineH, l.lines = true, headH, []string{msg}
-	} else {
-		l.lineH = bodyH
-		maxLines := int(budget / bodyH)
-		if maxLines < 1 {
-			maxLines = 1
-		}
-		lines := wrapTextW(msg, l.inner.w)
-		if len(lines) > maxLines {
-
-			tail := strings.Join(lines[maxLines-1:], " ")
-			lines = append(lines[:maxLines-1], tail)
-		}
-		for i, s := range lines {
-
-			lines[i] = truncateW(s, l.inner.w)
-		}
-		l.lines = lines
-	}
-
-	gap := (l.inner.h - (float64(len(l.lines))*l.lineH + bodyH)) / 3
-	l.msgY = l.inner.y + gap
-	l.hintY = l.msgY + float64(len(l.lines))*l.lineH + gap
-	return l
-}
-
-func (a *App) drawWarning(screen *ebiten.Image) {
-	r := warnRect()
-	vector.DrawFilledRect(screen, float32(r.x), float32(r.y), float32(r.w), float32(r.h), colWarnBG, false)
-	vector.StrokeRect(screen, float32(r.x), float32(r.y), float32(r.w), float32(r.h), warnBorderW, colMiss, false)
-
-	l := warnLayoutFor(a.warnMsg)
-	y := l.msgY
-	for _, s := range l.lines {
-		if l.heading {
-			drawTextScaled(screen, s, centreXScaled(s, l.inner.x, l.inner.w, warnScale), y, warnScale, colMiss)
-		} else {
-			drawText(screen, s, centreX(s, l.inner.x, l.inner.w), y, colMiss)
-		}
-		y += l.lineH
-	}
-	hint := a.warnBannerHint()
-	drawText(screen, hint, centreX(hint, l.inner.x, l.inner.w), l.hintY, colHUD)
-}
-
-var legendItems = []struct {
-	s   string
-	col color.RGBA
-}{{"Hit", colHit}, {"Close", colClose}, {"Miss", colMiss}}
-
-const legendGap = 14.0
-
-func legendXs() []float64 {
-	xs := make([]float64, len(legendItems))
-	x := uiPadX
-	for i, e := range legendItems {
-		xs[i] = x
-		x += textW(e.s) + legendGap
-	}
-	return xs
-}
-
-func (a *App) drawLegend(screen *ebiten.Image) {
-	y := a.legendY()
-	for i, x := range legendXs() {
-		drawText(screen, legendItems[i].s, x, y, legendItems[i].col)
-	}
-}
-
 var keyNames = [12]string{"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"}
 
 func keyName(key int) string {
@@ -403,7 +223,7 @@ func keyName(key int) string {
 func (a *App) drawTuner(screen *ebiten.Image) {
 	if !a.tunerSounding {
 		s, scale := a.tunerIdleLine()
-		drawTextScaled(screen, s, centreXScaled(s, 0, screenW, scale), 300, scale, colString)
+		drawTextScaled(screen, s, centreXScaled(s, 0, screenW, scale), a.tabMid()-30, scale, colString)
 		return
 	}
 	n := a.tunerNote
@@ -415,11 +235,11 @@ func (a *App) drawTuner(screen *ebiten.Image) {
 
 	name := fmt.Sprintf("%s %+.0fc", a.displayName(n.Key), n.Cents)
 	scale := dispX
-	drawTextScaled(screen, name, centreXScaled(name, 0, screenW, scale), 250, scale, col)
+	drawTextScaled(screen, name, centreXScaled(name, 0, screenW, scale), a.tabMid()-80, scale, col)
 
 	const barW, barH = 500, 20
 	x0 := float32((screenW - barW) / 2)
-	y0 := float32(370)
+	y0 := float32(a.tabMid() + 40)
 	cx := x0 + barW/2
 	zone := float32(5.0 / 50.0 * barW / 2)
 	vector.DrawFilledRect(screen, cx-zone, y0, 2*zone, barH, colTuneZone, false)

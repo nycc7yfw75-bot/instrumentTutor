@@ -21,6 +21,7 @@ const (
 	legatoNone  legato = iota
 	legatoArc          // hammer-on or pull-off: an arc from the note before
 	legatoSlide        // a slanted line from the note before
+	legatoTie          // a tie: an arc under the string from the note before
 )
 
 type tabMark struct {
@@ -63,6 +64,8 @@ func markFor(n score.Note, prevStart int64, prevFret int, hasPrev bool) tabMark 
 	var m tabMark
 	if hasPrev {
 		switch {
+		case n.Tied:
+			m.link = legatoTie
 		case n.Tech&(score.TechHammer|score.TechPull) != 0:
 			m.link = legatoArc
 		case n.Tech&score.TechSlide != 0:
@@ -123,7 +126,7 @@ func quarterToneText(q uint8) string {
 func strokeCurve(dst *ebiten.Image, p *vector.Path) {
 	op := &vector.DrawPathOptions{AntiAlias: true}
 	op.ColorScale.ScaleWithColor(colTechMark)
-	vector.StrokePath(dst, p, &vector.StrokeOptions{Width: 1.4, LineCap: vector.LineCapRound}, op)
+	vector.StrokePath(dst, p, &vector.StrokeOptions{Width: 2, LineCap: vector.LineCapRound}, op)
 }
 
 func arrowHead(dst *ebiten.Image, x, y float32, up bool) {
@@ -141,24 +144,33 @@ func arrowHead(dst *ebiten.Image, x, y float32, up bool) {
 	vector.FillPath(dst, &p, &vector.FillOptions{}, op)
 }
 
-// drawTechMark draws one note's technique marks. nx, ny are where its
-// label sits (left edge, string line) and w the label's width; xOf maps a
-// tick to the screen.
-func drawTechMark(dst *ebiten.Image, m tabMark, nx, ny, w float32, xOf func(int64) float32) {
+// drawTechMark draws one note's technique marks at 2px in text2, ending
+// short of the numbers (§6.4). nx, ny are where its label sits (left edge,
+// string line), w its width and h its size; xOf maps a tick to the screen.
+func drawTechMark(dst *ebiten.Image, m tabMark, nx, ny, w, h float32, xOf func(int64) float32) {
+	const short = 6 // marks stop this far from the numbers
 	if m.link != legatoNone {
 		px := xOf(m.prevStart)
-		pw := float32(textWMono(fmt.Sprintf("%d", m.prevFret)))
-		x0, x1 := px+pw+3, nx-3
-		if x1 > x0 {
+		pw := float32(textWFret(fmt.Sprintf("%d", m.prevFret), float64(h)))
+		x0, x1 := px+pw+short, nx-short
+		if x1 > x0 || m.link != legatoSlide {
 			var p vector.Path
 			switch m.link {
 			case legatoArc:
+				// Hammer-on or pull-off: an arc over the two numbers.
 				mid := (px + pw/2 + nx + w/2) / 2
-				p.MoveTo(px+pw/2, ny-10)
-				p.QuadTo(mid, ny-21, nx+w/2, ny-10)
+				topY := ny - h/2 - short
+				p.MoveTo(px+pw/2, topY)
+				p.QuadTo(mid, topY-h*0.6, nx+w/2, topY)
+			case legatoTie:
+				// A tie: a small arc under the string from the note before.
+				mid := (px + pw/2 + nx + w/2) / 2
+				bot := ny + h/2 + short/2
+				p.MoveTo(px+pw/2, bot)
+				p.QuadTo(mid, bot+h*0.45, nx+w/2, bot)
 			case legatoSlide:
 				// Rising to a higher fret, falling to a lower one.
-				dy := float32(5)
+				dy := h * 0.3
 				if !m.up {
 					dy = -dy
 				}
@@ -170,18 +182,18 @@ func drawTechMark(dst *ebiten.Image, m tabMark, nx, ny, w float32, xOf func(int6
 	}
 	if m.bent {
 		// An arrow curving up from the note; a release curves back down.
-		sx, sy := nx+w+3, ny-2
-		tx, ty := sx+9, ny-22
+		sx, sy := nx+w+short/2, ny-h*0.2
+		tx, ty := sx+h*0.6, ny-h*1.4
 		var p vector.Path
 		p.MoveTo(sx, sy)
 		p.QuadTo(tx, sy, tx, ty+2)
 		strokeCurve(dst, &p)
 		arrowHead(dst, tx, ty, true)
 		if s := bendText(m.bend); s != "" {
-			drawTextSmall(dst, s, float64(tx)-textWSmall(s)/2, float64(ty)-16, colHint)
+			drawTextSmall(dst, s, float64(tx)-textWSmall(s)/2, float64(ty)-18, colTechMark)
 		}
 		if m.bend.To < m.bend.Peak {
-			ex, ey := tx+12, ny-8
+			ex, ey := tx+h*0.8, ny-h*0.5
 			var r vector.Path
 			r.MoveTo(tx+1, ty)
 			r.QuadTo(ex, ty, ex, ey-2)
@@ -190,6 +202,6 @@ func drawTechMark(dst *ebiten.Image, m tabMark, nx, ny, w float32, xOf func(int6
 		}
 	}
 	if m.above != "" {
-		drawTextSmall(dst, m.above, float64(nx), float64(ny)-24, colHint)
+		drawTextSmall(dst, m.above, float64(nx), float64(ny-h/2-short)-uiTextH, colTechMark)
 	}
 }

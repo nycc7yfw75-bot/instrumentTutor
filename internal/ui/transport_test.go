@@ -123,7 +123,7 @@ func TestDragOnTabSeeks(t *testing.T) {
 	a := newApp(t, 8)
 	tab := a.layout().tab
 
-	x := screenW*playheadX + 200
+	x := playheadXAt() + 200
 	a.handleMouse(pointer{x: x, y: tab.y + tab.h/2, down: true, pressed: true}, false)
 	want := int64(200 / a.pxPerTick())
 	if got := a.eng.PosTick(); abs64(got-want) > 2 {
@@ -135,7 +135,7 @@ func TestTabDragIsInertInTheTuner(t *testing.T) {
 	a := newApp(t, 8)
 	a.tunerView = true
 	tab := a.layout().tab
-	a.handleMouse(pointer{x: screenW*playheadX + 200, y: tab.y + tab.h/2, down: true, pressed: true}, false)
+	a.handleMouse(pointer{x: playheadXAt() + 200, y: tab.y + tab.h/2, down: true, pressed: true}, false)
 	if a.drag != dragNone || a.eng.PosTick() != 0 {
 		t.Errorf("the tuner view should not seek: drag %v, pos %d", a.drag, a.eng.PosTick())
 	}
@@ -304,11 +304,11 @@ func TestWheelOverTheTabZooms(t *testing.T) {
 
 func TestPositionCaptionReportsBarAndTime(t *testing.T) {
 	a := newApp(t, 8)
-	if got, want := a.positionCaption(), "Bar 1 of 8"; len(got) < len(want) || got[:len(want)] != want {
+	if got, want := a.positionCaption(), "Bar 1 / 8"; len(got) < len(want) || got[:len(want)] != want {
 		t.Errorf("caption %q should start with %q", got, want)
 	}
 	a.eng.SeekTick(3840 * 3)
-	if got, want := a.positionCaption(), "Bar 4 of 8"; got[:len(want)] != want {
+	if got, want := a.positionCaption(), "Bar 4 / 8"; got[:len(want)] != want {
 		t.Errorf("after seeking to bar 4 the caption is %q", got)
 	}
 
@@ -460,7 +460,7 @@ func TestRightClickNeverSeeksOrGrabs(t *testing.T) {
 	}
 
 	tab := a.tabRect()
-	a.handleMouse(rightAt(screenW*playheadX+200, tab.y+tab.h/2), false)
+	a.handleMouse(rightAt(playheadXAt()+200, tab.y+tab.h/2), false)
 	if got := a.eng.PosTick(); got != 0 {
 		t.Errorf("right-clicking the tab seeked to %d", got)
 	}
@@ -623,11 +623,11 @@ func TestShiftDragDrawsALoopOnTheTab(t *testing.T) {
 	a := newApp(t, 8)
 	tab := a.layout().tab
 	y := tab.y + tab.h/2
-	a.handleMouse(pointer{x: screenW*playheadX + 400, y: y, down: true, pressed: true}, true)
+	a.handleMouse(pointer{x: playheadXAt() + 400, y: y, down: true, pressed: true}, true)
 	if a.drag != dragLoopNew {
 		t.Fatalf("a shift-press on the tab started %v, want dragLoopNew", a.drag)
 	}
-	a.handleMouse(heldAt(screenW*playheadX+500, y), true)
+	a.handleMouse(heldAt(playheadXAt()+500, y), true)
 	la, lb, on := a.eng.Loop()
 	if !on {
 		t.Fatal("shift-dragging the tab drew no loop")
@@ -643,7 +643,7 @@ func TestShiftDragDrawsALoopOnTheTab(t *testing.T) {
 
 	b := newApp(t, 8)
 	b.tunerView = true
-	b.handleMouse(pointer{x: screenW*playheadX + 200, y: y, down: true, pressed: true}, true)
+	b.handleMouse(pointer{x: playheadXAt() + 200, y: y, down: true, pressed: true}, true)
 	if b.drag != dragNone {
 		t.Errorf("shift-press over the tuner started %v", b.drag)
 	}
@@ -656,8 +656,8 @@ func TestShiftDragStaysOnItsAnchorSurface(t *testing.T) {
 	tabY := l.tab.y + l.tab.h/2
 	tlY := l.timeline.y + l.timeline.h/2
 
-	a.handleMouse(pointer{x: screenW*playheadX + 400, y: tabY, down: true, pressed: true}, true)
-	a.handleMouse(heldAt(screenW*playheadX+500, tlY), true)
+	a.handleMouse(pointer{x: playheadXAt() + 400, y: tabY, down: true, pressed: true}, true)
+	a.handleMouse(heldAt(playheadXAt()+500, tlY), true)
 	la, lb, on := a.eng.Loop()
 	if !on {
 		t.Fatal("the drifted tab drag drew no loop")
@@ -751,8 +751,8 @@ func TestTransportRowSharesOneHeight(t *testing.T) {
 	a := newApp(t, 4)
 	l := a.layout()
 	for i, r := range l.transport {
-		if r.h != chipH {
-			t.Errorf("transport button %d is %v tall, chips are %v", i, r.h, chipH)
+		if r.h != zItemH {
+			t.Errorf("transport button %d is %v tall, toolbar items are %v", i, r.h, zItemH)
 		}
 		if got, want := r.y+r.h, l.chips[0].y+l.chips[0].h; got != want {
 			t.Errorf("transport button %d bottom %v, chip bottom %v", i, got, want)
@@ -795,7 +795,7 @@ func TestTempoButtonsStepByFivePercent(t *testing.T) {
 func TestClickingTheBannerDismissesIt(t *testing.T) {
 	a := newApp(t, 4)
 	a.SetLiveWarning("something to read")
-	a.handleMouse(pressAt(warnRect()), false)
+	a.handleMouse(pressAt(bannerRect()), false)
 	if a.warningVisible() {
 		t.Fatal("a click on the warning banner left it showing")
 	}

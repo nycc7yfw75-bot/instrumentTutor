@@ -1,15 +1,17 @@
 package ui
 
 import (
+	"math"
+	"strings"
+
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
 const (
 	tipDelay = 0.35
 
-	tipGap  = 8.0
-	tipPadX = 9.0
-	tipH    = 30.0
+	tipGap = 8.0
+	tipH   = pillH + 2*sp1
 )
 
 type tips struct {
@@ -41,21 +43,16 @@ func (t *tips) hide() { t.id, t.dwell, t.seen = "", 0, false }
 
 func (t *tips) visible() bool { return t.id != "" && t.dwell >= tipDelay && t.seen }
 
-func (t *tips) draw(dst *ebiten.Image) {
-	show := t.visible()
-	t.seen = false
-	if !show {
-		return
-	}
-	label := t.text
-	if t.key != "" {
-		label += "   " + t.key
-	}
-	w := textW(t.text) + 2*tipPadX
-	if t.key != "" {
-		w = textW(t.text) + textWSmall(t.key) + 2*tipPadX + 12
-	}
+// tipKeyText is a shortcut as its keycap shows it.
+func tipKeyText(k string) string { return strings.ToUpper(k) }
 
+// placement is where the tooltip goes: under its control, or above when
+// that would run off the page; never past the side margins.
+func (t *tips) placement() rect {
+	w := sp3 + textWSmall(t.text) + sp3
+	if t.key != "" {
+		w += math.Max(pillH, textWScaled(tipKeyText(t.key), dispS)+2*sp2) + sp1
+	}
 	x := t.at.x
 	if x+w > screenW-uiPadX {
 		x = screenW - uiPadX - w
@@ -67,11 +64,21 @@ func (t *tips) draw(dst *ebiten.Image) {
 	if y+tipH > screenH-uiPadX {
 		y = t.at.y - tipGap - tipH
 	}
+	return rect{x, y, w, tipH}
+}
 
-	r := rect{x, y, w, tipH}
-	drawPanel(dst, r, colTipBG, colTipEdge)
-	drawText(dst, t.text, r.x+tipPadX, r.y+6, colNote)
-	if t.key != "" {
-		drawTextSmall(dst, t.key, r.x+tipPadX+textW(t.text)+12, r.y+8, colSounding)
+// draw draws the tooltip (§5): a notched surface, the label, and the
+// shortcut in a keycap.
+func (t *tips) draw(dst *ebiten.Image) {
+	show := t.visible()
+	t.seen = false
+	if !show {
+		return
 	}
+	r := t.placement()
+	if t.key == "" {
+		drawKitTooltip(dst, r.x, r.y, t.text)
+		return
+	}
+	drawKitTooltip(dst, r.x, r.y, t.text, tipKeyText(t.key))
 }

@@ -1094,15 +1094,11 @@ const (
 	settingsLineH  = uiLineH
 	settingsRowH   = uiRowH
 
-	settingsWrap = screenW - settingsValueX - uiPadX
-
 	settingsBtnH   = 22.0
 	settingsBtnPad = 8.0
 	settingsBtnGap = 6.0
 
 	settingsValueGap = 12.0
-
-	settingsFooterW = screenW - 2*settingsLeft
 
 	settingsNoticeLines = 3
 	settingsSfNoteLines = 1
@@ -1580,3 +1576,8 @@ func (s *Settings) setReduceMotion(on bool) {
 	SetReduceMotion(on)
 	s.save()
 }
+
+var (
+	settingsWrap    = screenW - settingsValueX - uiPadX
+	settingsFooterW = screenW - 2*settingsLeft
+)

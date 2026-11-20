@@ -825,7 +825,7 @@ func TestEditorHotspotsAreInsideTheWindow(t *testing.T) {
 	}
 	for _, h := range e.hotspots() {
 		if h.r.x < 0 || h.r.y < 0 || h.r.x+h.r.w > screenW || h.r.y+h.r.h > screenH {
-			t.Errorf("a control sits at %+v, outside the %dx%d window", h.r, screenW, screenH)
+			t.Errorf("a control sits at %+v, outside the %.0fx%.0f window", h.r, screenW, screenH)
 		}
 	}
 }

@@ -701,7 +701,8 @@ func (o *shellOpener) Open(path string) (ui.Screen, []string, error) {
 		o.player.Play()
 	}
 	o.watchOutputLatency(app)
-	o.setTitleFor(path)
+	o.setTitleFor(sc, path)
+	app.SetPiecePath(path)
 	if s := importSummary(warns); s != "" {
 		conds = append(conds, s)
 	}
@@ -772,9 +773,10 @@ func framesToDuration(frames int) time.Duration {
 	return time.Duration(frames) * time.Second / time.Duration(sampleRate)
 }
 
-func (o *shellOpener) setTitleFor(path string) {
+// setTitleFor names the window after the song, as the header does.
+func (o *shellOpener) setTitleFor(sc *score.Score, path string) {
 	if o.shell != nil {
-		o.shell.SetTitle("HEADLINER — " + strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)))
+		o.shell.SetTitle("HEADLINER — " + ui.CleanTitle(sc, path))
 	}
 }
 

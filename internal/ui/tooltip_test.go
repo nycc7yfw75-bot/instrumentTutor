@@ -115,22 +115,8 @@ func TestTipStaysOnScreen(t *testing.T) {
 }
 
 func tipPlacement(t tips) (x, y, w, h float64) {
-	w = textW(t.text) + 2*tipPadX
-	if t.key != "" {
-		w = textW(t.text) + textWSmall(t.key) + 2*tipPadX + 12
-	}
-	x = t.at.x
-	if x+w > screenW-uiPadX {
-		x = screenW - uiPadX - w
-	}
-	if x < uiPadX {
-		x = uiPadX
-	}
-	y = t.at.y + t.at.h + tipGap
-	if y+tipH > screenH-uiPadX {
-		y = t.at.y - tipGap - tipH
-	}
-	return x, y, w, tipH
+	r := t.placement()
+	return r.x, r.y, r.w, r.h
 }
 
 func TestEditorOffersATooltipForEveryControl(t *testing.T) {

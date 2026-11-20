@@ -136,7 +136,7 @@ func TestAppPositionFollowsASeek(t *testing.T) {
 	if got := a.posTick(); got != 3840 {
 		t.Errorf("posTick after a seek = %d, want 3840", got)
 	}
-	if got, want := a.xAtTick(3840), screenW*playheadX; math.Abs(got-want) > 0.5 {
+	if got, want := a.xAtTick(3840), playheadXAt(); math.Abs(got-want) > 0.5 {
 		t.Errorf("the sought tick draws at x=%.1f, want the playhead's %.1f", got, want)
 	}
 }

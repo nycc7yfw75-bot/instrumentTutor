@@ -3,9 +3,7 @@ package ui
 import (
 	"fmt"
 	"image/color"
-	"math"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -16,14 +14,27 @@ import (
 	"github.com/S95F/musicTutor/internal/score"
 )
 
+// The window: at least the design size, and it fills whatever the player
+// makes it (REDESIGN §6). resize keeps the size-derived values in step.
 const (
-	screenW = 1280
-	screenH = 720
+	designW = 1280
+	designH = 720
+)
 
+var screenW, screenH float64 = designW, designH
+
+// resize applies a new window size.
+func resize(w, h int) {
+	screenW, screenH = float64(max(w, designW)), float64(max(h, designH))
+	uiFooterY = screenH - 26.0
+	edGridW = screenW - 2*uiPadX - edLabelW
+	settingsWrap = screenW - settingsValueX - uiPadX
+	settingsFooterW = screenW - 2*settingsLeft
+}
+
+const (
 	playheadX = 0.3
-	stringGap = 26
 
-	tabTop     = 274
 	defaultPxQ = 96
 )
 
@@ -42,6 +53,11 @@ type App struct {
 	eng   *engine.Engine
 	sc    *score.Score
 	track int
+
+	// REDESIGN §6: the file (for the title fallback), and how long the input
+	// has been flat while playing (for NO SIGNAL).
+	piecePath string
+	flatFor   float64
 
 	zoom float64
 
@@ -113,14 +129,9 @@ func New(eng *engine.Engine, sc *score.Score, track int) *App {
 }
 
 func (a *App) Run() error {
-	ebiten.SetWindowSize(screenW, screenH)
-	title := a.sc.Title
-	if title == "" {
-		title = "HEADLINER"
-	} else {
-		title = "HEADLINER — " + title
-	}
-	ebiten.SetWindowTitle(title)
+	ebiten.SetWindowSize(designW, designH)
+	ebiten.SetWindowSizeLimits(designW, designH, -1, -1)
+	ebiten.SetWindowTitle("HEADLINER — " + a.songTitle())
 	err := ebiten.RunGame(a)
 	if err == errQuit {
 		return nil
@@ -455,7 +466,8 @@ func (a *App) updateBPMEntry() {
 
 func bpmEntryRect() rect {
 	const w, h = 300, 84
-	return rect{(screenW - w) / 2, tabTop + 20, w, h}
+	z := practiceTabZone()
+	return rect{(screenW - w) / 2, z.y + sp6, w, h}
 }
 
 func (a *App) bpmDigit(d byte) {
@@ -761,7 +773,7 @@ func (a *App) Draw(screen *ebiten.Image) {
 	}
 	a.drawHUD(screen, l)
 	if a.warningVisible() {
-		a.drawWarning(screen)
+		a.drawPracticeBanner(screen)
 	}
 	if a.bpmEntry {
 		a.drawBPMEntry(screen)
@@ -771,102 +783,6 @@ func (a *App) Draw(screen *ebiten.Image) {
 	if a.helpOpen {
 		a.drawHelp(screen)
 	}
-}
-
-func (a *App) drawTab(screen *ebiten.Image) {
-
-	pos := a.posF()
-	posTick := int64(math.Round(pos))
-	ppt := a.pxPerTick()
-	phX := float32(screenW * playheadX)
-	tr := a.displayed()
-	wind := tr.Wind != nil
-	nLines := a.laneLines()
-	bandTop, bandBottom := float64(tabTop), a.tabBottom()
-
-	var ladder windLadder
-	if wind {
-		ladder = windLadderFor(tr)
-	}
-
-	tickToX := func(t int64) float32 {
-		return phX + float32((float64(t)-pos)*ppt)
-	}
-
-	minTick := posTick - int64(float64(phX)/ppt) - score.PPQ
-	maxTick := posTick + int64(float64(screenW-float64(phX))/ppt) + score.PPQ
-
-	if wind {
-		a.drawWindGrid(screen, ladder, bandTop, bandBottom)
-	} else {
-		for si := 0; si < nLines; si++ {
-			y := float32(tabTop + si*stringGap)
-			vector.StrokeLine(screen, 0, y, screenW, y, 1, colString, false)
-		}
-	}
-
-	if la, lb, on := a.eng.Loop(); on {
-		x0, x1 := tickToX(la), tickToX(lb)
-		vector.DrawFilledRect(screen, x0, tabTop-20, x1-x0, float32(bandBottom-bandTop)+40, colLoop, false)
-		vector.StrokeLine(screen, x0, tabTop-20, x0, float32(bandBottom+20), 2, colLoopEdge, false)
-		vector.StrokeLine(screen, x1, tabTop-20, x1, float32(bandBottom+20), 2, colLoopEdge, false)
-	}
-
-	waiting := a.waitingKeys()
-	for bi, bar := range tr.Bars {
-		barEnd := bar.Start + bar.Len()
-		if barEnd < minTick || bar.Start > maxTick {
-			continue
-		}
-		x := tickToX(bar.Start)
-		vector.StrokeLine(screen, x, tabTop-14, x, float32(bandBottom+14), 1, colBarline, false)
-		drawTextSmall(screen, fmt.Sprintf("%d", a.sc.BarNumber(bi)), float64(x)+4, tabTop-32, colHint)
-
-		for _, beat := range bar.Beats {
-			for _, n := range beat.Notes {
-				nx := tickToX(beat.Start)
-				var ny float32
-				var label string
-				if wind {
-					ny = float32(ladder.y(tr.Wind.Written(tr.Pitch(n)), bandTop, bandBottom))
-					label = windNoteLabel(tr, n)
-				} else {
-					ny = float32(tabTop + (n.String-1)*stringGap)
-					label = fretLabel(n)
-				}
-				col, sounding := a.noteCue(beat.Start, beat.Dur, n.String, n.Inferred, pos, posTick, waiting)
-
-				if !wind && n.Tech&score.TechGrace != 0 {
-					// Grace notes read small, as on printed tab.
-					w := float32(textWSmall(label))
-					vector.DrawFilledRect(screen, nx-1, ny-7, w+2, 14, colNoteBG, false)
-					drawTextSmall(screen, label, float64(nx), float64(ny)-8, col)
-					drawTechMark(screen, a.tabMarks()[noteKey{beat.Start, n.String}], nx, ny, w, tickToX)
-					continue
-				}
-				w := float32(textWMono(label))
-				vector.DrawFilledRect(screen, nx-2, ny-9, w+4, 18, colNoteBG, false)
-				drawTextMono(screen, label, float64(nx), float64(ny)-9, col)
-				if !wind {
-					drawTechMark(screen, a.tabMarks()[noteKey{beat.Start, n.String}], nx, ny, w, tickToX)
-				}
-				if sounding {
-					vector.DrawFilledRect(screen, nx-2, ny+9, w+4, 2, colTabSounding, false)
-				}
-			}
-		}
-	}
-
-	if n := len(tr.Bars); n > 0 {
-		endTick := tr.Bars[n-1].Start + tr.Bars[n-1].Len()
-		x := tickToX(endTick)
-		vector.StrokeLine(screen, x, tabTop-14, x, float32(bandBottom+14), 2, colBarline, false)
-	}
-
-	a.drawGhosts(screen, tickToX, posTick)
-
-	vector.StrokeLine(screen, phX, tabTop-24, phX, float32(bandBottom+24), 2, colPlayhead, false)
-
 }
 
 func (a *App) noteCue(start, dur int64, str int, inferred bool, pos float64, posTick int64, waiting map[noteKey]bool) (col color.RGBA, sounding bool) {
@@ -884,73 +800,21 @@ func (a *App) noteCue(start, dur int64, str int, inferred bool, pos float64, pos
 }
 
 func (a *App) drawHUD(screen *ebiten.Image, l practiceLayout) {
-	x := drawEscButton(screen, a.backChip(), &a.anim, a.ptr)
-	drawHeaderAt(screen, x, a.pieceTitle(), a.statusLine(), a.statusColour())
+	a.trackSignal()
+	a.drawPracticeHeader(screen)
 	a.drawTransport(screen, l, a.ptr)
 	a.drawTrackStrip(screen, l, a.ptr)
+	a.drawPracticeHUD(screen)
 	a.drawTimeline(screen, l, a.ptr)
-
-	if in, left := a.eng.CountingIn(); in {
-		a.drawStateChip(screen, fmt.Sprintf("COUNT-IN %d", left), colCountIn, a.stateChipY())
-	} else if a.eng.Waiting() {
-		a.drawStateChip(screen, "WAITING", a.pulseCol(), a.stateChipY())
-	}
-	if a.live {
-		a.drawLiveHUD(screen)
-	}
 	if a.game.sess != nil {
 		a.drawGameHUD(screen)
-	} else if a.live {
-		a.drawLegend(screen)
 	}
-	if msg := a.bpmMessage(); msg != "" {
-		drawText(screen, msg, centreX(msg, 0, screenW), a.msgY(), colSounding)
-	}
-	if msg := a.reloadPrompt(); msg != "" {
-		drawText(screen, msg, centreX(msg, 0, screenW), a.msgY()+20, colClose)
-	}
-	drawFooter(screen, a.hintLine())
+	a.drawPracticeMessages(screen)
 	if a.helpOpen || a.mixer.visible() || a.warnList.visible() || a.bpmEntry {
 		a.tip.hide()
 	} else {
 		a.tip.draw(screen)
 	}
-}
-
-func (a *App) pieceTitle() string {
-	if a.sc.Title == "" {
-		return "HEADLINER"
-	}
-
-	const gap = 32.0
-	budget := screenW - uiPadX - a.titleX() - textW(a.statusLine()) - gap
-	return truncateWScaled(a.sc.Title, budget, uiTitleScl)
-}
-
-func (a *App) statusLine() string {
-	// The tempo lives in the menu's tempo control; the header says what is
-	// happening.
-	parts := []string{"Paused"}
-	if a.eng.Playing() {
-		parts[0] = "Playing"
-	}
-	if in, _ := a.eng.CountingIn(); in {
-		parts[0] = "Count-in"
-	}
-	if _, _, on := a.eng.Loop(); on {
-		parts = append(parts, fmt.Sprintf("Pass %d", a.eng.PassCount()))
-	}
-	if a.live {
-		parts = append(parts, "Live")
-	}
-	return strings.Join(parts, "  ·  ")
-}
-
-func (a *App) statusColour() color.RGBA {
-	if a.eng.Playing() {
-		return colSounding
-	}
-	return colHUD
 }
 
 func (a *App) drawBPMEntry(screen *ebiten.Image) {
@@ -966,4 +830,7 @@ func (a *App) drawHelp(screen *ebiten.Image) {
 	drawHelpOverlay(screen, "PRACTICE KEYS", a.helpRows(), practiceHelpFootnote)
 }
 
-func (a *App) Layout(int, int) (int, int) { return screenW, screenH }
+func (a *App) Layout(w, h int) (int, int) {
+	resize(w, h)
+	return int(screenW), int(screenH)
+}

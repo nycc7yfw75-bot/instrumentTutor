@@ -80,3 +80,16 @@ func maybeShoot(dst *ebiten.Image, sc Screen) {
 	defer f.Close()
 	_ = png.Encode(f, img)
 }
+
+// shotWindowSize is HEADLINER_SHOT_SIZE=<w>x<h>: with screenshots on, the
+// window opens at that size so every review size can be captured.
+func shotWindowSize() (int, int, bool) {
+	var w, h int
+	if shotDir == "" {
+		return 0, 0, false
+	}
+	if _, err := fmt.Sscanf(os.Getenv("HEADLINER_SHOT_SIZE"), "%dx%d", &w, &h); err != nil || w < designW || h < designH {
+		return 0, 0, false
+	}
+	return w, h, true
+}

@@ -44,7 +44,7 @@ func (a *App) warnListCard() rect {
 func (a *App) warnListLines() []wlLine {
 	var out []wlLine
 	w := wlCardW - 2*wlPadX - wlNumW
-	for i, warn := range a.importWarns {
+	for i, warn := range a.warnItems() {
 		for j, l := range wrapTextW(warn, w) {
 			line := wlLine{text: l}
 			if j == 0 {
@@ -63,7 +63,7 @@ func (a *App) warnListRows() int {
 }
 
 func (a *App) toggleWarnList() {
-	if len(a.importWarns) == 0 {
+	if len(a.warnItems()) == 0 {
 		a.setBPMMessage("this piece imported without warnings")
 		return
 	}
@@ -119,8 +119,8 @@ func (a *App) drawWarnList(screen *ebiten.Image) {
 
 func (a *App) paintWarnList(c *ebiten.Image, card rect) {
 	drawPanel(c, card, colPanel, colPanelEdge)
-	n := len(a.importWarns)
-	drawText(c, fmt.Sprintf("IMPORT WARNINGS (%d)", n), card.x+wlPadX, card.y+16, colInferred)
+	n := len(a.warnItems())
+	drawText(c, fmt.Sprintf("WARNINGS (%d)", n), card.x+wlPadX, card.y+16, colInferred)
 	drawTextRight(c, "I or esc closes", card.x+card.w-wlPadX, card.y+16, colDim)
 
 	lines := a.warnListLines()
@@ -146,14 +146,7 @@ func (a *App) paintWarnList(c *ebiten.Image, card rect) {
 	drawText(c, foot, centreX(foot, card.x, card.w), card.y+card.h-wlFootH+12, colDim)
 }
 
-// warnBannerHint is the banner's bottom line: it offers the full list when
-// the importer raised warnings.
-func (a *App) warnBannerHint() string {
-	switch n := len(a.importWarns); {
-	case n == 1:
-		return "press I or click to read the import warning   ·   D to dismiss"
-	case n > 1:
-		return fmt.Sprintf("press I or click to read all %d import warnings   ·   D to dismiss", n)
-	}
-	return warnHint
+// warnItems is every warning: the banner's conditions, then the importer's.
+func (a *App) warnItems() []string {
+	return append(a.bannerItems(), a.importWarns...)
 }

@@ -141,6 +141,6 @@ func TestSettingsProfileRowFitsOnScreen(t *testing.T) {
 	}
 	last := items[len(items)-1]
 	if last.y+settingsRowH > screenH-68 {
-		t.Errorf("Settings runs to y=%.0f, into the footer at %d", last.y+settingsRowH, screenH-68)
+		t.Errorf("Settings runs to y=%.0f, into the footer at %.0f", last.y+settingsRowH, screenH-68)
 	}
 }

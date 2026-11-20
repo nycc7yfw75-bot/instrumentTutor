@@ -2,8 +2,8 @@ package ui
 
 import (
 	"fmt"
-	"image/color"
 	"math"
+	"strings"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
@@ -27,7 +27,7 @@ const (
 	ptBtnH   = chipH
 	ptBtnGap = 6.0
 
-	ptGrab = 6.0
+	ptGrab = 12.0 // a loop handle's hit zone is 24px wide (§6.6)
 
 	ptTrackChipW = 150.0
 )
@@ -47,6 +47,9 @@ const (
 type practiceChip struct {
 	label string
 
+	// icon is its pixel icon (§5).
+	icon iconID
+
 	// key is the shortcut, shown in the item's tooltip.
 	key string
 
@@ -63,34 +66,34 @@ type practiceChip struct {
 }
 
 var practiceChips = []practiceChip{
-	{label: "Loop", key: "A / B, L clears",
+	{label: "Loop", icon: icLoop, key: "A / B, L clears",
 		on:  func(a *App) bool { _, _, on := a.eng.Loop(); return on },
 		act: func(a *App) { a.toggleLoop() }},
-	{label: "Click", key: "M",
+	{label: "Click", icon: icMetronome, key: "M",
 		on:  func(a *App) bool { return a.metronome },
 		act: func(a *App) { a.toggleMetronome() }},
-	{label: "Ramp", key: "R",
+	{label: "Ramp", icon: icRamp, key: "R",
 		on:  func(a *App) bool { return a.ramp },
 		act: func(a *App) { a.toggleRamp() }},
-	{label: "Count-in", key: "C",
+	{label: "Count-in", icon: icCountIn, key: "C",
 		on:  func(a *App) bool { return a.CountInBeats() > 0 },
 		act: func(a *App) { a.toggleCountIn() }},
-	{label: "Wait", key: "W",
+	{label: "Wait", icon: icWait, key: "W",
 		on:       func(a *App) bool { return a.wait },
 		disabled: func(a *App) bool { return !a.waitCtl },
 		whenOff:  func(a *App) string { return "wait mode needs live input — " + a.liveRemedy() },
 		act:      func(a *App) { a.toggleWait() }},
-	{label: "Tuner", key: "T", right: true,
+	{label: "Tuner", icon: icTuner, key: "T", right: true,
 		on:  func(a *App) bool { return a.tunerView },
 		act: func(a *App) { a.tunerView = !a.tunerView }},
-	{label: "Mixer", key: "V", right: true,
+	{label: "Mixer", icon: icMixer, key: "V", right: true,
 		on:  func(a *App) bool { return a.mixer.open },
 		act: func(a *App) { a.toggleMixer() }},
-	{label: "Settings", key: "S", right: true,
+	{label: "Settings", icon: icSettings, key: "S", right: true,
 		disabled: func(a *App) bool { return a.settings == nil },
 		whenOff:  func(a *App) string { return "settings need the full app — start HEADLINER without a file" },
 		act:      func(a *App) { a.openSettings() }},
-	{label: "Help", key: "?", right: true,
+	{label: "Help", icon: icHelp, key: "?", right: true,
 		on:  func(a *App) bool { return a.helpOpen },
 		act: func(a *App) { a.openHelp() }},
 }
@@ -145,45 +148,39 @@ type practiceLayout struct {
 }
 
 func (a *App) tabBottom() float64 {
-	return float64(tabTop + (a.laneLines()-1)*stringGap)
+	return a.tabTop() + float64(a.laneLines()-1)*a.stringGap()
 }
 
-func (a *App) tabRect() rect {
-	top := tabTop - ptTabHeadroom
-	return rect{0, top, screenW, a.tabBottom() + ptTabFooting - top}
+// tabRect is the tab's clickable area: its whole zone.
+func (a *App) tabRect() rect { return a.tabZone() }
+
+// toolsLabelled: the Tools show their labels only on a wide window (§6.2).
+func toolsLabelled() bool { return screenW >= 1600 }
+
+// chipW is a toolbar item's width: icon and label, or the icon alone for a
+// Tool on a narrow window.
+func toolChipW(c practiceChip) float64 {
+	if c.right && !toolsLabelled() {
+		return zItemH
+	}
+	return kitMenuItemW(c.icon, c.label)
 }
-
-func (a *App) stateChipY() float64 { return a.tabBottom() + 34 }
-
-const (
-	ptCaptionY  = screenH - 158.0
-	ptTimelineY = screenH - 134.0
-	ptLegendY   = screenH - 86.0
-	ptMsgY      = screenH - 64.0
-)
-
-func (a *App) captionY() float64 { return ptCaptionY }
-
-func (a *App) timelineY() float64 { return ptTimelineY }
-
-func (a *App) legendY() float64 { return ptLegendY }
-
-func (a *App) msgY() float64 { return ptMsgY }
 
 func (a *App) layout() practiceLayout {
 	var l practiceLayout
+	y := zToolbarY() + (zToolbarH-zItemH)/2
 
-	// One row: transport | Loop Click Ramp Count-in Wait | tempo, then
-	// Tuner Mixer Settings Help pinned to the right.
-	x := uiPadX - (menuIconW-16)/2 // align the first icon's ink with the margin
+	// Transport (icons) | Loop Click Ramp Count-in Wait | ‹ tempo ›, and
+	// Tuner Mixer Settings Help at the right (§6.2).
+	x := pgMargin - (zItemH-iconSize)/2 // the first icon's ink on the margin
 	for i := range l.transport {
-		l.transport[i] = rect{x, ptTransportY, menuIconW, chipH}
-		x += menuIconW + 4
+		l.transport[i] = rect{x, y, zItemH, zItemH}
+		x += zItemH
 	}
 	divide := func() {
-		x += menuGroupGap - menuGap/2
+		x += sp6
 		l.dividers = append(l.dividers, x)
-		x += menuGroupGap
+		x += sp6
 	}
 	divide()
 	l.chips = make([]rect, len(practiceChips))
@@ -191,42 +188,43 @@ func (a *App) layout() practiceLayout {
 		if c.right {
 			continue
 		}
-		w := menuItemW(c.label)
-		l.chips[i] = rect{x, ptTransportY, w, chipH}
-		x += w + menuGap
+		w := toolChipW(c)
+		l.chips[i] = rect{x, y, w, zItemH}
+		x += w + sp1
 	}
-	x -= menuGap / 2
 	divide()
-	arrowW := textW("‹") + 2*menuPadX + 8
-	l.tempo[0] = rect{x, ptTransportY, arrowW, chipH}
-	l.tempo[1] = rect{x + arrowW, ptTransportY, tempoTextW, chipH}
-	l.tempo[2] = rect{x + arrowW + tempoTextW, ptTransportY, arrowW, chipH}
+	l.tempo[0] = rect{x, y, zItemH, zItemH}
+	l.tempo[1] = rect{x + zItemH, y, tempoReadoutW(), zItemH}
+	l.tempo[2] = rect{x + zItemH + tempoReadoutW(), y, zItemH, zItemH}
 
-	rx := screenW - uiPadX
+	rx := screenW - pgMargin + (zItemH-iconSize)/2
 	for i := len(practiceChips) - 1; i >= 0; i-- {
 		c := practiceChips[i]
 		if !c.right {
 			continue
 		}
-		w := menuItemW(c.label)
+		w := toolChipW(c)
 		rx -= w
-		l.chips[i] = rect{rx, ptTransportY, w, chipH}
-		rx -= menuGap
+		l.chips[i] = rect{rx, y, w, zItemH}
+		rx -= sp1
 	}
 
+	// Track tags: yours first, then the rest, while they fit (§6.3).
 	l.tracks = make([]rect, len(a.sc.Tracks))
-	tx := uiPadX
-	for i := range a.sc.Tracks {
-
-		if tx+ptTrackChipW > a.trackStripRight() {
+	names := a.shortTrackNames()
+	tx := pgMargin + textWScaled(spaced("TRACKS"), dispS) + sp6
+	ty := zTrackBarY() + (zTrackBarH-zTrackTagH)/2
+	for _, i := range a.trackOrder() {
+		w := a.trackTagW(i, names[i])
+		if tx+w > a.trackStripRight() {
 			break
 		}
-		l.tracks[i] = rect{tx, ptTracksY, ptTrackChipW, chipH}
-		tx += ptTrackChipW + chipGap
+		l.tracks[i] = rect{tx, ty, w, zTrackTagH}
+		tx += w + sp6
 	}
 
 	l.tab = a.tabRect()
-	l.timeline = rect{uiPadX, a.timelineY(), screenW - 2*uiPadX, ptTimelineH}
+	l.timeline = rect{pgMargin, timelineZoneY() + sp2, screenW - 2*pgMargin, zTlTrackH}
 
 	if la, lb, on := a.eng.Loop(); on {
 
@@ -240,16 +238,17 @@ func (a *App) layout() practiceLayout {
 	return l
 }
 
+// trackStripRight is where the track tags stop: before the HUD.
 func (a *App) trackStripRight() float64 {
 	if a.live {
-		return screenW - uiPadX - 260
+		return screenW - pgMargin - hudW
 	}
-	return screenW - uiPadX
+	return screenW - pgMargin - textW("Not listening") - sp6
 }
 
 func (a *App) loopHandleOnTab(tick int64) rect {
 	x := a.xAtTick(tick)
-	if x < -ptGrab || x > screenW+ptGrab {
+	if x < tabLeft()-ptGrab || x > tabRight()+ptGrab {
 		return rect{}
 	}
 	t := a.tabRect()
@@ -258,15 +257,15 @@ func (a *App) loopHandleOnTab(tick int64) rect {
 
 func (a *App) loopHandleOnTimeline(tl rect, tick int64) rect {
 	x := a.timelineX(tl, tick)
-	return rect{x - ptGrab, tl.y, 2 * ptGrab, tl.h}
+	return rect{x - ptGrab, tl.y - 4, 2 * ptGrab, tl.h + 8}
 }
 
 func (a *App) xAtTick(tick int64) float64 {
-	return screenW*playheadX + (float64(tick)-a.posF())*a.pxPerTick()
+	return playheadXAt() + (float64(tick)-a.posF())*a.pxPerTick()
 }
 
 func (a *App) tickAtX(x float64) int64 {
-	return int64(math.Round(a.posF() + (x-screenW*playheadX)/a.pxPerTick()))
+	return int64(math.Round(a.posF() + (x-playheadXAt())/a.pxPerTick()))
 }
 
 func (a *App) pieceEnd() int64 {
@@ -475,13 +474,18 @@ func (a *App) hitChrome(p pointer, l practiceLayout) bool {
 		hotspot{r: l.tempo[2], on: a.faster},
 	)
 	if a.warningVisible() {
-		spots = append(spots, hotspot{r: warnRect(), on: func() {
-			if len(a.importWarns) > 0 {
-				a.toggleWarnList()
-			} else {
-				a.dismissWarning()
-			}
-		}})
+		// × dismisses; the rest of the strip (and its "N more") opens the
+		// list of every warning, or dismisses when there is only the one.
+		b := bannerRect()
+		spots = append(spots,
+			hotspot{r: rect{b.x + b.w - 40, b.y, 40, b.h}, on: a.dismissWarning},
+			hotspot{r: b, on: func() {
+				if len(a.warnItems()) > 1 {
+					a.toggleWarnList()
+				} else {
+					a.dismissWarning()
+				}
+			}})
 	}
 	for i := range l.tracks {
 		i := i
@@ -623,62 +627,35 @@ func (a *App) zoomOut() {
 }
 
 func (a *App) drawTransport(dst *ebiten.Image, l practiceLayout, p pointer) {
-	icons := [4]iconKind{iconToStart, iconPrevBar, iconPlay, iconNextBar}
+	icons := [4]iconID{icSkipStart, icPrevBar, icPlay, icNextBar}
 	if a.eng.Playing() {
-		icons[2] = iconPause
+		icons[2] = icPause
 	}
 	dt := motionDt()
 	names := [4]string{"transport:start", "transport:prev", "transport:play", "transport:next"}
 	tipText := [4]string{"Back to the start", "Previous bar", "Play / pause", "Next bar"}
 	tipKey := [4]string{"home", "left", "space", "right"}
 	for i, r := range l.transport {
-		drawMenuIcon(dst, r, icons[i], a.anim.step(names[i], p.over(r), p.down, dt))
+		drawKitMenuItem(dst, r, icons[i], "", false, false, a.anim.step(names[i], p.over(r), p.down, dt))
 		a.tip.offer(names[i], tipText[i], tipKey[i], r, p.over(r), dt)
 	}
 	for _, x := range l.dividers {
-		drawMenuDivider(dst, x)
+		drawToolbarDivider(dst, x)
 	}
 	for i, c := range a.chipStates() {
 		r := l.chips[i]
-		drawMenuItem(dst, r, c.label, c.on, c.disabled, a.anim.step("chip:"+c.label, p.over(r) && !c.disabled, p.down, dt))
+		label := c.label
+		if practiceChips[i].right && !toolsLabelled() {
+			label = "" // icon only; the tooltip names it
+		}
+		drawKitMenuItem(dst, r, practiceChips[i].icon, label, c.on, c.disabled, a.anim.step("chip:"+c.label, p.over(r) && !c.disabled, p.down, dt))
 		a.tip.offer("chip:"+c.label, c.label, c.key, r, p.over(r), dt)
 	}
 	a.drawTempo(dst, l, p, dt)
 }
 
 func (a *App) drawTrackStrip(dst *ebiten.Image, l practiceLayout, p pointer) {
-	for i, r := range l.tracks {
-		if r.empty() {
-			continue
-		}
-		// No boxes: two lines of text. Your track has a 2px accent edge and
-		// accent name; a muted one recedes; a solo reads in green.
-		av := a.anim.step(fmt.Sprintf("track:%d", i), p.over(r), p.down, motionDt())
-		muted := a.mutedAudibly(i)
-		name, sub := lerpCol(colHUD, colNote, av.hover), colDim
-		switch {
-		case i == a.track:
-			name = colAccent
-		case muted:
-			name, sub = lerpCol(colString, colDim, av.hover), colBarline
-		}
-		if a.solo == i+1 {
-			sub = colOnEdge
-		}
-		if i == a.track {
-			vector.FillRect(dst, float32(r.x), float32(r.y+3), 2, float32(r.h-6), colAccent, false)
-		}
-		label := truncateW(fmt.Sprintf("%d  %s", i+1, a.trackName(i)), r.w-18)
-		drawText(dst, label, r.x+10, r.y+2, name)
-		state := sentenceCase(a.trackStateText(i))
-		if i == a.track {
-			state = "You · " + state
-		}
-		drawTextSmall(dst, state, r.x+10, r.y+20, sub)
-	}
-	if n := a.hiddenTracks(l); n > 0 {
-		drawText(dst, a.hiddenTracksHint(len(l.tracks)-n, n), uiPadX, ptTracksY+chipH+4, colHint)
-	}
+	a.drawTrackTags(dst, l, p)
 }
 
 func (a *App) hiddenTracksHint(shown, hidden int) string {
@@ -722,48 +699,61 @@ func (a *App) userMutedAt(i int) bool {
 
 func (a *App) drawTimeline(dst *ebiten.Image, l practiceLayout, p pointer) {
 	tl := l.timeline
-	hover := p.over(tl)
-	edge := colPanelEdge
-	if hover {
-		edge = colDim
-	}
-	drawPanel(dst, tl, colPanel, edge)
-
-	a.drawSections(dst, tl)
-
-	bars := a.displayed().Bars
-	step := 1
-	if len(bars) > 0 && tl.w/float64(len(bars)) < 3 {
-		step = 4
-	}
-	for i := 0; i < len(bars); i += step {
-		x := float32(a.timelineX(tl, bars[i].Start))
-		vector.StrokeLine(dst, x, float32(tl.y+tl.h-8), x, float32(tl.y+tl.h-2), 1, colBarline, false)
-	}
+	notchedFill(dst, tl, colPanel)
+	a.drawSections(dst, tl, p)
 
 	if la, lb, on := a.eng.Loop(); on {
 		x0, x1 := a.timelineX(tl, la), a.timelineX(tl, lb)
-		vector.DrawFilledRect(dst, float32(x0), float32(tl.y+1), float32(x1-x0), float32(tl.h-2), colLoop, false)
-		for _, x := range []float64{x0, x1} {
-			vector.StrokeLine(dst, float32(x), float32(tl.y), float32(x), float32(tl.y+tl.h), 2, colLoopEdge, false)
-		}
+		vector.FillRect(dst, float32(x0), float32(tl.y), float32(x1-x0), float32(tl.h), colLoop, false)
+		drawLoopBracket(dst, x0, tl.y-3, tl.h+6, true)
+		drawLoopBracket(dst, x1, tl.y-3, tl.h+6, false)
+	}
+	x := float32(math.Round(a.timelineXf(tl, a.posF())))
+	vector.FillRect(dst, x-1, float32(tl.y-4), 2, float32(tl.h+8), colPlayhead, false)
+	if p.over(tl) && a.drag == dragNone {
+		// Anchored to run to the window's foot, so the tip opens above.
+		a.tip.offer("timeline", a.timelineTip(tl, p.x), "", rect{tl.x, tl.y, tl.w, screenH - tl.y}, true, motionDt())
 	}
 
-	x := float32(a.timelineXf(tl, a.posF()))
-	vector.StrokeLine(dst, x, float32(tl.y-4), x, float32(tl.y+tl.h+4), 2, colPlayhead, false)
+	// One line under it: the section, the bar, the time (§6.6).
+	y := tl.y + tl.h + sp3
+	x2 := pgMargin
+	if sec := a.currentSection(); sec != "" {
+		s := strings.ToUpper(sec)
+		drawTextScaled(dst, s, x2, y-1, dispS, tokBrand)
+		x2 += textWScaled(s, dispS) + sp4
+	}
+	drawMonoSized(dst, a.positionCaption(), x2, y, sizeMono, colDim)
+}
 
-	if hover && a.drag == dragNone {
-		vector.StrokeLine(dst, float32(p.x), float32(tl.y+tl.h), float32(p.x), float32(tl.y+tl.h+4), 1, colDim, false)
+// drawLoopBracket draws a loop end: a 2px upright with feet toward the loop.
+func drawLoopBracket(dst *ebiten.Image, x, y, h float64, left bool) {
+	x = math.Round(x)
+	vector.FillRect(dst, float32(x-1), float32(y), 2, float32(h), colLoopEdge, false)
+	foot := float32(4)
+	fx := float32(x - 1)
+	if !left {
+		fx = float32(x+1) - foot
 	}
-	drawTextMono(dst, a.positionCaption(), uiPadX, a.captionY(), colHUD)
-	hint, hintCol := a.timelineHint(), colBarline
-	if hover {
-		if i := a.sc.SectionAt(a.timelineTick(tl, p.x)); i >= 0 {
-			// Names too long for their stretch of timeline read in full here.
-			hint, hintCol = a.sc.Sections[i].Name+"   ·   Click or drag to move   ·   [ ] jumps to a section start", colHUD
+	vector.FillRect(dst, fx, float32(y), foot, 2, colLoopEdge, false)
+	vector.FillRect(dst, fx, float32(y+h-2), foot, 2, colLoopEdge, false)
+}
+
+// timelineTip names what is under the pointer: the section, its bars and
+// length, or the bar and time; and how to use the timeline.
+func (a *App) timelineTip(tl rect, x float64) string {
+	tick := a.timelineTick(tl, x)
+	if i := a.sc.SectionAt(tick); i >= 0 {
+		s := a.sc.Sections[i]
+		end := a.pieceEnd()
+		if i+1 < len(a.sc.Sections) {
+			end = a.sc.Sections[i+1].Tick
 		}
+		from, to := a.sc.BarNumber(a.barAt(s.Tick)), a.sc.BarNumber(a.barAt(max(s.Tick, end-1)))
+		secs := (a.sc.Tempos.TimeAt(end) - a.sc.Tempos.TimeAt(s.Tick)) / max(a.eng.TempoScale(), 0.01)
+		return fmt.Sprintf("%s · bars %d–%d · %s   (click to move, shift-drag to loop)", s.Name, from, to, clockText(secs))
 	}
-	drawTextSmall(dst, hint, screenW-uiPadX-textWSmall(hint), a.captionY()+2, hintCol)
+	return fmt.Sprintf("Bar %d   (click to move, shift-drag to loop)", a.sc.BarNumber(a.barAt(tick)))
 }
 
 func (a *App) timelineHint() string {
@@ -785,9 +775,9 @@ func (a *App) positionCaption() string {
 	at := a.sc.Tempos.TimeAt(pos) / scale
 	total := a.sc.Tempos.TimeAt(a.pieceEnd()) / scale
 	if sec := a.currentSection(); sec != "" {
-		return fmt.Sprintf("Bar %d of %d   %s     %s / %s", bar, lastBar, sec, clockText(at), clockText(total))
+		_ = sec // the section is drawn on its own, in the display font
 	}
-	return fmt.Sprintf("Bar %d of %d     %s / %s", bar, lastBar, clockText(at), clockText(total))
+	return fmt.Sprintf("Bar %d / %d   ·   %s / %s", bar, lastBar, clockText(at), clockText(total))
 }
 
 func clockText(sec float64) string {
@@ -796,9 +786,4 @@ func clockText(sec float64) string {
 	}
 	s := int(sec + 0.5)
 	return fmt.Sprintf("%d:%02d", s/60, s%60)
-}
-
-func (a *App) drawStateChip(dst *ebiten.Image, label string, col color.RGBA, y float64) {
-	x := screenW*playheadX - textWScaled(label, dispM)/2
-	drawTextScaled(dst, label, x, y, dispM, col)
 }

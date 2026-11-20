@@ -707,14 +707,21 @@ func TestHintLineFromTable(t *testing.T) {
 	}
 }
 
-func TestStatusLineCountsPassesOnlyInsideALoop(t *testing.T) {
+func TestStatusPillsCountPassesOnlyInsideALoop(t *testing.T) {
 	a := newApp(t, 2)
-	if got := a.statusLine(); strings.Contains(got, "Pass") {
-		t.Errorf("status %q counts passes with no loop armed", got)
+	pills := func() string {
+		var s []string
+		for _, p := range a.headerPills() {
+			s = append(s, p.label)
+		}
+		return strings.Join(s, " ")
+	}
+	if got := pills(); strings.Contains(got, "PASS") {
+		t.Errorf("pills %q count passes with no loop armed", got)
 	}
 	a.eng.SetLoop(0, 3840)
-	if got := a.statusLine(); !strings.Contains(got, "Pass 0") {
-		t.Errorf("status %q should count passes once a loop is armed", got)
+	if got := pills(); !strings.Contains(got, "PASS 0") {
+		t.Errorf("pills %q should count passes once a loop is armed", got)
 	}
 }
 

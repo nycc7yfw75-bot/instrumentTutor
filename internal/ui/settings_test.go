@@ -16,7 +16,7 @@ type settingsStubScreen struct{}
 
 func (settingsStubScreen) Update() error              { return nil }
 func (settingsStubScreen) Draw(*ebiten.Image)         {}
-func (settingsStubScreen) Layout(int, int) (int, int) { return screenW, screenH }
+func (settingsStubScreen) Layout(int, int) (int, int) { return int(screenW), int(screenH) }
 
 type settingsFakePrefs struct {
 	recents   []string

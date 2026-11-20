@@ -220,7 +220,7 @@ func (e *Editor) commitEntry() {
 func edEntryRect() rect { return rect{screenW/2 - 230, screenH/2 - 60, 460, 120} }
 
 func (e *Editor) drawEntry(screen *ebiten.Image) {
-	vector.DrawFilledRect(screen, 0, 0, screenW, screenH, colHelpDim, false)
+	vector.DrawFilledRect(screen, 0, 0, float32(screenW), float32(screenH), colHelpDim, false)
 	r := edEntryRect()
 	drawPanel(screen, r, colPanel, colSounding)
 	drawText(screen, e.entry.prompt, r.x+16, r.y+12, colHUD)

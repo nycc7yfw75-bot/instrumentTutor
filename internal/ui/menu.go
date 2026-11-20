@@ -90,20 +90,31 @@ func (a *App) faster() { a.eng.SetTempoScale(a.eng.TempoScale() + 0.05) }
 // drawTempo draws the tempo control: ‹ slower, the readout (click for an
 // exact BPM), › faster.
 func (a *App) drawTempo(dst *ebiten.Image, l practiceLayout, p pointer, dt float64) {
-	parts := [3]struct{ id, text, tip, key string }{
-		{"tempo:down", "‹", "Slower by 5%", "down"},
-		{"tempo:bpm", a.tempoText(), "Type an exact BPM", "shift+B"},
-		{"tempo:up", "›", "Faster by 5%", "up"},
+	parts := [3]struct{ id, tip, key string }{
+		{"tempo:down", "Slower by 5%", "down"},
+		{"tempo:bpm", "Type an exact BPM", "shift+B"},
+		{"tempo:up", "Faster by 5%", "up"},
 	}
 	for i, part := range parts {
 		r := l.tempo[i]
 		av := a.anim.step(part.id, p.over(r), p.down, dt)
-		ink := lerpCol(colHUD, colNote, av.hover)
-		if i != 1 {
-			ink = menuInk(false, false, av)
+		cy := r.y + r.h/2
+		switch i {
+		case 1:
+			bpm := fmt.Sprintf("%.0f", a.eng.EffectiveBPM())
+			pct := fmt.Sprintf("· %.0f%%", a.eng.TempoScale()*100)
+			w := textWScaled(bpm, dispM) + sp2 + textW(pct)
+			x := r.x + (r.w-w)/2
+			drawTextScaled(dst, bpm, x, cy-sizeDisplayM/2-3, dispM, lerpCol(colNote, colNote, av.hover))
+			drawText(dst, pct, x+textWScaled(bpm, dispM)+sp2, cy-uiTextH/2-2, colDim)
+			drawUnderline(dst, r, w, false, av)
+		default:
+			glyph := "‹"
+			if i == 2 {
+				glyph = "›"
+			}
+			drawTextScaled(dst, glyph, r.x+(r.w-textWScaled(glyph, dispM))/2, cy-sizeDisplayM/2-3, dispM, menuInk(false, false, av))
 		}
-		drawText(dst, part.text, centreX(part.text, r.x, r.w), r.y+(r.h-uiTextH)/2, ink)
-		drawUnderline(dst, r, textW(part.text), false, av)
 		a.tip.offer(part.id, part.tip, part.key, r, p.over(r), dt)
 	}
 }
@@ -114,4 +125,10 @@ func sentenceCase(s string) string {
 		return s
 	}
 	return strings.ToUpper(s[:1]) + s[1:]
+}
+
+// tempoReadoutW is the tempo readout's fixed width (BPM in the display
+// font, then "· 188%"), so the toolbar does not shift as it changes.
+func tempoReadoutW() float64 {
+	return textWScaled("888", dispM) + sp2 + textW("· 188%") + 2*sp1
 }

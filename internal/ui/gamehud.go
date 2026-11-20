@@ -266,7 +266,7 @@ func (c *levelCard) draw(dst *ebiten.Image) {
 		exit = curveExit.at(math.Min(1, (c.t-lvExitAt)/lvExitFor))
 	}
 	scrim := math.Min(1, math.Max(0, (c.t-lvScrimAt)/0.2)) * (1 - exit)
-	vector.FillRect(dst, 0, 0, screenW, screenH, withAlpha(colBG, 0.4*scrim), false)
+	vector.FillRect(dst, 0, 0, float32(screenW), float32(screenH), withAlpha(colBG, 0.4*scrim), false)
 
 	if c.t < lvCardAt {
 		return

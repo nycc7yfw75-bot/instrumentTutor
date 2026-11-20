@@ -196,3 +196,4 @@ func wrapTextW(s string, maxPx float64) []string {
 	}
 	return append(out, line)
 }
+func textAdvance(s string, f text.Face) float64 { return text.Advance(s, f) }

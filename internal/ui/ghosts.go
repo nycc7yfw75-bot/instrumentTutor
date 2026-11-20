@@ -2,6 +2,7 @@ package ui
 
 import (
 	"image/color"
+	"math"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
@@ -113,15 +114,16 @@ func (a *App) drawGhosts(screen *ebiten.Image, tickToX func(int64) float32, posT
 			continue // faded: dropped
 		}
 		keep = append(keep, gh)
-		ny := float32(tabTop + (gh.str-1)*stringGap)
-		drawGhost(screen, gh, alpha, tickToX(gh.start), tickToX(gh.start+gh.offTicks), ny)
+		ny := float32(math.Round(a.tabTop() + float64(gh.str-1)*a.stringGap()))
+		drawGhost(screen, gh, alpha, tickToX(gh.start), tickToX(gh.start+gh.offTicks), ny, a.fretSize())
 	}
 	g.ghosts = keep
 }
 
 // drawGhost draws one ghost at gx, joined to its written note at nx.
-func drawGhost(dst *ebiten.Image, gh ghost, alpha float64, nx, gx, ny float32) {
-	w := float32(textWMono(gh.label))
+func drawGhost(dst *ebiten.Image, gh ghost, alpha float64, nx, gx, ny float32, size float64) {
+	w := float32(textWFret(gh.label, size))
+	h := float32(size)
 	// The joining line, from the written note's edge to the ghost's.
 	lineCol := withAlpha(colGhostLine, alpha/ghostAlpha)
 	if gh.offTicks > 0 {
@@ -130,12 +132,12 @@ func drawGhost(dst *ebiten.Image, gh ghost, alpha float64, nx, gx, ny float32) {
 		vector.FillRect(dst, gx+w+3, ny, max(0, nx-2-(gx+w+3)), 1, lineCol, false)
 	}
 	col := withAlpha(colGhost, alpha)
-	dashedRectNotched(dst, gx-3, ny-10, w+6, 20, col)
-	drawTextMono(dst, gh.label, float64(gx), float64(ny)-9, col)
+	dashedRectNotched(dst, gx-3, ny-h/2-4, w+6, h+8, col)
+	drawFretText(dst, gh.label, float64(gx), float64(ny)-size*0.62, size, col)
 	// Direction without colour: ‹ before an early ghost, › after a late one.
 	if gh.offTicks < 0 {
-		drawTextSmall(dst, "‹", float64(gx)-11, float64(ny)-8, col)
+		drawTextSmall(dst, "‹", float64(gx)-12, float64(ny)-uiTextH/2, col)
 	} else {
-		drawTextSmall(dst, "›", float64(gx+w)+5, float64(ny)-8, col)
+		drawTextSmall(dst, "›", float64(gx+w)+6, float64(ny)-uiTextH/2, col)
 	}
 }

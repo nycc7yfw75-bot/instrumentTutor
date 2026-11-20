@@ -53,7 +53,7 @@ func TestWindLadderPlacesPitch(t *testing.T) {
 	if l.hi-l.lo < 12 {
 		t.Errorf("ladder compass %d..%d spans %d semitones, want at least an octave", l.lo, l.hi, l.hi-l.lo)
 	}
-	top, bottom := float64(tabTop), a.tabBottom()
+	top, bottom := a.tabTop(), a.tabBottom()
 	prevY := bottom + 1
 	for i := 0; i < 4; i++ {
 		written := tr.Wind.Written(tr.Pitch(score.Note{String: 1, Fret: 16 + i}))

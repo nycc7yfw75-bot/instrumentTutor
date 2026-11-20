@@ -192,9 +192,9 @@ func (o *overlay) draw(screen *ebiten.Image, card rect, paint func(c *ebiten.Ima
 		return
 	}
 	v := o.value
-	vector.DrawFilledRect(screen, 0, 0, screenW, screenH, withAlpha(colScrim, overlayScrimAlpha*v), false)
-	if o.canvas == nil {
-		o.canvas = ebiten.NewImage(screenW, screenH)
+	vector.DrawFilledRect(screen, 0, 0, float32(screenW), float32(screenH), withAlpha(colScrim, overlayScrimAlpha*v), false)
+	if o.canvas == nil || o.canvas.Bounds().Dx() != int(screenW) || o.canvas.Bounds().Dy() != int(screenH) {
+		o.canvas = ebiten.NewImage(int(screenW), int(screenH)) // follows the window
 	}
 	o.canvas.Clear()
 	paint(o.canvas)

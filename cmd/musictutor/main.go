@@ -307,6 +307,7 @@ func runPlay(args []string) error {
 	}
 
 	app := ui.New(eng, sc, display)
+	app.SetPiecePath(fs.Arg(0))
 	app.SetInitialMetronome(*met)
 
 	app.SetCountIn(*countIn)

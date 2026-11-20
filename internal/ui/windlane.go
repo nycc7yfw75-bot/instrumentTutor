@@ -61,7 +61,7 @@ func (a *App) drawWindGrid(screen *ebiten.Image, l windLadder, top, bottom float
 
 	for c := (l.lo + 11) / 12 * 12; c <= l.hi; c += 12 {
 		y := float32(l.y(c, top, bottom))
-		vector.StrokeLine(screen, 0, y, screenW, y, 1, colString, false)
+		vector.StrokeLine(screen, 0, y, float32(screenW), y, 1, colString, false)
 		drawTextSmall(screen, keyName(c), 4, float64(y)-14, colHint)
 	}
 }

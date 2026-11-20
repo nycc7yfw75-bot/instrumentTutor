@@ -7,13 +7,14 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
+var uiFooterY = screenH - 26.0
+
 const (
 	uiPadX    = 24.0
 	uiHeaderY = 18.0
 
 	uiHeaderH  = 64.0
 	uiTitleScl = dispL
-	uiFooterY  = screenH - 26.0
 	uiBodyTop  = uiHeaderH + 8.0
 	uiLineH    = 18.0
 	uiRowH     = 26.0
@@ -36,14 +37,23 @@ func drawHeader(dst *ebiten.Image, title, status string, statusCol color.RGBA) {
 
 // The esc button every screen shows at the top left of its header.
 var (
-	escBackChip = chipState{label: "‹  Back", key: "esc"}
+	escBackChip = chipState{label: "Back", key: "esc"}
 	escQuitChip = chipState{label: "Quit", key: "esc"}
 )
 
-// drawEscButton draws a screen's esc button and returns where the title starts.
+// escIcon is the esc button's icon: the back arrow, or none for Quit.
+func escIcon(c chipState) iconID {
+	if c.label == escBackChip.label {
+		return icBack
+	}
+	return -1
+}
+
+// drawEscButton draws a screen's esc button (pixel back arrow and "Back",
+// or "Quit") and returns where the title starts.
 func drawEscButton(dst *ebiten.Image, c chipState, an *animator, p pointer) float64 {
 	r := backButtonRect(c)
-	drawMenuItem(dst, r, c.label, false, false, an.step("chip:esc", p.over(r), p.down, motionDt()))
+	drawKitMenuItem(dst, r, escIcon(c), c.label, false, false, an.step("chip:esc", p.over(r), p.down, motionDt()))
 	vector.StrokeLine(dst, float32(r.x+r.w+12), float32(r.y+8), float32(r.x+r.w+12), float32(r.y+r.h-8), 1, colPanelEdge, false)
 	return r.x + r.w + 26
 }
@@ -56,7 +66,7 @@ func escButtonPressed(c chipState, p pointer) bool {
 // backButtonRect places a screen's esc button at the top left of the header.
 func backButtonRect(c chipState) rect {
 	// A text link like the menu items: its ink starts at the left margin.
-	return rect{uiPadX - menuPadX, uiHeaderY - 2, menuItemW(c.label), chipH}
+	return rect{uiPadX - menuPadX, uiHeaderY - 6, kitMenuItemW(escIcon(c), c.label), zItemH}
 }
 
 // drawHeaderAt is drawHeader with the title starting at x, leaving room
@@ -66,7 +76,7 @@ func drawHeaderAt(dst *ebiten.Image, x float64, title, status string, statusCol 
 	if status != "" {
 		drawTextRight(dst, status, screenW-uiPadX, uiHeaderY+8, statusCol)
 	}
-	vector.StrokeLine(dst, uiPadX, uiHeaderH-10, screenW-uiPadX, uiHeaderH-10, 1, colPanelEdge, false)
+	vector.StrokeLine(dst, uiPadX, uiHeaderH-10, float32(screenW-uiPadX), uiHeaderH-10, 1, colPanelEdge, false)
 }
 
 func drawFooter(dst *ebiten.Image, hint string) {
@@ -75,7 +85,7 @@ func drawFooter(dst *ebiten.Image, hint string) {
 
 func drawSection(dst *ebiten.Image, y *float64, title string) {
 	drawText(dst, title, uiPadX, *y, colInferred)
-	vector.StrokeLine(dst, uiPadX, float32(*y)+16, screenW-uiPadX, float32(*y)+16, 1, colBarline, false)
+	vector.StrokeLine(dst, uiPadX, float32(*y)+16, float32(screenW-uiPadX), float32(*y)+16, 1, colBarline, false)
 	*y += uiSectionH
 }
 

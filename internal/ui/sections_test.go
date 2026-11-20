@@ -43,8 +43,8 @@ func TestBracketsJumpBetweenSections(t *testing.T) {
 func TestCaptionNamesTheSection(t *testing.T) {
 	a := appWithSections(t)
 	a.seekTo(3 * 3840)
-	if c := a.positionCaption(); !strings.Contains(c, "Verse") {
-		t.Errorf("caption in the Verse reads %q", c)
+	if c := a.currentSection(); !strings.Contains(c, "Verse") {
+		t.Errorf("the line under the timeline names the section %q in the Verse", c)
 	}
 	plain := newApp(t, 4)
 	plain.jumpSection(1)

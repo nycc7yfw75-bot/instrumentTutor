@@ -236,22 +236,54 @@ func (a *App) endPass(tick int64) {
 	}
 }
 
-// gameHUDRects are the HUD row's clickable parts.
-func (a *App) gameHUDReason() (string, rect) {
-	if a.game.store != nil && a.game.store.NeedsProfile() {
-		s := "Add your name to start saving your progress"
-		return s, rect{uiPadX, a.legendY() - 4, textW(s), uiTextH + 8}
+// The game HUD shares the line under the timeline (REDESIGN §6.6): the
+// section and position on the left, then excitement (or why play is
+// unscored), the level and the XP bar at the right.
+
+func gameHUDY() float64 { return timelineZoneY() + sp2 + zTlTrackH + sp3 }
+
+const xpBarW = xpBlocks*(xpBlockW+xpBlockGap) - xpBlockGap
+
+// levelLabel is "LV 7 · Garage Player", or "" with no profile.
+func (a *App) levelLabel() string {
+	if a.game.store == nil {
+		return ""
 	}
-	s := a.unscoredReason()
-	return s, rect{uiPadX, a.legendY() - 4, textW(s), uiTextH + 8}
+	if _, xp, ok := a.game.store.Active(); ok {
+		lvl := xp.Level()
+		return fmt.Sprintf("LV %d · %s", lvl, scoring.Title(lvl))
+	}
+	return ""
 }
 
-// drawGameHUD draws the HUD row under the timeline: excitement (or why play
-// is unscored) on the left, the level and XP on the right; then any XP toast
-// and level-up card once the player has stopped.
+// gameHUDRight is where the excitement bar (or the reason) ends: left of
+// the level and XP bar.
+func (a *App) gameHUDRight() float64 {
+	right := screenW - pgMargin
+	if l := a.levelLabel(); l != "" {
+		right -= xpBarW + sp3 + textW(l)
+	}
+	return right - sp8
+}
+
+// gameHUDReason is the message shown instead of excitement, and its
+// clickable area.
+func (a *App) gameHUDReason() (string, rect) {
+	s := a.unscoredReason()
+	if a.game.store != nil && a.game.store.NeedsProfile() {
+		s = "Add your name to start saving your progress"
+	}
+	w := textW(s)
+	return s, rect{a.gameHUDRight() - w, gameHUDY() - 4, w, uiTextH + 8}
+}
+
+func exciteW() float64 { return exciteBlocks*(exciteBlockW+exciteBlockGap) + 8 + textW("On fire") }
+
+// drawGameHUD draws the excitement (or the reason), the level and XP; then
+// any XP toast and level-up card once the player has stopped.
 func (a *App) drawGameHUD(screen *ebiten.Image) {
 	g := &a.game
-	y := a.legendY()
+	y := gameHUDY()
 	if reason, r := a.gameHUDReason(); reason != "" {
 		col := colClose
 		if a.ptr.over(r) {
@@ -259,16 +291,12 @@ func (a *App) drawGameHUD(screen *ebiten.Image) {
 		}
 		drawText(screen, reason, r.x, y, col)
 	} else {
-		g.excite.draw(screen, uiPadX, y+3)
+		g.excite.draw(screen, a.gameHUDRight()-exciteW(), y+3)
 	}
-	if g.store != nil {
-		if _, xp, ok := g.store.Active(); ok {
-			g.xpView.step()
-			left := g.xpView.draw(screen, screenW-uiPadX, y+7)
-			lvl := xp.Level()
-			label := fmt.Sprintf("LV %d · %s", lvl, scoring.Title(lvl))
-			drawTextRight(screen, label, left-10, y, colHUD)
-		}
+	if l := a.levelLabel(); l != "" {
+		g.xpView.step()
+		left := g.xpView.draw(screen, screenW-pgMargin, y+6)
+		drawTextRight(screen, l, left-sp3, y, colHUD)
 	}
 
 	// Rewards wait for the player to stop (MOTION §B1.5, §B1.6).
@@ -281,7 +309,7 @@ func (a *App) drawGameHUD(screen *ebiten.Image) {
 		g.toasts = g.toasts[1:]
 	}
 	if g.toast != nil {
-		g.toast.draw(screen, screenW-uiPadX, y-24)
+		g.toast.draw(screen, screenW-pgMargin, timelineZoneY()-uiTextH-sp1) // just above the timeline
 		if g.toast.done() {
 			g.toast = nil
 		}
@@ -343,14 +371,4 @@ func (a *App) Close() {
 	}
 	defer func() { _ = recover() }() // leaving must never fail
 	a.endPass(a.eng.PosTick())
-}
-
-// gameStatsLine is the stats line with the scored accuracy of the pass:
-// "—" until enough notes are judged for a fair number.
-func gameStatsLine(st practice.Stats, pass scoring.Summary) string {
-	acc := "—"
-	if pct, ok := pass.AccuracyPct(); ok {
-		acc = fmt.Sprintf("%d%%", pct)
-	}
-	return fmt.Sprintf("Hit %d   Close %d   Miss %d   ·   %s", st.Hit, st.Close, st.Miss, acc)
 }

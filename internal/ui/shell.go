@@ -246,11 +246,20 @@ func (s *Shell) Draw(dst *ebiten.Image) {
 	}
 }
 
-func (s *Shell) Layout(int, int) (int, int) { return screenW, screenH }
+// Layout fills the window: the UI is laid out at the window's size (never
+// below the design size, which is also the window's minimum).
+func (s *Shell) Layout(w, h int) (int, int) {
+	resize(w, h)
+	return int(screenW), int(screenH)
+}
 
 func (s *Shell) Run() error {
-	ebiten.SetWindowSize(screenW, screenH)
+	ebiten.SetWindowSize(designW, designH)
+	ebiten.SetWindowSizeLimits(designW, designH, -1, -1)
 	ebiten.SetWindowTitle(s.title)
+	if w, h, ok := shotWindowSize(); ok {
+		ebiten.SetWindowSize(w, h)
+	}
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 	if err := ebiten.RunGame(s); err != nil && err != errQuit {
 		return err
