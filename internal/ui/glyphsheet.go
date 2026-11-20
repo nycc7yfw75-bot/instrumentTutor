@@ -89,5 +89,4 @@ func (s *GlyphSheet) Draw(dst *ebiten.Image) {
 
 		drawTextSmall(dst, truncateW(sp.name, cellW-24), x+10, y+52, colHUD)
 	}
-	drawFooter(dst, "glyph specimen sheet — tools/uishot -screen glyphs")
 }

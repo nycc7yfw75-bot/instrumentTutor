@@ -109,11 +109,11 @@ func (a *App) drawTempo(dst *ebiten.Image, l practiceLayout, p pointer, dt float
 			drawText(dst, pct, x+textWScaled(bpm, dispM)+sp2, cy-uiTextH/2-2, colDim)
 			drawUnderline(dst, r, w, false, av)
 		default:
-			glyph := "‹"
+			ic := icChevronLeft
 			if i == 2 {
-				glyph = "›"
+				ic = icChevronRight
 			}
-			drawTextScaled(dst, glyph, r.x+(r.w-textWScaled(glyph, dispM))/2, cy-sizeDisplayM/2-3, dispM, menuInk(false, false, av))
+			drawPixelIcon(dst, ic, r.x+(r.w-iconSize)/2, cy-iconSize/2-2, menuInk(false, false, av))
 		}
 		a.tip.offer(part.id, part.tip, part.key, r, p.over(r), dt)
 	}

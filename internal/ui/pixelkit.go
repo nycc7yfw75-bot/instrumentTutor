@@ -124,6 +124,7 @@ const (
 	pillOutline                 // outline line: PAUSED / PLAYING
 	pillWarn                    // outline close: NO SIGNAL
 	pillYou                     // outline brand: YOU
+	pillLive                    // filled brand with the pulsing dot: LIVE
 )
 
 const pillH = 24.0
@@ -132,24 +133,51 @@ func pillW(label string) float64 { return textWScaled(label, dispS) + 2*sp2 }
 
 // drawPill draws an uppercase display-font pill and returns its width.
 func drawPill(dst *ebiten.Image, x, y float64, label string, kind pillKind) float64 {
-	w := pillW(label)
+	return drawPillA(dst, x, y, label, kind, 1, true)
+}
+
+// liveDotW is the LIVE pill's dot and its gap.
+const liveDotW = 4.0 + sp1
+
+// pillKindW is a pill's width; the LIVE pill also holds its dot.
+func pillKindW(label string, kind pillKind) float64 {
+	if kind == pillLive {
+		return pillW(label) + liveDotW
+	}
+	return pillW(label)
+}
+
+// drawPillA is drawPill at an opacity (for a crossfade); dot is the LIVE
+// pill's pulse, lit or dimmed.
+func drawPillA(dst *ebiten.Image, x, y float64, label string, kind pillKind, alpha float64, dot bool) float64 {
+	w := pillKindW(label, kind)
 	r := rect{x, y, w, pillH}
+	a := func(c color.RGBA) color.RGBA { return withAlpha(c, alpha) }
 	ink := colNote
+	tx := x + sp2
 	switch kind {
-	case pillBrand:
-		notchedFill(dst, r, tokBrand)
+	case pillBrand, pillLive:
+		notchedFill(dst, r, a(tokBrand))
 		ink = colBG
+		if kind == pillLive {
+			dc := colBG
+			if !dot {
+				dc = lerpCol(colBG, tokBrand, 0.6)
+			}
+			vector.FillRect(dst, float32(math.Round(tx)), float32(math.Round(y+(pillH-4)/2)), 4, 4, a(dc), false)
+			tx += liveDotW
+		}
 	case pillOutline:
-		notchedStroke(dst, r, 1, colPanelEdge)
+		notchedStroke(dst, r, 1, a(colPanelEdge))
 		ink = colDim
 	case pillWarn:
-		notchedStroke(dst, r, 1, colClose)
+		notchedStroke(dst, r, 1, a(colClose))
 		ink = colClose
 	case pillYou:
-		notchedStroke(dst, r, 1, tokBrand)
+		notchedStroke(dst, r, 1, a(tokBrand))
 		ink = tokBrand
 	}
-	drawTextScaled(dst, label, x+sp2, y+(pillH-sizeDisplayS)/2-1, dispS, ink)
+	drawTextScaled(dst, label, tx, y+(pillH-sizeDisplayS)/2-1, dispS, a(ink))
 	return w
 }
 
@@ -174,14 +202,7 @@ func drawSegMeter(dst *ebiten.Image, x, y float64, n int, level float64) float64
 	for i := 0; i < n; i++ {
 		col := colBlockOff
 		if i < lit {
-			switch {
-			case i == n-1:
-				col = colMiss
-			case i >= n*3/4:
-				col = colClose
-			default:
-				col = colHit
-			}
+			col = segBlockCol(i, n)
 		}
 		bx := x + float64(i)*(meterBlockW+meterGap)
 		vector.FillRect(dst, float32(bx), float32(y), meterBlockW, meterBlockH, col, false)
@@ -325,4 +346,31 @@ func drawWordmark(dst *ebiten.Image, x, y float64) float64 {
 		tx += textWScaled(s, dispL) + wordmarkTrack
 	}
 	return tx - wordmarkTrack - x
+}
+
+// drawDialogCard draws a prompt's card (REDESIGN §8): a notched surface
+// with a 1px line edge and the title in display 24. It returns where the
+// body starts.
+func drawDialogCard(dst *ebiten.Image, r rect, title string) float64 {
+	notchedFill(dst, r, colPanel)
+	notchedStroke(dst, r, 1, colPanelEdge)
+	drawTextScaled(dst, title, math.Round(r.x+sp6), math.Round(r.y+sp4), dispM, colNote)
+	return r.y + sp4 + sizeDisplayM + sp3
+}
+
+// drawField draws a text field: a raised notched box with its text and a
+// caret.
+func drawField(dst *ebiten.Image, r rect, s string, scale float64, caret bool) {
+	notchedFill(dst, r, colHover)
+	h := uiTextH
+	w := textW(s)
+	if scale > 0 {
+		h, w = displaySize(scale), textWScaled(s, scale)
+		drawTextScaled(dst, s, math.Round(r.x+sp3), math.Round(r.y+(r.h-h)/2-2), scale, colNote)
+	} else {
+		drawText(dst, s, r.x+sp3, r.y+(r.h-h)/2, colNote)
+	}
+	if caret {
+		vector.FillRect(dst, float32(math.Round(r.x+sp3+w+2)), float32(r.y+(r.h-h)/2), 2, float32(h), colNote, false)
+	}
 }

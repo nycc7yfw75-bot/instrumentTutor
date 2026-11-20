@@ -217,14 +217,13 @@ func (e *Editor) commitEntry() {
 	e.entry = nil
 }
 
-func edEntryRect() rect { return rect{screenW/2 - 230, screenH/2 - 60, 460, 120} }
+func edEntryRect() rect { return rect{screenW/2 - 260, screenH/2 - 84, 520, 168} }
 
 func (e *Editor) drawEntry(screen *ebiten.Image) {
-	vector.DrawFilledRect(screen, 0, 0, float32(screenW), float32(screenH), colHelpDim, false)
+	vector.FillRect(screen, 0, 0, float32(screenW), float32(screenH), colHelpDim, false)
 	r := edEntryRect()
-	drawPanel(screen, r, colPanel, colSounding)
-	drawText(screen, e.entry.prompt, r.x+16, r.y+12, colHUD)
-	drawTextScaled(screen, e.entry.buf+"_", r.x+16, r.y+34, dispM, colNote)
-	drawTextSmall(screen, e.entry.hint, r.x+16, r.y+76, colDim)
-	drawTextSmall(screen, "enter apply    esc cancel", r.x+16, r.y+94, colHint)
+	y := drawDialogCard(screen, r, sentenceCase(e.entry.prompt))
+	drawField(screen, rect{r.x + sp6, y, r.w - 2*sp6, 40}, e.entry.buf, 0, true)
+	drawTextSmall(screen, e.entry.hint, r.x+sp6, y+40+sp2, colDim)
+	drawTextSmall(screen, "Enter applies · Esc cancels", r.x+sp6, y+40+sp2+16, colBarline)
 }

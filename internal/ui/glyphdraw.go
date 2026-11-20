@@ -9,6 +9,12 @@ import (
 )
 
 func drawGlyph(dst *ebiten.Image, id glyphID, box rect, col color.RGBA) {
+	// UI symbols the pixel set covers are drawn from it (REDESIGN §5);
+	// notation glyphs stay vector.
+	if ic, ok := glyphPixelIcon[id]; ok {
+		drawPixelIconScaled(dst, ic, math.Round(box.x+(box.w-iconPx)/2), math.Round(box.y+(box.h-iconPx)/2), 1, col)
+		return
+	}
 
 	side := math.Round(math.Min(box.w, box.h))
 
@@ -367,4 +373,16 @@ func drawQuestionMark(g *glyphCanvas, x, y, h float64) {
 	g.quadTo(x+h*0.06, top+h*0.50, x, top+h*0.66)
 	g.stroke(wStem)
 	g.dot(x, y+h*0.42, 0.055)
+}
+
+// glyphPixelIcon maps a UI glyph to its pixel icon.
+var glyphPixelIcon = map[glyphID]iconID{
+	glyphPlay:     icPlay,
+	glyphHelp:     icHelp,
+	glyphTempo:    icMetronome,
+	glyphWind:     icHorn,
+	glyphFolder:   icOpen,
+	glyphNewPiece: icNew,
+	glyphPencil:   icEdit,
+	glyphSliders:  icSettings,
 }

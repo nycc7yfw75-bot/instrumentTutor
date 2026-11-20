@@ -474,14 +474,14 @@ var gtLegendLines = gtLegendLayout(gtLegendRect())
 func (e *Editor) drawGtabLegend(screen *ebiten.Image) {
 	r := gtLegendRect()
 	drawPanel(screen, r, colPanel, colPanelEdge)
-	drawText(screen, "WHAT THE TEXT MEANS", r.x+12, r.y+8, colInferred)
+	drawSectionHeader(screen, r.x+12, r.y+8, 0, "WHAT THE TEXT MEANS", 0)
 
 	for _, l := range gtLegendLines {
 		if l.example == "" {
 			drawTextSmall(screen, l.means, r.x+12, l.y, colGroupCap)
 			continue
 		}
-		drawTextSmall(screen, l.example, r.x+12, l.y, colSounding)
+		drawTextSmall(screen, l.example, r.x+12, l.y, colNote)
 		drawTextSmall(screen, truncateW(l.means, r.w-gtLegendCol-22), r.x+gtLegendCol, l.y, colDim)
 	}
 	drawTextSmall(screen, "the notation view has controls for the common ones",
@@ -505,7 +505,7 @@ func (e *Editor) drawTextPane(screen *ebiten.Image) {
 		if trimmed := strings.TrimSpace(line); strings.HasPrefix(trimmed, "//") {
 			col = colDim
 		} else if strings.HasPrefix(trimmed, "\\") {
-			col = colInferred
+			col = colHUD
 		}
 		drawTextMono(screen, line, r.x+gtPadX+gtGutter, y, col)
 		if ln == p.cy {

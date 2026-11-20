@@ -235,7 +235,7 @@ func (a *App) paintReview(c *ebiten.Image, card rect) {
 	r := &a.game.review
 	p := r.pass
 	drawPanel(c, card, colPanel, colPanelEdge)
-	drawText(c, "Pass review", card.x+reviewPad, card.y+18, colInferred)
+	drawTextScaled(c, "Pass review", card.x+reviewPad, card.y+14, dispM, colNote)
 	drawTextRight(c, p.label, card.x+card.w-reviewPad, card.y+18, colDim)
 
 	// Header stats arrive as pieces: accuracy, tightness, XP, peak.

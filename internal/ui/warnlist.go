@@ -120,7 +120,7 @@ func (a *App) drawWarnList(screen *ebiten.Image) {
 func (a *App) paintWarnList(c *ebiten.Image, card rect) {
 	drawPanel(c, card, colPanel, colPanelEdge)
 	n := len(a.warnItems())
-	drawText(c, fmt.Sprintf("WARNINGS (%d)", n), card.x+wlPadX, card.y+16, colInferred)
+	drawSectionHeader(c, card.x+wlPadX, card.y+16, 0, fmt.Sprintf("WARNINGS (%d)", n), 0)
 	drawTextRight(c, "I or esc closes", card.x+card.w-wlPadX, card.y+16, colDim)
 
 	lines := a.warnListLines()

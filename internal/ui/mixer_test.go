@@ -13,14 +13,16 @@ func TestMixerClickSetsTheVolumeUnderThePointer(t *testing.T) {
 	card := a.mixerCard(len(rows))
 	// Row 2 is track 1 (master, metronome, then tracks).
 	bar := a.mixerBar(a.mixerRowRect(card, 2))
-	a.mixerMouse(pointer{x: bar.x + bar.w/4, y: bar.y + 1, down: true, pressed: true}, rows)
+	// The faders are vertical now (REDESIGN §8): the value rises from the
+	// bottom of the fader.
+	a.mixerMouse(pointer{x: bar.x + 1, y: bar.y + bar.h*0.75, down: true, pressed: true}, rows)
 	if got := a.eng.Mix().Tracks[0]; math.Abs(got-0.25) > 0.01 {
-		t.Fatalf("clicking a quarter along track 1's slider set it to %.2f, want 0.25", got)
+		t.Fatalf("clicking a quarter up track 1's fader set it to %.2f, want 0.25", got)
 	}
 	if a.mixerDrag != 2 {
 		t.Fatalf("the click did not start a drag (drag row %d)", a.mixerDrag)
 	}
-	a.mixerMouse(pointer{x: bar.x + bar.w*0.75, y: bar.y + 1, down: true}, rows)
+	a.mixerMouse(pointer{x: bar.x + 1, y: bar.y + bar.h*0.25, down: true}, rows)
 	if got := a.eng.Mix().Tracks[0]; math.Abs(got-0.75) > 0.01 {
 		t.Fatalf("dragging to three quarters left the volume at %.2f", got)
 	}

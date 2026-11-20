@@ -15,8 +15,8 @@ the top screen only. Esc on any screen pops it (the start screen quits).
 
 | Screen | Drawn by | Controls | Keys |
 |---|---|---|---|
-| Start screen (piece browser) | `browserdraw.go: Browser.Draw`, `drawPanes`, `drawPane`, `drawPaneNote`, `drawActions`, `drawStatus` | Action buttons: Open a file… (primary), Write a new piece, Edit selected, Settings, Help; three panes (Recent, Created here, Library) with selectable rows; Quit chip (top left) | `browser.go: browserBindings` (O, N, E, S, H, ?, arrows, Enter, Tab between panes, Esc/Q quit) |
-| Getting-started strip | `hint.go: Browser.drawHint` | Three steps (interface, calibration, open a piece) with ticks; show/hide (H) button | H |
+| Start screen (piece browser) | `browserdraw.go: Browser.Draw`, `drawBrowserHeader`, `drawHint`, `drawActions`, `drawSongs`, `drawSongRow`, `drawStatus` | Wordmark; Settings and Help menu items; Open song (primary), Write new, Edit; SONGS list with tabs All / Recent / Written here / Library and selectable rows; empty-tab button; Back (only when nested) | `browser.go: browserBindings` (O, N, E, S, H, ?, arrows, Enter, Tab between tabs, Del, F5, Esc/Q quit) |
+| Getting-started card | `browserdraw.go: Browser.drawHint` | Three numbered steps (interface, calibration, open a piece), clickable; dismiss × | H |
 | Practice view | `ui.go: App.Draw`, `drawHUD`, `drawTab`; `transport.go: drawTransport`, `drawTrackStrip`, `drawTimeline`, `drawStateChip`; `menu.go: drawTempo`, `drawMenuItem`; `sections.go: drawSections`; `windlane.go: drawWindGrid` (wind tracks) | Back chip; text menu (play, loop, click, ramp, count-in, wait, tempo ‹ BPM ›, tuner, mixer, settings, help); track chips (click mute, right-click solo); notation (click/drag seek, shift-drag loop, wheel zoom, loop edges drag); timeline (click/drag seek, sections) | `ui.go: practiceBindings` (Space, arrows, Home/End, [ ], A/B/L, shift+B, R, C, M, T, V, W, I, D, P, S, F5, Tab, 1–9, shift+1–9, +/−, ?, Esc, Q) |
 | Settings | `settings.go: Settings.Draw`, `drawItemRow` | Profile: player + rename; capture ‹ ›; playback ‹ ›; round-trip offset: calibrate now, ‹ › fine-tune; tap calibrate: tap now; instrument sounds: browse, clear; count-in − +; audio/visual sync − + (when measurable); Back chip | `settings.go: settingsBindings` (up/down, left/right, Enter, ?, Esc) |
 | Name prompt | `nameprompt.go: NamePrompt.Draw` | Text field, Save button, Back chip | typing, Backspace, Enter save, Esc later |
@@ -32,11 +32,10 @@ the top screen only. Esc on any screen pops it (the start screen quits).
 | Help overlay (every screen) | `help.go: drawHelpOverlay` | Close on click | ?/F1 toggles, Esc closes |
 | Tooltip | `tooltip.go: tips.draw` | — (hover) | — |
 | Tuner | `live.go: App.drawTuner` | — | T |
-| Mixer | `mixer.go: drawMixer`, `paintMixer` | Sliders: master, metronome, backing track, each track; drag or click | V, up/down select, left/right adjust, Esc |
+| Mixer | `mixer.go: drawMixer`, `paintMixer` | Vertical faders (columns): master, metronome, backing track, each track; drag or click | V, up/down select, left/right adjust, Esc |
 | Import-warnings list | `warnlist.go: drawWarnList`, `paintWarnList` | Scrollable list, close | I, Esc |
 | Warning banner (practice) | `live.go: App.drawWarning` | Dismiss | D |
 | Live HUD stats line | `live.go: App.drawLiveHUD` | — | — |
-| Hit/Close/Miss legend | `live.go: App.drawLegend` (when no game layer) | — | — |
 | Scoring HUD row | `game.go: drawGameHUD`; `gamehud.go: exciteView.draw`, `xpBarView.draw`, `xpToast.draw`, `levelCard.draw` | Click the "Unscored"/"Add your name" message | Space/click skips level card |
 | Timing ghosts | `ghosts.go: drawGhosts`, `drawGhost` | — | — |
 | Pass review | `review.go: drawReview`, `paintReview`, `paintTimingStrip`, `paintDotTip`, `paintReviewTab` | Dots (hover, click), Loop this again, Close | P, ←/→, Esc |
@@ -57,5 +56,11 @@ the top screen only. Esc on any screen pops it (the start screen quits).
 | Practice status line (Paused/Playing · Pass n · Live) | `ui.go: statusLine` |
 | BPM / reload messages | `ui.go: drawHUD` (`bpmMessage`, `reloadPrompt`) |
 | Input hint (no input chosen) | `inputhint.go` |
-| Footer shortcut bar | `theme.go: drawFooter` (every screen) |
 | Native file dialogs and their fallbacks | `cmd/musictutor/dialogs.go` (OS dialogs, not drawn by the app) |
+
+## Redesign notes (Stage 5)
+
+- No screen draws a footer shortcut bar any more (REDESIGN §6.8): keys live in tooltips and the help overlay.
+- Prompts (name, BPM entry, editor entry, unsaved changes, instrument picker) are notched surface cards: `pixelkit.go: drawDialogCard`, `drawField`.
+- Help overlay: two columns of groups with keycaps, `help.go: helpLayout`, `drawHelpOverlay`. Practice groups: playback, navigation, tracks, loop, tempo, tools, app.
+- Header and HUD motion: `chromemotion.go` (LIVE dot pulse, LIVE ↔ NO SIGNAL crossfade, input-meter peak hold, section-label crossfade).

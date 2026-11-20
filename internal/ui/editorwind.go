@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -275,35 +276,37 @@ func (e *Editor) pickerSpots(out *int) []hotspot {
 }
 
 func (e *Editor) drawPicker(screen *ebiten.Image) {
-	vector.DrawFilledRect(screen, 0, 0, float32(screenW), float32(screenH), colHelpDim, false)
+	vector.FillRect(screen, 0, 0, float32(screenW), float32(screenH), colHelpDim, false)
 	r := edPickerRect()
-	drawPanel(screen, r, colPanel, colSounding)
+	notchedFill(screen, r, colPanel)
+	notchedStroke(screen, r, 1, colPanelEdge)
 	title := "What will this piece be played on?"
 	if e.picker.purpose == pickAddTrack {
 		title = "What will the new track be played on?"
 	}
-	drawTextScaled(screen, title, centreXScaled(title, r.x, r.w, dispS), r.y+18, dispS, colNote)
+	drawTextScaled(screen, title, math.Round(centreXScaled(title, r.x, r.w, dispS)), r.y+18, dispS, colNote)
 
 	for i, name := range edPickerChoices {
 		row := rect{r.x + 16, r.y + 66 + float64(i)*edPickRowH, r.w - 32, edPickRowH}
-		fill, edge, ink := colPanel, colPanelEdge, colHUD
-		if i == e.picker.sel {
-			fill, edge, ink = colFocus, colInferred, colNote
+		sel, over := i == e.picker.sel, e.ptr.over(row)
+		ink := colDim
+		if sel || over {
+			vector.FillRect(screen, float32(row.x), float32(row.y), float32(row.w), float32(row.h), colHover, false)
+			ink = colNote
 		}
-		if e.ptr.over(row) {
-			edge = colNote
+		if sel {
+			vector.FillRect(screen, float32(row.x), float32(row.y), 3, float32(row.h), tokBrand, false)
 		}
-		drawPanel(screen, rect{row.x, row.y + 2, row.w, row.h - 4}, fill, edge)
-		g := glyphTuning
+		icon := icGuitar
 		if i > 0 {
-			g = glyphWind
+			icon = icHorn
 		}
-		drawGlyph(screen, g, rect{row.x + 8, row.y + (row.h-glyphBox)/2, glyphBox, glyphBox}, ink)
-		drawText(screen, name, row.x+8+glyphBox+8, row.y+(row.h-uiTextH)/2+1, ink)
+		drawPixelIconScaled(screen, icon, row.x+sp3, row.y+(row.h-iconPx)/2, 1, ink)
+		drawText(screen, name, row.x+sp3+iconPx+sp2, row.y+(row.h-uiTextH)/2, ink)
 	}
-	hint := "↑ ↓ choose · enter takes it · esc keeps the guitar"
+	hint := "↑ ↓ choose · Enter takes it · Esc keeps the guitar"
 	if e.picker.purpose == pickAddTrack {
-		hint = "↑ ↓ choose · enter takes it · esc adds nothing"
+		hint = "↑ ↓ choose · Enter takes it · Esc adds nothing"
 	}
-	drawTextSmall(screen, hint, r.x+(r.w-textWSmall(hint))/2, r.y+r.h-22, colDim)
+	drawTextSmall(screen, hint, r.x+(r.w-textWSmall(hint))/2, r.y+r.h-22, colBarline)
 }

@@ -220,6 +220,10 @@ func keyName(key int) string {
 	return fmt.Sprintf("%s%d", keyNames[((key%12)+12)%12], key/12-1)
 }
 
+// drawTuner is the tuner (REDESIGN §8): the note huge in the display font,
+// the cents offset as a 21-block segmented meter (the centre block lights
+// hit when within ±5 cents; others close, then miss, by distance), and the
+// nearest open string below.
 func (a *App) drawTuner(screen *ebiten.Image) {
 	if !a.tunerSounding {
 		s, scale := a.tunerIdleLine()
@@ -232,33 +236,72 @@ func (a *App) drawTuner(screen *ebiten.Image) {
 	if inTune {
 		col = colHit
 	}
+	mid := math.Round(a.tabMid())
+	name := a.displayName(n.Key)
+	drawTextScaled(screen, name, math.Round(centreXScaled(name, 0, screenW, dispX)), mid-96, dispX, col)
 
-	name := fmt.Sprintf("%s %+.0fc", a.displayName(n.Key), n.Cents)
-	scale := dispX
-	drawTextScaled(screen, name, centreXScaled(name, 0, screenW, scale), a.tabMid()-80, scale, col)
-
-	const barW, barH = 500, 20
-	x0 := float32((screenW - barW) / 2)
-	y0 := float32(a.tabMid() + 40)
-	cx := x0 + barW/2
-	zone := float32(5.0 / 50.0 * barW / 2)
-	vector.DrawFilledRect(screen, cx-zone, y0, 2*zone, barH, colTuneZone, false)
-	vector.StrokeRect(screen, x0, y0, barW, barH, 1, colString, false)
-	vector.StrokeLine(screen, cx, y0-6, cx, y0+barH+6, 1, colHUD, false)
-
-	c := n.Cents
-	if c > 50 {
-		c = 50
-	} else if c < -50 {
-		c = -50
+	const blocks, bw, bh, gap = tunerBlocks, 16.0, 24.0, 4.0
+	w := blocks*(bw+gap) - gap
+	x0 := math.Round((screenW - w) / 2)
+	y0 := mid - 8
+	lit := tunerBlock(n.Cents)
+	for i := 0; i < blocks; i++ {
+		r := rect{x0 + float64(i)*(bw+gap), y0, bw, bh}
+		switch {
+		case i == lit:
+			notchedFill(screen, r, tunerBlockCol(i, inTune))
+		case i == blocks/2:
+			notchedStroke(screen, r, 1, colDim) // the target
+		default:
+			vector.FillRect(screen, float32(r.x), float32(r.y), bw, bh, colBlockOff, false)
+		}
 	}
-	mcol := colClose
-	if inTune {
-		mcol = colHit
+	drawMonoSized(screen, "-50", x0-sp3-textWMonoSized("-50", sizeUISmall), y0+4, sizeUISmall, colBarline)
+	drawMonoSized(screen, "+50", x0+w+sp3, y0+4, sizeUISmall, colBarline)
+	cents := fmt.Sprintf("%+.0f cents", n.Cents)
+	drawMonoSized(screen, cents, math.Round((screenW-textWMonoSized(cents, sizeUI))/2), y0+bh+sp3, sizeUI, colDim)
+	if s := a.nearestString(n.Key); s != "" {
+		drawText(screen, s, math.Round(centreX(s, 0, screenW)), y0+bh+sp3+uiTextH+sp2, colDim)
 	}
-	vector.DrawFilledRect(screen, cx+float32(c/50)*barW/2-3, y0-4, 6, barH+8, mcol, false)
-	drawText(screen, "-50", float64(x0)-30, float64(y0)+4, colBarline)
-	drawText(screen, "+50", float64(x0)+barW+8, float64(y0)+4, colBarline)
+}
+
+const tunerBlocks = 21
+
+// tunerBlock is the meter block for a cents offset: 10 is in the middle,
+// each block 5 cents.
+func tunerBlock(cents float64) int {
+	return max(0, min(tunerBlocks-1, tunerBlocks/2+int(math.Round(cents/5))))
+}
+
+// tunerBlockCol colours the lit block by its distance from the centre.
+func tunerBlockCol(i int, inTune bool) color.RGBA {
+	switch d := i - tunerBlocks/2; {
+	case d == 0 && inTune:
+		return colHit
+	case d >= -3 && d <= 3:
+		return colClose
+	}
+	return colMiss
+}
+
+// nearestString names the open string closest to a key on the practised
+// track ("Closest string: A"), or "" for a wind track.
+func (a *App) nearestString(key int) string {
+	tr := a.displayed()
+	if tr.Wind != nil || len(tr.Tuning) == 0 {
+		return ""
+	}
+	best, bestD := 0, 1<<30
+	for i, k := range tr.Tuning {
+		d := key - k
+		if d < 0 {
+			d = -d
+		}
+		if d < bestD {
+			best, bestD = i, d
+		}
+	}
+	return "Closest string: " + keyName(tr.Tuning[best])
 }
 
 func (a *App) tunerIdleLine() (string, float64) {

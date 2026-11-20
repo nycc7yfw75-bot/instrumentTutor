@@ -8,7 +8,7 @@ Work down the list. For each test:
   (what you clicked, what you expected, what you saw). That's all I need to fix it.
 - If you skip one, write "skipped" in Notes.
 
-Last updated: 2026-11-21 (after redesign Stage 4, the start screen).
+Last updated: 2026-11-21 (after redesign Stage 5: every other screen).
 
 ---
 
@@ -29,25 +29,25 @@ Notes:
 
 ## 1. Start screen (the first screen you see)
 
-- [ ] You see the amber **HEADLINER** title with a small spotlight, "Open mic to arena" under it, and **Settings** and **Help** at the top right. There's no "Quit" button and no row of shortcuts along the bottom.
+- [ X ] You see the amber **HEADLINER** title with a small spotlight, "Open mic to arena" under it, and **Settings** and **Help** at the top right. There's no "Quit" button and no row of shortcuts along the bottom.
   Notes:
-- [ ] Under **SONGS** there are four tabs: **All · Recent · Written here · Library**. Click each one. The amber underline slides to the tab you click, and the list changes.
+- [ X] Under **SONGS** there are four tabs: **All · Recent · Written here · Library**. Click each one. The amber underline slides to the tab you click, and the list changes.
   Notes:
-- [ ] Press **Tab** and **← / →**. The tabs change (the underline jumps rather than slides).
+- [X ] Press **Tab** and **← / →**. The tabs change (the underline jumps rather than slides).
   Notes:
-- [ ] Songs show clean names ("Sultans of Swing", not the long file name with the date), and no song appears twice in the same tab. No Windows folder paths are written on the rows.
+- [ XT] Songs show clean names ("Sultans of Swing", not the long file name with the date), and no song appears twice in the same tab. No Windows folder paths are written on the rows.
   Notes:
-- [ ] Hover over a song for a moment. A small box shows the folder it's in.
+- [X ] Hover over a song for a moment. A small box shows the folder it's in.
   Notes:
-- [ ] Click a song once to highlight it, then click it again to open it. Press **Esc** to come back.
+- [X ] Click a song once to highlight it, then click it again to open it. Press **Esc** to come back.
   Notes:
-- [ ] Highlight a song and press **Enter**. It opens. (Esc to come back.)
+- [X ] Highlight a song and press **Enter**. It opens. (Esc to come back.)
   Notes:
-- [ ] Press **H**. A "GETTING STARTED" card appears with 3 numbered steps; finished steps have green numbers. Click its **×**: it hides. Press **H** again and it shows again. Close the app and reopen it: the card is the way you left it.
+- [ X] Press **H**. A "GETTING STARTED" card appears with 3 numbered steps; finished steps have green numbers. Click its **×**: it hides. Press **H** again and it shows again. Close the app and reopen it: the card is the way you left it.
   Notes:
-- [ ] Click **Open song**: the Windows file picker opens. Cancel it.
+- [X ] Click **Open song**: the Windows file picker opens. Cancel it.
   Notes:
-- [ ] Click **Write new**: the editor opens. Esc back.
+- [ XS] Click **Write new**: the editor opens. Esc back.
   Notes:
 - [ ] On an empty tab (e.g. Written here, if you haven't written anything) you see one line of text and a button under it.
   Notes:
@@ -64,23 +64,23 @@ Notes:
 
 Open **Sultans**.
 
-- [ ] Top: a back arrow and "Back", then the song title "Sultans of Swing" with your track name under it. Pills on the right: **LIVE** (amber) and **PAUSED**.
+- [ X] Top: a back arrow and "Back", then the song title "Sultans of Swing" with your track name under it. Pills on the right: **LIVE** (amber) and **PAUSED**.
   Notes:
 - [ ] Toolbar: play controls as small pixel icons, then Loop, Click, Ramp, Count-in and Wait, then the tempo "‹ 89 · 60% ›", then Tuner, Mixer, Settings and Help at the right. Hovering any of them shows a tooltip with its key.
   Notes:
-- [ ] Track row: your track first with a **YOU** tag, then the other tracks with short names ("Vocals · Backing", "Bass"…). On the right: the **IN** meter, three counters and accuracy.
+- [ X] Track row: your track first with a **YOU** tag, then the other tracks with short names ("Vocals · Backing", "Bass"…). On the right: the **IN** meter, three counters and accuracy.
   Notes:
-- [ ] Play a note: the **IN** meter jumps.
+- [X ] Play a note: the **IN** meter jumps.
   Notes:
-- [ ] Unplug the guitar cable (or turn the guitar volume to 0) and press **Space** to play. After about 3 seconds, LIVE changes to **NO SIGNAL** (yellow outline). Plug back in / turn up: it returns to LIVE.
+- [ X] Unplug the guitar cable (or turn the guitar volume to 0) and press **Space** to play. After about 3 seconds, LIVE changes to **NO SIGNAL** (yellow outline). Plug back in / turn up: it returns to LIVE.
   Notes:
-- [ ] Tab: string names at the left (e B G D A E), bar numbers above, big clear fret numbers. Notes already played turn grey. Ties show as a small curve, not "(7)". The play line is white with a soft glow — **no amber/orange anywhere inside the tab**.
+- [X ] Tab: string names at the left (e B G D A E), bar numbers above, big clear fret numbers. Notes already played turn grey. Ties show as a small curve, not "(7)". The play line is white with a soft glow — **no amber/orange anywhere inside the tab**.
   Notes:
-- [ ] Bottom: the song's sections as blocks, the current one amber, and a line like "INTRO  Bar 3 / 212 · 0:10 / 9:36". Hover a block: a tooltip shows the section's name, bars and length.
+- [X ] Bottom: the song's sections as blocks, the current one amber, and a line like "INTRO  Bar 3 / 212 · 0:10 / 9:36". Hover a block: a tooltip shows the section's name, bars and length.
   Notes:
-- [ ] Drag the window bigger and smaller (or maximise it). Everything fills the window; the tab gets taller and nothing overlaps. It can't be made smaller than its starting size.
+- [ X] Drag the window bigger and smaller (or maximise it). Everything fills the window; the tab gets taller and nothing overlaps. It can't be made smaller than its starting size.
   Notes:
-- [ ] If the yellow warning strip appears under the header: it's one line. Click "N more" and a list of all warnings opens. Click × to hide the strip.
+- [X ] If the yellow warning strip appears under the header: it's one line. Click "N more" and a list of all warnings opens. Click × to hide the strip.
   Notes:
 
 ---
@@ -89,25 +89,25 @@ Open **Sultans**.
 
 Still in **Sultans**. These worked before the redesign; this checks that none broke.
 
-- [ ] **Space** plays and pauses. Clicking the play icon does the same.
+- [X ] **Space** plays and pauses. Clicking the play icon does the same.
   Notes:
-- [ ] **← / →** move a bar; **Home / End** go to the start or end; **[ / ]** jump to the previous or next section.
+- [X ] **← / →** move a bar; **Home / End** go to the start or end; **[ / ]** jump to the previous or next section.
   Notes:
-- [ ] Click or drag on the tab or on the section bar at the bottom: the playhead moves there.
+- [X ] Click or drag on the tab or on the section bar at the bottom: the playhead moves there.
   Notes:
-- [ ] **↑ / ↓** change the speed by 5% (the tempo number changes). Clicking the ‹ › arrows does the same. Click the BPM number (or **Shift+B**): a box opens to type an exact BPM.
+- [ X] **↑ / ↓** change the speed by 5% (the tempo number changes). Clicking the ‹ › arrows does the same. Click the BPM number (or **Shift+B**): a box opens to type an exact BPM.
   Notes:
-- [ ] **A**, move a few bars, **B** → a loop is set (white brackets). Shift+drag on the bottom bar draws a loop. Drag a bracket to move it. **L** clears it.
+- [ X] **A**, move a few bars, **B** → a loop is set (white brackets). Shift+drag on the bottom bar draws a loop. Drag a bracket to move it. **L** clears it.
   Notes:
-- [ ] **M** click on/off · **R** ramp on/off · **C** count-in on/off · **W** wait on/off. Each item turns amber with an underline when on.
+- [ X] **M** click on/off · **R** ramp on/off · **C** count-in on/off · **W** wait on/off. Each item turns amber with an underline when on.
   Notes:
-- [ ] **1–9** mute or unmute a track (it fades and gets a crossed-out speaker). **Shift+1–9** solo. **Tab** switches which track you're playing.
+- [ X] **1–9** mute or unmute a track (it fades and gets a crossed-out speaker). **Shift+1–9** solo. **Tab** switches which track you're playing.
   Notes:
-- [ ] **T** tuner · **V** mixer · **S** settings · **?** help. Each opens and closes with Esc.
+- [ X] **T** tuner · **V** mixer · **S** settings · **?** help. Each opens and closes with Esc.
   Notes:
-- [ ] **+ / −** (or the mouse wheel over the tab) zoom the tab.
+- [ X] **+ / −** (or the mouse wheel over the tab) zoom the tab.
   Notes:
-- [ ] **Esc** goes back to the start screen. The window title said "HEADLINER — Sultans of Swing" while the song was open.
+- [ X] **Esc** goes back to the start screen. The window title said "HEADLINER — Sultans of Swing" while the song was open.
   Notes:
 
 ---
@@ -131,7 +131,7 @@ Press **S** for Settings.
   Notes:
 - [ ] At the end it shows a result such as "Offset 34 ms · steady". If you were uneven, it asks you to try again (that's correct behaviour).
   Notes:
-- [ ] The **‹ ›** buttons next to the offset change it by 2 ms each click.
+- [ ] The **‹ ›** buttons next to the offset chanSge it by 2 ms each click.
   Notes:
 - [ ] Close the app and reopen it: the offset is still there.
   Notes:
@@ -153,11 +153,11 @@ Use **First Steps** first (fairest), then try Sultans.
   Notes:
 - [ ] Play along. Notes you hit get a **filled green square**; close ones a **yellow outline**; missed ones turn **red with a small ×**. The counters and accuracy % at the top right go up.
   Notes:
-- [ ] The excitement bar (bottom right) fills as you play well and slowly drains while the song plays. It never jumps down because of a miss.
+- [ X] The excitement bar (bottom right) fills as you play well and slowly drains while the song plays. It never jumps down because of a miss.
   Notes:
-- [ ] Pause mid-song: the excitement bar stops draining.
+- [ X] Pause mid-song: the excitement bar stops draining.
   Notes:
-- [ ] Turn **Wait** on (**W**). The bottom shows "Unscored — wait mode is practice". Turn it off again.
+- [ X] Turn **Wait** on (**W*S*). The bottom shows "Unscored — wait mode is practice". Turn it off again.
   Notes:
 - [ ] Hit a note early or late (not perfectly). A faint dashed copy of the note (a "ghost") appears where you actually played it, with a ‹ (early) or › (late) mark, and fades away after about 2 bars. Perfect notes and misses get no ghost.
   Notes:
@@ -220,6 +220,40 @@ A day counts when the song has been **playing** for 5 minutes or more that day. 
 ## 10. Settings extras
 
 - [ ] Settings → **reduce motion** → **turn on**. Menus and pop-ups now appear instantly without animating. Turn it off again.
+  Notes:
+
+---
+
+## 10b. New look for the other screens (redesign Stage 5)
+
+- [ ] **No shortcut bar along the bottom** of any screen (start, practice, Settings, editor, name box). Hovering a control still shows its key.
+  Notes:
+- [ ] **Settings** (press S): sections read PROFILE, AUDIO, PLAYBACK, DISPLAY. The highlighted row has an amber bar at its left. The ‹ › buttons are small pixel arrows and still change the value. ↑ ↓ move between rows, ← → change the highlighted one, Enter acts on it.
+  Notes:
+- [ ] Settings → **audio / visual sync** now sits under AUDIO, straight after the calibration rows. ↓ reaches it before "instrument sounds".
+  Notes:
+- [ ] **Help** (press ? on the start screen, in a song, in Settings and in the editor): a dark card with the keys in little boxes, in two columns. In a song the groups are PLAYBACK, NAVIGATION, TRACKS, LOOP, TEMPO, TOOLS, APP. Nothing is cut off with "…". A click or Esc closes it.
+  Notes:
+- [ ] **Tuner** (T in a song, then play a string): a big note name, a row of 21 blocks with one lit, "−17 cents"-style number, and "Closest string: A2". In tune (within 5 cents) the middle block lights green; a little off it's yellow; far off it's red.
+  Notes:
+- [ ] **Mixer** (V in a song): one column per channel (Master, Metronome, then each track) with an icon, a stack of blocks for the volume, the %, and a speaker / crossed speaker / S for muted and soloed tracks. Click or drag up and down on a column to set it. ↑ ↓ pick a channel, ← → change it by 5%, Space plays and pauses, V or Esc closes.
+  Notes:
+- [ ] **Exact BPM box** (Shift+B or click the BPM number): a "Target BPM" card with big digits. Type a number, Enter applies, Esc cancels.
+  Notes:
+- [ ] **Your name** (Settings → PROFILE → rename): a centred card with the name box and an amber **Save** button. Enter saves, Esc leaves it.
+  Notes:
+- [ ] **Editor** (Write new): the instrument picker is a dark card with an amber bar on the chosen row. The toolbar buttons have stepped (pixel) corners, and play, help and tempo use the pixel icons. The time signature and tempo above the staff are grey, not orange.
+  Notes:
+- [ ] Editor: change something, then press Esc. The "Unsaved changes" card shows **Save** (amber), **Discard** (red text) and **Cancel**. Each does what it did before.
+  Notes:
+- [ ] Editor: Shift+T (piece title) or Shift+B (tempo) opens a card with a text box. Enter applies, Esc cancels.
+  Notes:
+- [ ] **Little animations**:
+  - The **LIVE** pill has a small dot that blinks about once a second.
+  - When the input goes quiet, LIVE fades into **NO SIGNAL**, and back again.
+  - The **IN** meter's top block hangs for a moment after a loud note, then drops back block by block.
+  - When the song moves into a new section, the amber section name under the timeline fades from the old name to the new one.
+  - With Settings → **reduce motion** on, the dot stays still and the swaps happen instantly.
   Notes:
 
 ---

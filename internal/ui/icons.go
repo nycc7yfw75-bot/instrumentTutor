@@ -45,6 +45,8 @@ const (
 	icEdit
 	icSpotlight
 	icWarning
+	icChevronLeft
+	icChevronRight
 	iconCount
 )
 
@@ -52,7 +54,7 @@ var iconNames = [iconCount]string{
 	"back", "play", "pause", "skip-start", "prev-bar", "next-bar", "loop",
 	"metronome", "ramp", "count-in", "wait", "tuner", "mixer", "settings",
 	"help", "speaker-on", "speaker-muted", "solo", "guitar", "bass", "drums",
-	"mic", "keys", "horn", "open", "new", "edit", "spotlight", "warning",
+	"mic", "keys", "horn", "open", "new", "edit", "spotlight", "warning", "chevron-left", "chevron-right",
 }
 
 var iconGrids = [iconCount][iconPx]string{
@@ -575,6 +577,42 @@ var iconGrids = [iconCount][iconPx]string{
 		"..#....##....#..",
 		".##....##....##.",
 		".##############.",
+		"................",
+		"................",
+	},
+	icChevronLeft: {
+		"................",
+		"................",
+		"................",
+		"................",
+		"........##......",
+		".......###......",
+		"......###.......",
+		".....###........",
+		".....###........",
+		"......###.......",
+		".......###......",
+		"........##......",
+		"................",
+		"................",
+		"................",
+		"................",
+	},
+	icChevronRight: {
+		"................",
+		"................",
+		"................",
+		"................",
+		"......##........",
+		"......###.......",
+		".......###......",
+		"........###.....",
+		"........###.....",
+		".......###......",
+		"......###.......",
+		"......##........",
+		"................",
+		"................",
 		"................",
 		"................",
 	},

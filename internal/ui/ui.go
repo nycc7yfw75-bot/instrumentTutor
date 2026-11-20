@@ -8,7 +8,6 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
-	"github.com/hajimehoshi/ebiten/v2/vector"
 
 	"github.com/S95F/musicTutor/internal/engine"
 	"github.com/S95F/musicTutor/internal/score"
@@ -26,7 +25,6 @@ var screenW, screenH float64 = designW, designH
 // resize applies a new window size.
 func resize(w, h int) {
 	screenW, screenH = float64(max(w, designW)), float64(max(h, designH))
-	uiFooterY = screenH - 26.0
 	edGridW = screenW - 2*uiPadX - edLabelW
 	settingsWrap = screenW - settingsValueX - uiPadX
 	settingsFooterW = screenW - 2*settingsLeft
@@ -58,6 +56,7 @@ type App struct {
 	// has been flat while playing (for NO SIGNAL).
 	piecePath string
 	flatFor   float64
+	chrome    chromeMotion // the header and HUD's small motions (MOTION §A)
 
 	zoom float64
 
@@ -465,7 +464,7 @@ func (a *App) updateBPMEntry() {
 }
 
 func bpmEntryRect() rect {
-	const w, h = 300, 84
+	const w, h = 380, 168
 	z := practiceTabZone()
 	return rect{(screenW - w) / 2, z.y + sp6, w, h}
 }
@@ -683,40 +682,41 @@ func liveInputCaveat(have func(a *App) bool) func(a *App) string {
 }
 
 var practiceBindings = []practiceBinding{
-	{Group: "transport", Keys: "space", Hint: "space play/pause", Desc: "Start or pause playback"},
-	{Group: "transport", Keys: "left / right", Hint: "arrows seek", Desc: "Jump to the previous / next bar; inside a loop, right wraps to the loop start"},
-	{Group: "transport", Keys: "home / end", Desc: "Jump to the first / last bar"},
-	{Group: "transport", Keys: "[ / ]", Hint: "[ ] section", Desc: "Jump to the previous / next named section (Intro, Verse, Solo)",
+	{Group: "playback", Keys: "space", Hint: "space play/pause", Desc: "Start or pause playback"},
+
+	{Group: "navigation", Keys: "left / right", Hint: "arrows seek", Desc: "Jump to the previous / next bar; inside a loop, right wraps to the loop start"},
+	{Group: "navigation", Keys: "home / end", Desc: "Jump to the first / last bar"},
+	{Group: "navigation", Keys: "[ / ]", Hint: "[ ] section", Desc: "Jump to the previous / next named section (Intro, Verse, Solo)",
 		Enabled: func(a *App) bool { return len(a.sc.Sections) > 0 }},
-	{Group: "transport", Keys: "click / drag", Desc: "On the notation or the timeline: move the playhead"},
-
-	{Group: "tempo", Keys: "up / down", Hint: "up/dn tempo", Desc: "Practice speed up / down by 5%"},
-	{Group: "tempo", Keys: "shift+B", Hint: "shift+B bpm", Desc: "Type an exact target BPM"},
-	{Group: "tempo", Keys: "R", Desc: "Ramp the speed up 5% after each loop pass"},
-	{Group: "tempo", Keys: "C", Desc: "Count-in on / off for the next play"},
-
-	{Group: "loop", Keys: "A / B,  L", Hint: "A/B loop", Desc: "Set the loop start / end at the current bar; L clears the loop"},
-	{Group: "loop", Keys: "shift+drag, edges", Desc: "Shift+drag draws a new loop; drag an edge to move it (shift: tick-exact)"},
+	{Group: "navigation", Keys: "click / drag", Desc: "On the notation or the timeline: move the playhead"},
 
 	{Group: "tracks", Keys: "1..9", Hint: "1-9 mute", Desc: "Mute / unmute a track (or click its chip)"},
 	{Group: "tracks", Keys: "shift+1..9", Desc: "Solo a track; press again to release (or right-click it)"},
 	{Group: "tracks", Keys: "tab / shift+tab", Hint: "tab track", Desc: "Show and score the next / previous track",
 		Enabled: func(a *App) bool { return a.switchTrack != nil && a.playableTracks() > 1 }},
 
-	{Group: "practice", Keys: "M", Hint: "M click", Desc: "Metronome click on / off"},
-	{Group: "practice", Keys: "V", Hint: "V mixer", Desc: "Volume mixer: master, metronome, backing track and each track"},
+	{Group: "loop", Keys: "A / B,  L", Hint: "A/B loop", Desc: "Set the loop start / end at the current bar; L clears the loop"},
+	{Group: "loop", Keys: "shift+drag, edges", Desc: "Shift+drag draws a new loop; drag an edge to move it (shift: tick-exact)"},
 
-	{Group: "practice", Keys: "T", Hint: "T tuner", Desc: "Tuner overlay",
+	{Group: "tempo", Keys: "up / down", Hint: "up/dn tempo", Desc: "Practice speed up / down by 5%"},
+	{Group: "tempo", Keys: "shift+B", Hint: "shift+B bpm", Desc: "Type an exact target BPM"},
+	{Group: "tempo", Keys: "R", Desc: "Ramp the speed up 5% after each loop pass"},
+	{Group: "tempo", Keys: "C", Desc: "Count-in on / off for the next play"},
+
+	{Group: "tools", Keys: "M", Hint: "M click", Desc: "Metronome click on / off"},
+	{Group: "tools", Keys: "V", Hint: "V mixer", Desc: "Volume mixer: master, metronome, backing track and each track"},
+
+	{Group: "tools", Keys: "T", Hint: "T tuner", Desc: "Tuner overlay",
 		Caveat: liveInputCaveat(func(a *App) bool { return a.live })},
-	{Group: "practice", Keys: "W", Hint: "W wait", Desc: "Wait at each note until you play it",
+	{Group: "tools", Keys: "W", Hint: "W wait", Desc: "Wait at each note until you play it",
 		Enabled: func(a *App) bool { return a.waitCtl },
 		Caveat:  liveInputCaveat(func(a *App) bool { return a.waitCtl })},
 
-	{Group: "practice", Keys: "P", Desc: "Review your last pass: the timing of every note, and where you rushed or dragged",
+	{Group: "tools", Keys: "P", Desc: "Review your last pass: the timing of every note, and where you rushed or dragged",
 		Enabled: func(a *App) bool { return a.game.review.pass != nil }},
-	{Group: "practice", Keys: "+ / -", Desc: "Zoom the notation in / out (or the wheel over it)"},
+	{Group: "tools", Keys: "+ / -", Desc: "Zoom the notation in / out (or the wheel over it)"},
 
-	{Group: "session", Keys: "S", Hint: "S settings", Desc: "Settings, without leaving the piece",
+	{Group: "app", Keys: "S", Hint: "S settings", Desc: "Settings, without leaving the piece",
 		Enabled: func(a *App) bool { return a.settings != nil },
 		Caveat: func(a *App) string {
 			if a.settings == nil {
@@ -724,19 +724,18 @@ var practiceBindings = []practiceBinding{
 			}
 			return ""
 		}},
-	{Group: "session", Keys: "F5", Desc: "Re-open this piece, picking up changed settings",
+	{Group: "app", Keys: "F5", Desc: "Re-open this piece, picking up changed settings",
 		Enabled: func(a *App) bool { return a.reload != nil }},
-	{Group: "session", Keys: "? or F1", Hint: "? help", Desc: "This key-binding list"},
-	{Group: "session", Keys: "D / I", Desc: "Dismiss the warning banner; I lists every import warning"},
-	{Group: "session", Keys: "esc", Hint: "esc back", Desc: "Leave this piece and go back",
+	{Group: "app", Keys: "? or F1", Hint: "? help", Desc: "This key-binding list"},
+	{Group: "app", Keys: "D / I", Desc: "Dismiss the warning banner; I lists every import warning"},
+	{Group: "app", Keys: "esc", Hint: "esc back", Desc: "Leave this piece and go back",
 		Reword: func(a *App) (string, string) {
 			if a.quitAll == nil {
-
 				return "esc quit", "Leave the piece — with nothing behind it, this quits"
 			}
 			return "esc back", "Leave this piece and go back"
 		}},
-	{Group: "session", Keys: "Q", Hint: "Q quit", Desc: "Quit HEADLINER"},
+	{Group: "app", Keys: "Q", Hint: "Q quit", Desc: "Quit HEADLINER"},
 }
 
 func (a *App) helpRows() []helpBinding {
@@ -819,11 +818,9 @@ func (a *App) drawHUD(screen *ebiten.Image, l practiceLayout) {
 
 func (a *App) drawBPMEntry(screen *ebiten.Image) {
 	r := bpmEntryRect()
-	vector.DrawFilledRect(screen, float32(r.x), float32(r.y), float32(r.w), float32(r.h), colBG, false)
-	vector.StrokeRect(screen, float32(r.x), float32(r.y), float32(r.w), float32(r.h), 2, colSounding, false)
-	drawText(screen, "target BPM", r.x+16, r.y+12, colHUD)
-	drawTextScaled(screen, a.bpmDigits+"_", r.x+16, r.y+30, dispL, colNote)
-	drawText(screen, "enter apply    esc or click away to cancel", r.x+16, r.y+64, colHint)
+	y := drawDialogCard(screen, r, "Target BPM")
+	drawField(screen, rect{r.x + sp6, y, r.w - 2*sp6, 48}, a.bpmDigits, dispL, true)
+	drawTextSmall(screen, "Enter applies · Esc or a click away cancels", r.x+sp6, y+48+sp3, colBarline)
 }
 
 func (a *App) drawHelp(screen *ebiten.Image) {

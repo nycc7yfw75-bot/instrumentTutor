@@ -165,7 +165,7 @@ func (a *App) headerPills() []struct {
 		if a.noSignal() {
 			out = append(out, pill{"NO SIGNAL", pillWarn})
 		} else {
-			out = append(out, pill{"LIVE", pillBrand})
+			out = append(out, pill{"LIVE", pillLive})
 		}
 	}
 	if _, _, on := a.eng.Loop(); on {
@@ -187,9 +187,26 @@ func (a *App) drawPracticeHeader(dst *ebiten.Image) {
 	x := drawEscButton(dst, a.backChip(), &a.anim, a.ptr)
 	pills := a.headerPills()
 	right := screenW - pgMargin
+	m := &a.chrome
 	for i := len(pills) - 1; i >= 0; i-- {
-		right -= pillW(pills[i].label)
-		drawPill(dst, right, 20, pills[i].label, pills[i].kind)
+		p := pills[i]
+		right -= pillKindW(p.label, p.kind)
+		if p.kind == pillLive || p.kind == pillWarn {
+			// LIVE ↔ NO SIGNAL: a 200ms replacement crossfade (MOTION §A).
+			m.live.set(p.label)
+			k := m.live.step(motionDt())
+			if k < 1 && m.live.prev != "" {
+				old := pillLive
+				if m.live.prev == "NO SIGNAL" {
+					old = pillWarn
+				}
+				ow := pillKindW(m.live.prev, old)
+				drawPillA(dst, right+pillKindW(p.label, p.kind)-ow, 20, m.live.prev, old, 1-k, true)
+			}
+			drawPillA(dst, right, 20, p.label, p.kind, k, m.liveDotOn())
+		} else {
+			drawPill(dst, right, 20, p.label, p.kind)
+		}
 		right -= sp2
 	}
 	budget := right - sp6 - x
@@ -211,6 +228,10 @@ func (a *App) noSignal() bool { return a.flatFor >= noSignalAfter }
 
 // trackSignal advances the flat-input clock; once a frame.
 func (a *App) trackSignal() {
+	dt := uiFrameSeconds()
+	a.chrome.clock += dt
+	lv := math.Max(-60, math.Min(0, a.levelDB))
+	a.chrome.peak.update(int(math.Round((lv+60)/60*hudMeterBlocks)), dt)
 	if a.live && a.eng.Playing() && a.levelDB < noSignalDB {
 		a.flatFor += uiFrameSeconds()
 		return
@@ -400,6 +421,7 @@ func (a *App) drawPracticeHUD(dst *ebiten.Image) {
 	meterW := float64(hudMeterBlocks)*(meterBlockW+meterGap) - meterGap
 	right -= meterW
 	drawSegMeter(dst, right, cy-meterBlockH/2, hudMeterBlocks, (lv+60)/60)
+	drawPeakBlock(dst, right, cy-meterBlockH/2, hudMeterBlocks, a.chrome.peak.block, int(math.Round((lv+60)/60*hudMeterBlocks)))
 	meter := rect{right, cy - 12, meterW, 24}
 	hint, hintCol := a.inputHint()
 	if a.dropped > 0 {

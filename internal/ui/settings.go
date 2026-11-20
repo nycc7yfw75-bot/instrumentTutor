@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"image/color"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -366,10 +367,11 @@ func (s *Settings) rebuild() {
 			s.rows = append(s.rows, srTap)
 		}
 	}
-	s.rows = append(s.rows, srSoundFont, srCountIn)
+	// The same order as drawn: sync trim is an AUDIO row (REDESIGN §8).
 	if s.hasSyncTrim() {
 		s.rows = append(s.rows, srSyncTrim)
 	}
+	s.rows = append(s.rows, srSoundFont, srCountIn)
 	if s.motionPrefs() != nil {
 		s.rows = append(s.rows, srMotion)
 	}
@@ -1056,7 +1058,7 @@ func (s *Settings) calibrationText(sn calSnap) (string, color.RGBA) {
 	}
 	switch sn.Phase {
 	case calRunning:
-		return fmt.Sprintf("measuring... %3.0f%%", sn.Progress*100), colSounding
+		return fmt.Sprintf("measuring... %3.0f%%", sn.Progress*100), colDim
 	case calDone:
 		return fmt.Sprintf("measured %s, confidence %.0f%%", s.framesText(sn.Frames), sn.Confidence*100), colHit
 	case calFailed:
@@ -1094,8 +1096,8 @@ const (
 	settingsLineH  = uiLineH
 	settingsRowH   = uiRowH
 
-	settingsBtnH   = 22.0
-	settingsBtnPad = 8.0
+	settingsBtnH   = 24.0
+	settingsBtnPad = 10.0
 	settingsBtnGap = 6.0
 
 	settingsValueGap = 12.0
@@ -1109,7 +1111,7 @@ const (
 const calSetupHint = "plays a few seconds of clicks that must travel out and back in:" +
 	" point a mic at your speakers, or cable an output back into an input;" +
 	" a guitar's pickup won't hear them, a mic'd horn already does." +
-	" - / + fine-tune it by 5 ms: if notes you play on the beat show amber, step either way until they turn green"
+	" ‹ › fine-tune it by 5 ms: if notes you play on the beat show yellow, step either way until they turn green"
 
 type settingsItemKind int
 
@@ -1194,8 +1196,11 @@ func (b *itemsBuilder) addRow(label, value string, col color.RGBA, btns ...setti
 	x := screenW - uiPadX
 	for i := len(btns) - 1; i >= 0; i-- {
 		w := textW(btns[i].label) + 2*settingsBtnPad
+		if _, ok := chevronFor(btns[i].label); ok {
+			w = settingsBtnH + 4
+		}
 		x -= w
-		btns[i].r = rect{x, b.y - 4, w, settingsBtnH}
+		btns[i].r = rect{x, b.y - 3, w, settingsBtnH}
 		x -= settingsBtnGap
 	}
 
@@ -1215,12 +1220,6 @@ func (b *itemsBuilder) addRow(label, value string, col color.RGBA, btns ...setti
 func (s *Settings) items() []settingsItem {
 	b := &itemsBuilder{y: uiBodyTop + 8}
 
-	backend := "audio backend: none"
-	if a := s.audio(); a != nil {
-		backend = "audio backend: " + a.BackendName()
-	}
-	b.note(backend, colBarline)
-
 	if st := s.progress(); st != nil {
 		b.section("PROFILE")
 		name, xp, ok := st.Active()
@@ -1235,14 +1234,14 @@ func (s *Settings) items() []settingsItem {
 		}})
 	}
 
-	b.section("AUDIO DEVICES")
+	b.section("AUDIO")
 	if s.hasDevices() {
 		b.addRow("capture", deviceText(s.capture, s.capIdx, s.deviceStateOf(srCapture)), colHUD,
-			settingsButton{label: "<", act: func(s *Settings) { s.adjustRow(srCapture, -1) }},
-			settingsButton{label: ">", act: func(s *Settings) { s.adjustRow(srCapture, +1) }})
+			settingsButton{label: "‹", act: func(s *Settings) { s.adjustRow(srCapture, -1) }},
+			settingsButton{label: "›", act: func(s *Settings) { s.adjustRow(srCapture, +1) }})
 		b.addRow("playback", deviceText(s.playback, s.playIdx, s.deviceStateOf(srPlayback)), colHUD,
-			settingsButton{label: "<", act: func(s *Settings) { s.adjustRow(srPlayback, -1) }},
-			settingsButton{label: ">", act: func(s *Settings) { s.adjustRow(srPlayback, +1) }})
+			settingsButton{label: "‹", act: func(s *Settings) { s.adjustRow(srPlayback, -1) }},
+			settingsButton{label: "›", act: func(s *Settings) { s.adjustRow(srPlayback, +1) }})
 		if s.capMissing {
 			b.note("the saved capture device is not connected: the fallback shown here is what a piece will actually use", colClose)
 		}
@@ -1258,7 +1257,6 @@ func (s *Settings) items() []settingsItem {
 		}
 	}
 
-	b.section("LATENCY CALIBRATION")
 	sn := s.calSnapshot()
 	if s.hasDevices() {
 		txt, col := s.calibrationText(sn)
@@ -1311,7 +1309,14 @@ func (s *Settings) items() []settingsItem {
 	}
 	b.reserveNote(settingsNoticeLines, noticeTxt, noticeCol)
 
-	b.section("INSTRUMENT")
+	if s.hasSyncTrim() {
+		b.addRow("audio / visual sync", s.syncTrimText(), colHUD,
+			settingsButton{label: "‹", act: func(s *Settings) { s.adjustRow(srSyncTrim, -1) }},
+			settingsButton{label: "›", act: func(s *Settings) { s.adjustRow(srSyncTrim, +1) }})
+		b.reserveNote(1, "the app already subtracts the buffering it can measure; this trims what it cannot", colDim)
+	}
+
+	b.section("PLAYBACK")
 	sfButtons := []settingsButton{{label: "clear", act: func(s *Settings) {
 		s.focusRow(srSoundFont)
 		s.clearSoundFont()
@@ -1331,18 +1336,12 @@ func (s *Settings) items() []settingsItem {
 	sfNote, sfCol := s.soundFontNote()
 	b.reserveNote(settingsSfNoteLines, sfNote, sfCol)
 
-	b.section("PRACTICE")
 	b.addRow("count-in beats", fmt.Sprintf("%d  (0-%d)", s.countIn, MaxCountIn), colHUD,
-		settingsButton{label: "-", act: func(s *Settings) { s.adjustRow(srCountIn, -1) }},
-		settingsButton{label: "+", act: func(s *Settings) { s.adjustRow(srCountIn, +1) }})
-	if s.hasSyncTrim() {
-		b.addRow("audio / visual sync", s.syncTrimText(), colHUD,
-			settingsButton{label: "-", act: func(s *Settings) { s.adjustRow(srSyncTrim, -1) }},
-			settingsButton{label: "+", act: func(s *Settings) { s.adjustRow(srSyncTrim, +1) }})
-		b.reserveNote(1, "the app already subtracts the buffering it can measure; this trims what it cannot", colDim)
-	}
+		settingsButton{label: "‹", act: func(s *Settings) { s.adjustRow(srCountIn, -1) }},
+		settingsButton{label: "›", act: func(s *Settings) { s.adjustRow(srCountIn, +1) }})
 
 	if s.motionPrefs() != nil {
+		b.section("DISPLAY")
 		value, label := "off", "turn on"
 		if reduceMotion {
 			value, label = "on  (screens change without animating)", "turn off"
@@ -1452,7 +1451,11 @@ func (s *Settings) Update() error {
 func (s *Settings) Draw(dst *ebiten.Image) {
 	dst.Fill(colBG)
 	x := drawEscButton(dst, escBackChip, &s.anim, s.ptr)
-	drawHeaderAt(dst, x, "Settings", "Changes are saved as you make them", colDim)
+	status := "Changes are saved as you make them"
+	if a := s.audio(); a != nil {
+		status += "  ·  audio: " + a.BackendName()
+	}
+	drawHeaderAt(dst, x, "Settings", status, colDim)
 
 	for _, it := range s.items() {
 		switch it.kind {
@@ -1460,50 +1463,75 @@ func (s *Settings) Draw(dst *ebiten.Image) {
 			y := it.y
 			drawSection(dst, &y, it.text)
 		case siNote:
-			drawText(dst, it.text, settingsValueX, it.y, it.col)
+			drawTextSmall(dst, it.text, settingsValueX, it.y, it.col)
 		case siProgress:
-			const barW, barH = 320, 8
-			x0 := float32(settingsValueX)
-			vector.StrokeRect(dst, x0, float32(it.y), barW, barH, 1, colString, false)
-			vector.DrawFilledRect(dst, x0+1, float32(it.y)+1, (barW-2)*float32(it.prog), barH-2, colSounding, false)
+			// A segmented bar, like the input meter (REDESIGN §5).
+			const blocks = 24
+			lit := int(math.Round(it.prog * blocks))
+			for i := 0; i < blocks; i++ {
+				col := colBlockOff
+				if i < lit {
+					col = colNote
+				}
+				bx := settingsValueX + float64(i)*(meterBlockW+meterGap)
+				vector.FillRect(dst, float32(bx), float32(it.y), meterBlockW, meterBlockH, col, false)
+			}
 		case siRow:
 			s.drawItemRow(dst, it)
 		}
 	}
 
-	fy := screenH - 68.0
-	drawText(dst, s.configText(), settingsLeft, fy, colBarline)
+	fy := pageBottom() - 2*settingsLineH
+	drawTextSmall(dst, s.configText(), settingsLeft, fy, colBarline)
 	if line, ok := s.saveErrLine(); ok {
 		drawText(dst, line, settingsLeft, fy+settingsLineH, colMiss)
 	}
-	drawFooter(dst, s.hintLine())
 
 	if s.helpOpen {
 		drawHelpOverlay(dst, "SETTINGS KEYS", s.settingsBindings(), "")
 	}
 }
 
+// drawItemRow draws a setting (REDESIGN §8): label left in text2, value,
+// buttons right as notched secondary buttons. The selected row is a list
+// row's selection: raised, with the brand bar at its left edge.
 func (s *Settings) drawItemRow(dst *ebiten.Image, it settingsItem) {
 	col := it.col
+	labelCol := colDim
 	if it.row == s.cur {
 		band := it.band()
-		vector.DrawFilledRect(dst, float32(band.x), float32(band.y), float32(band.w), float32(band.h), colFocus, false)
-		drawText(dst, ">", settingsLeft-8, it.y, colSounding)
-		col = colNote
+		vector.FillRect(dst, float32(band.x), float32(band.y), float32(band.w), float32(band.h), colHover, false)
+		vector.FillRect(dst, float32(band.x), float32(band.y), 3, float32(band.h), tokBrand, false)
+		labelCol = colNote
+		if col == colHUD {
+			col = colNote
+		}
 	}
-	drawText(dst, it.label, settingsLeft+8, it.y, colHUD)
+	drawText(dst, it.label, settingsLeft+8, it.y, labelCol)
 	drawText(dst, it.valueText(), settingsValueX, it.y, col)
 	for _, btn := range it.buttons {
-		fill, edge, tc := colPanel, colPanelEdge, colHUD
+		over := s.ptr.over(btn.r) && !btn.disabled
+		r := btn.r
+		if over && s.ptr.down {
+			r.y++ // a pixel press
+		}
+		ink := colDim
 		switch {
 		case btn.disabled:
-
-			fill, edge, tc = colBG, colBarline, colBarline
-		case s.ptr.over(btn.r):
-			fill, edge, tc = colHover, colDim, colNote
+			ink = colDisabled
+			notchedStroke(dst, r, 1, colBlockOff)
+		case over:
+			ink = colNote
+			notchedFill(dst, r, colHover)
+		default:
+			notchedStroke(dst, r, 1, colPanelEdge)
 		}
-		drawPanel(dst, btn.r, fill, edge)
-		drawText(dst, btn.label, centreX(btn.label, btn.r.x, btn.r.w), settingsBtnTextY(btn.r), tc)
+		if ic, ok := chevronFor(btn.label); ok {
+			// The adjusters' pixel arrows, as on the tempo control.
+			drawPixelIconScaled(dst, ic, r.x+(r.w-iconPx)/2, r.y+(r.h-iconPx)/2, 1, ink)
+			continue
+		}
+		drawText(dst, btn.label, centreX(btn.label, r.x, r.w), settingsBtnTextY(r), ink)
 	}
 }
 
@@ -1518,7 +1546,7 @@ func (s *Settings) tapText(sn calSnap) (string, color.RGBA) {
 	}
 	switch sn.Phase {
 	case calRunning:
-		return "listening — pluck a muted string right on each click", colSounding
+		return "listening — pluck a muted string right on each click", colDim
 	case calDone:
 		word := "rough"
 		switch {
@@ -1581,3 +1609,14 @@ var (
 	settingsWrap    = screenW - settingsValueX - uiPadX
 	settingsFooterW = screenW - 2*settingsLeft
 )
+
+// chevronFor is the pixel arrow an adjuster button shows.
+func chevronFor(label string) (iconID, bool) {
+	switch label {
+	case "‹":
+		return icChevronLeft, true
+	case "›":
+		return icChevronRight, true
+	}
+	return 0, false
+}

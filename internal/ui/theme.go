@@ -7,8 +7,6 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
-var uiFooterY = screenH - 26.0
-
 const (
 	uiPadX    = 24.0
 	uiHeaderY = 18.0
@@ -70,59 +68,26 @@ func backButtonRect(c chipState) rect {
 }
 
 // drawHeaderAt is drawHeader with the title starting at x, leaving room
-// on the left for a button.
+// on the left for a button: the title in the display font, a status in
+// text2 at the right. No rule under it: space separates (REDESIGN §3).
 func drawHeaderAt(dst *ebiten.Image, x float64, title, status string, statusCol color.RGBA) {
 	drawTextScaled(dst, title, x, uiHeaderY, uiTitleScl, colNote)
 	if status != "" {
 		drawTextRight(dst, status, screenW-uiPadX, uiHeaderY+8, statusCol)
 	}
-	vector.StrokeLine(dst, uiPadX, uiHeaderH-10, float32(screenW-uiPadX), uiHeaderH-10, 1, colPanelEdge, false)
 }
 
-func drawFooter(dst *ebiten.Image, hint string) {
-	drawText(dst, hint, uiPadX, uiFooterY, colHint)
-}
-
+// drawSection is a section header (§5): display 16, uppercase, text3,
+// letter-spaced, no rule.
 func drawSection(dst *ebiten.Image, y *float64, title string) {
-	drawText(dst, title, uiPadX, *y, colInferred)
-	vector.StrokeLine(dst, uiPadX, float32(*y)+16, float32(screenW-uiPadX), float32(*y)+16, 1, colBarline, false)
+	drawSectionHeader(dst, uiPadX, *y, 0, title, 0)
 	*y += uiSectionH
 }
 
-const uiCornerRadius = 5.0
+// Panels have notched corners, never rounded ones (REDESIGN §3).
+func fillRounded(dst *ebiten.Image, r rect, col color.RGBA) { notchedFill(dst, r, col) }
 
-func roundedRectPath(r rect) *vector.Path {
-	rad := float32(uiCornerRadius)
-	if half := float32(r.w) / 2; rad > half {
-		rad = half
-	}
-	if half := float32(r.h) / 2; rad > half {
-		rad = half
-	}
-	x0, y0 := float32(r.x), float32(r.y)
-	x1, y1 := float32(r.x+r.w), float32(r.y+r.h)
-	var p vector.Path
-	p.MoveTo(x0+rad, y0)
-	p.ArcTo(x1, y0, x1, y1, rad)
-	p.ArcTo(x1, y1, x0, y1, rad)
-	p.ArcTo(x0, y1, x0, y0, rad)
-	p.ArcTo(x0, y0, x1, y0, rad)
-	p.Close()
-	return &p
-}
-
-func fillRounded(dst *ebiten.Image, r rect, col color.RGBA) {
-	op := &vector.DrawPathOptions{AntiAlias: true}
-	op.ColorScale.ScaleWithColor(col)
-	vector.FillPath(dst, roundedRectPath(r), nil, op)
-}
-
-func strokeRounded(dst *ebiten.Image, r rect, col color.RGBA) {
-	op := &vector.DrawPathOptions{AntiAlias: true}
-	op.ColorScale.ScaleWithColor(col)
-	so := &vector.StrokeOptions{Width: 1}
-	vector.StrokePath(dst, roundedRectPath(r), so, op)
-}
+func strokeRounded(dst *ebiten.Image, r rect, col color.RGBA) { notchedStroke(dst, r, 1, col) }
 
 func drawPanel(dst *ebiten.Image, r rect, fill, edge color.RGBA) {
 	fillRounded(dst, r, fill)
@@ -332,3 +297,8 @@ func fillTriangle(dst *ebiten.Image, x0, y0, x1, y1, x2, y2 float64, col color.R
 	op.ColorScale.ScaleWithColor(col)
 	vector.FillPath(dst, &p, nil, op)
 }
+
+// pageBottom is where a screen's content ends: the bottom margin. There
+// is no footer shortcut bar any more (REDESIGN §6.8); keys live in
+// tooltips and the help overlay.
+func pageBottom() float64 { return screenH - uiPadX }

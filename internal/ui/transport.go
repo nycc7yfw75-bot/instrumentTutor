@@ -718,9 +718,15 @@ func (a *App) drawTimeline(dst *ebiten.Image, l practiceLayout, p pointer) {
 	// One line under it: the section, the bar, the time (§6.6).
 	y := tl.y + tl.h + sp3
 	x2 := pgMargin
-	if sec := a.currentSection(); sec != "" {
-		s := strings.ToUpper(sec)
-		drawTextScaled(dst, s, x2, y-1, dispS, tokBrand)
+	// The section label crossfades when the section changes (MOTION §A).
+	sf := &a.chrome.section
+	sf.set(strings.ToUpper(a.currentSection()))
+	k := sf.step(motionDt())
+	if k < 1 && sf.prev != "" {
+		drawTextScaled(dst, sf.prev, x2, y-1, dispS, withAlpha(tokBrand, 1-k))
+	}
+	if s := sf.cur; s != "" {
+		drawTextScaled(dst, s, x2, y-1, dispS, withAlpha(tokBrand, k))
 		x2 += textWScaled(s, dispS) + sp4
 	}
 	drawMonoSized(dst, a.positionCaption(), x2, y, sizeMono, colDim)

@@ -133,14 +133,14 @@ func TestSettingsProfileRowFitsOnScreen(t *testing.T) {
 	sh := NewShell(Services{Prefs: &settingsFakePrefs{}, Audio: newSettingsAudio(), Progress: tempStore(t, "Player")}, nil)
 	s := NewSettings(sh)
 	items := s.items()
-	if items[1].text != "PROFILE" {
-		t.Errorf("the Profile section should come first, got %q", items[1].text)
+	if items[0].text != "PROFILE" { // the backend note moved to the header
+		t.Errorf("the Profile section should come first, got %q", items[0].text)
 	}
 	if s.rows[0] != srProfile {
 		t.Errorf("first row is %v, want the profile row", s.rows[0])
 	}
 	last := items[len(items)-1]
-	if last.y+settingsRowH > screenH-68 {
-		t.Errorf("Settings runs to y=%.0f, into the footer at %.0f", last.y+settingsRowH, screenH-68)
+	if bottom := pageBottom() - 2*settingsLineH; last.y+settingsRowH > bottom {
+		t.Errorf("Settings runs to y=%.0f, into the config line at %.0f", last.y+settingsRowH, bottom)
 	}
 }

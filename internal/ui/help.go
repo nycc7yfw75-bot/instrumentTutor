@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"math"
 	"strings"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -58,50 +59,125 @@ func helpDismissed(p pointer) bool {
 	return helpKeyPressed() || inpututil.IsKeyJustPressed(ebiten.KeyEscape) || p.pressed
 }
 
+// The help overlay (REDESIGN §8): a notched surface card, the groups in
+// two columns, each row the keys as keycaps and the description in UI 14,
+// wrapped rather than cut. Generated from each screen's binding table.
+
 const (
-	helpX = 200.0
-
-	helpKeysX  = 220.0
-	helpDescX  = 420.0
-	helpTopY   = 72.0
-	helpRowH   = 17.0
-	helpHeadH  = 16.0
-	helpGroupH = 7.0
-
-	helpFootGap = 4.0
+	helpPad     = sp6
+	helpColGap  = sp6
+	helpKeysW   = 150.0
+	helpTopY    = helpPad + sizeDisplayM + sp4 // under the title
+	helpRowGap  = 4.0
+	helpHeadH   = sizeDisplayS + sp2
+	helpGroupH  = sp2
+	helpLineH   = uiTextH
+	helpKeyH    = 20.0
+	helpFootGap = sp3
 )
 
 func helpCard() rect {
-	return rect{160, 12, screenW - 320, screenH - 24}
+	return rect{sp6, sp4, screenW - 2*sp6, screenH - 2*sp4}
 }
+
+func helpColW() float64 { return (helpCard().w - 2*helpPad - helpColGap) / 2 }
+
+func helpDescW() float64 { return helpColW() - helpKeysW - sp3 }
 
 const (
 	editorHelpFootnote   = "rest the cursor on any toolbar symbol and it names itself, and gives its key"
-	browserHelpFootnote  = "tab and the arrow keys move between the three lists; the wheel scrolls whichever one the cursor is over"
-	practiceHelpFootnote = "track chips:  click to mute    right-click to solo    the blue edge marks your track    tab switches it"
+	browserHelpFootnote  = "tab and the arrow keys move between the song lists; the wheel scrolls the list under the cursor"
+	practiceHelpFootnote = "tracks:  click a track to mute it    right-click to solo    YOU marks your track    tab switches it"
 )
 
+// helpKeycaps splits a key label into its keys: "left / right" is two
+// caps, "? or F1" two, "shift+drag, edges" two.
+func helpKeycaps(keys string) []string {
+	var out []string
+	for _, a := range strings.Split(keys, " / ") {
+		for _, b := range strings.Split(a, " or ") {
+			for _, c := range strings.Split(b, ",") {
+				if c = strings.TrimSpace(c); c != "" {
+					out = append(out, c)
+				}
+			}
+		}
+	}
+	return out
+}
+
+func helpKeycapW(k string) float64 { return math.Max(helpKeyH, textWScaled(k, dispS)+2*sp2) }
+
+// helpKeysFit reports whether a row's keycaps fit the key column; if not
+// the keys are written as text.
+func helpKeysFit(keys string) bool {
+	w := 0.0
+	for _, k := range helpKeycaps(keys) {
+		w += helpKeycapW(k) + sp1
+	}
+	return w-sp1 <= helpKeysW
+}
+
+// helpPlaced is one row or group header at its place on the card.
+type helpPlaced struct {
+	head  string
+	b     helpBinding
+	x, y  float64
+	lines []string
+}
+
 type helpFlow struct {
+	items    []helpPlaced
 	footY    float64
 	dismissY float64
 	bottom   float64
 }
 
+func helpRowLines(b helpBinding) []string { return wrapTextW(overlayDesc(b), helpDescW()) }
+
+func helpRowH(b helpBinding) float64 {
+	return math.Max(helpKeyH, float64(len(helpRowLines(b)))*helpLineH) + helpRowGap
+}
+
+// helpLayout places the groups in two columns, splitting near the middle
+// of the total height; a group never splits.
 func helpLayout(rows []helpBinding, footnote string) helpFlow {
-	y := helpTopY
-	for _, g := range helpSections(rows) {
-		y += helpHeadH + float64(len(g.Rows))*helpRowH + helpGroupH
+	card := helpCard()
+	secs := helpSections(rows)
+	heights := make([]float64, len(secs))
+	total := 0.0
+	for i, g := range secs {
+		heights[i] = helpHeadH + helpGroupH
+		for _, b := range g.Rows {
+			heights[i] += helpRowH(b)
+		}
+		total += heights[i]
 	}
-	f := helpFlow{footY: -1}
+	var f helpFlow
+	top := card.y + helpTopY
+	x := card.x + helpPad
+	y, run, colBottom := top, 0.0, top
+	for i, g := range secs {
+		if run > 0 && run+heights[i]/2 > total/2 && x == card.x+helpPad {
+			x, y = x+helpColW()+helpColGap, top
+		}
+		f.items = append(f.items, helpPlaced{head: g.Name, x: x, y: y})
+		y += helpHeadH
+		for _, b := range g.Rows {
+			f.items = append(f.items, helpPlaced{b: b, x: x, y: y, lines: helpRowLines(b)})
+			y += helpRowH(b)
+		}
+		y += helpGroupH
+		run += heights[i]
+		colBottom = math.Max(colBottom, y)
+	}
+	y = colBottom
+	f.footY = -1
 	if footnote != "" {
 		f.footY = y + helpFootGap
 		y += helpFootGap + uiTextH
 	}
-
-	f.dismissY = screenH - 40
-	if y+8 > f.dismissY {
-		f.dismissY = y + 8
-	}
+	f.dismissY = math.Max(card.y+card.h-helpPad-uiTextH, y+sp2)
 	f.bottom = f.dismissY + uiTextH
 	return f
 }
@@ -114,29 +190,40 @@ func overlayDesc(b helpBinding) string {
 }
 
 func drawHelpOverlay(dst *ebiten.Image, title string, rows []helpBinding, footnote string) {
+	vector.FillRect(dst, 0, 0, float32(screenW), float32(screenH), colHelpDim, false)
+	card := helpCard()
+	notchedFill(dst, card, colPanel)
+	notchedStroke(dst, card, 1, colPanelEdge)
+	drawTextScaled(dst, titleCase(strings.ToLower(title)), card.x+helpPad, card.y+helpPad, dispM, colNote)
 
-	vector.DrawFilledRect(dst, 0, 0, float32(screenW), float32(screenH), colHelpDim, false)
-	drawPanel(dst, helpCard(), colPanel, colPanelEdge)
-	drawTextScaled(dst, title, helpX, 24, uiTitleScl, colNote)
-
-	y := helpTopY
-	for _, g := range helpSections(rows) {
-		drawText(dst, strings.ToUpper(g.Name), helpX, y, colSounding)
-		y += helpHeadH
-		for _, b := range g.Rows {
-			col, desc := colNote, overlayDesc(b)
-			if b.Off {
-				col = colBarline
-			}
-			drawText(dst, b.Keys, helpKeysX, y, col)
-			drawText(dst, truncateW(desc, screenW-uiPadX-helpDescX), helpDescX, y, col)
-			y += helpRowH
-		}
-		y += helpGroupH
-	}
 	f := helpLayout(rows, footnote)
-	if footnote != "" {
-		drawText(dst, footnote, helpX, f.footY, colHUD)
+	for _, it := range f.items {
+		if it.head != "" {
+			drawSectionHeader(dst, it.x, it.y, 0, strings.ToUpper(it.head), 0)
+			continue
+		}
+		b := it.b
+		col, kcol := colNote, colDim
+		if b.Off {
+			col, kcol = colDisabled, colDisabled
+		}
+		if helpKeysFit(b.Keys) {
+			kx := it.x
+			for _, k := range helpKeycaps(b.Keys) {
+				w := helpKeycapW(k)
+				notchedStroke(dst, rect{kx, it.y, w, helpKeyH}, 1, colPanelEdge)
+				drawTextScaled(dst, k, kx+(w-textWScaled(k, dispS))/2, it.y+(helpKeyH-sizeDisplayS)/2-1, dispS, kcol)
+				kx += w + sp1
+			}
+		} else {
+			drawText(dst, b.Keys, it.x, it.y+1, kcol)
+		}
+		for j, l := range it.lines {
+			drawText(dst, l, it.x+helpKeysW+sp3, it.y+1+float64(j)*helpLineH, col)
+		}
 	}
-	drawText(dst, "esc, F1, ? or a click closes this", helpX, f.dismissY, colHUD)
+	if footnote != "" {
+		drawTextSmall(dst, footnote, card.x+helpPad, f.footY, colDim)
+	}
+	drawTextSmall(dst, "Esc, F1, ? or a click closes this", card.x+helpPad, f.dismissY, colBarline)
 }

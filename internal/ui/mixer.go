@@ -16,15 +16,9 @@ import (
 // the metronome, the backing track and every track.
 
 const (
-	mixCardW   = 600.0
 	mixHeadH   = 52.0
-	mixRowH    = 36.0
 	mixFootH   = 40.0
-	mixLabelW  = 210.0
-	mixValueW  = 56.0
 	mixPadX    = 22.0
-	mixBarH    = 6.0
-	mixKnobR   = 8.0
 	mixStep    = 0.05
 	mixMaxRows = 14
 )
@@ -141,19 +135,47 @@ func (a *App) toggleMixer() {
 	a.mixerDrag = -1
 }
 
-func (a *App) mixerCard(rows int) rect {
-	h := mixHeadH + float64(rows)*mixRowH + mixFootH
-	return rect{(screenW - mixCardW) / 2, (screenH - h) / 2, mixCardW, h}
+// The mixer's columns (REDESIGN §8): one per channel, each an instrument
+// icon, a vertical segmented fader, its value in mono, and the track's
+// mute / solo state. The keys are as before: up / down choose a channel,
+// left / right step it 5%.
+const (
+	mixColW     = 78.0
+	mixColGap   = 6.0
+	mixIconH    = iconSize + sp2
+	mixFaderH   = mixBlocks*(mixBlockH+mixBlockGap) - mixBlockGap
+	mixBlocks   = 20
+	mixBlockH   = 6.0
+	mixBlockW   = 28.0
+	mixBlockGap = 2.0
+	mixValueH   = uiTextH + sp2
+	mixLabelH   = 2*16 + sp2
+	mixStateH   = iconPx + sp2
+	mixColH     = mixIconH + mixFaderH + sp2 + mixValueH + mixStateH + mixLabelH
+)
+
+func (a *App) mixerCard(cols int) rect {
+	w := 2*mixPadX + float64(cols)*mixColW + float64(max(0, cols-1))*mixColGap
+	w = math.Max(w, textWSmall(mixFoot)+2*mixPadX)
+	h := mixHeadH + mixColH + mixFootH
+	return rect{math.Round((screenW - w) / 2), math.Round((screenH - h) / 2), w, h}
 }
 
+// mixerRowRect is channel i's column.
 func (a *App) mixerRowRect(card rect, i int) rect {
-	return rect{card.x, card.y + mixHeadH + float64(i)*mixRowH, card.w, mixRowH}
+	n := float64(len(a.mixerRows()))
+	used := n*mixColW + (n-1)*mixColGap
+	x0 := card.x + (card.w-used)/2
+	return rect{x0 + float64(i)*(mixColW+mixColGap), card.y + mixHeadH, mixColW, mixColH}
 }
 
-func (a *App) mixerBar(row rect) rect {
-	x := row.x + mixPadX + mixLabelW
-	return rect{x, row.y + (row.h-mixBarH)/2, row.x + row.w - mixPadX - mixValueW - x, mixBarH}
+// mixerBar is a column's fader: its value rises from the bottom.
+func (a *App) mixerBar(col rect) rect {
+	return rect{col.x + (col.w-mixBlockW)/2, col.y + mixIconH, mixBlockW, mixFaderH}
 }
+
+// mixValueAt is the volume a pointer at y means on a fader.
+func mixValueAt(bar rect, y float64) float64 { return (bar.y + bar.h - y) / bar.h }
 
 // updateMixer takes all input while the mixer is open.
 func (a *App) updateMixer() {
@@ -193,7 +215,7 @@ func (a *App) mixerMouse(p pointer, rows []mixerRow) {
 		}
 		// A drag is direct: the value follows the pointer 1:1.
 		bar := a.mixerBar(a.mixerRowRect(card, a.mixerDrag))
-		a.mixSet(rows[a.mixerDrag], (p.x-bar.x)/bar.w)
+		a.mixSet(rows[a.mixerDrag], mixValueAt(bar, p.y))
 		return
 	}
 	if !p.pressed {
@@ -210,10 +232,10 @@ func (a *App) mixerMouse(p pointer, rows []mixerRow) {
 		}
 		a.mixerSel = i
 		bar := a.mixerBar(rr)
-		grab := rect{bar.x - mixKnobR, rr.y, bar.w + 2*mixKnobR, rr.h}
+		grab := rect{rr.x, bar.y - sp2, rr.w, bar.h + 2*sp2}
 		if p.over(grab) {
 			a.mixerDrag = i
-			a.mixSet(rows[i], (p.x-bar.x)/bar.w)
+			a.mixSet(rows[i], mixValueAt(bar, p.y))
 		}
 		return
 	}
@@ -226,38 +248,84 @@ func (a *App) drawMixer(screen *ebiten.Image) {
 }
 
 func (a *App) paintMixer(c *ebiten.Image, rows []mixerRow, card rect) {
-	drawPanel(c, card, colPanel, colPanelEdge)
-	drawText(c, "MIXER", card.x+mixPadX, card.y+16, colInferred)
-	drawTextRight(c, a.mixerHeadNote(rows), card.x+card.w-mixPadX, card.y+16, colDim)
+	notchedFill(c, card, colPanel)
+	notchedStroke(c, card, 1, colPanelEdge)
+	drawSectionHeader(c, card.x+mixPadX, card.y+sp4+2, 0, "MIXER", 0)
+	note := a.mixerHeadNote(rows)
+	drawTextSmall(c, note, card.x+card.w-mixPadX-textWSmall(note), card.y+sp4+2, colDim)
 
 	m := a.eng.Mix()
+	short := a.shortTrackNames()
 	for i, r := range rows {
-		rr := a.mixerRowRect(card, i)
+		col := a.mixerRowRect(card, i)
 		val := mixGet(m, r)
-		if i == a.mixerSel {
-			vector.DrawFilledRect(c, float32(rr.x+1), float32(rr.y), float32(rr.w-2), float32(rr.h), colFocus, false)
+		sel := i == a.mixerSel
+		if sel {
+			notchedFill(c, col, colHover)
+			vector.FillRect(c, float32(col.x+2), float32(col.y), float32(col.w-4), 3, tokBrand, false)
 		}
-		labelCol := colHUD
-		if r.kind == mixTrack && r.track == a.track {
-			labelCol = colInferred // your track, as on the track chips
+		ink := colDim
+		if sel || a.mixerDrag == i {
+			ink = colNote
 		}
-		drawText(c, truncateW(r.label, mixLabelW-12), rr.x+mixPadX, rr.y+(rr.h-uiTextH)/2, labelCol)
+		icon, line1, line2 := a.mixerChannel(r, short)
+		drawPixelIcon(c, icon, math.Round(col.x+(col.w-iconSize)/2), col.y+sp1, ink)
 
-		bar := a.mixerBar(rr)
-		fillRounded(c, bar, colBG)
-		filled := bar
-		filled.w = bar.w * val
-		if filled.w > 0 {
-			fillRounded(c, filled, colOnEdge)
+		bar := a.mixerBar(col)
+		lit := int(math.Round(val * mixBlocks))
+		for b := 0; b < mixBlocks; b++ {
+			bc := colBlockOff
+			if b < lit {
+				bc = ink
+			}
+			y := bar.y + bar.h - float64(b+1)*(mixBlockH+mixBlockGap) + mixBlockGap
+			vector.FillRect(c, float32(bar.x), float32(y), mixBlockW, mixBlockH, bc, false)
 		}
-		kx, ky := float32(bar.x+bar.w*val), float32(bar.y+bar.h/2)
-		knob := colNote
-		if a.ptr.over(rect{bar.x - mixKnobR, rr.y, bar.w + 2*mixKnobR, rr.h}) || a.mixerDrag == i {
-			knob = colSounding
+
+		y := bar.y + bar.h + sp2
+		v := fmt.Sprintf("%d%%", int(math.Round(val*100)))
+		drawMonoSized(c, v, math.Round(col.x+(col.w-textWMonoSized(v, sizeUI))/2), y, sizeUI, ink)
+		y += mixValueH
+		if r.kind == mixTrack {
+			st, stCol := icSpeakerOn, colBarline
+			switch {
+			case a.solo == r.track+1:
+				st, stCol = icSolo, colNote
+			case a.mutedAudibly(r.track):
+				st, stCol = icSpeakerMuted, colDim
+			}
+			drawPixelIconScaled(c, st, math.Round(col.x+(col.w-iconPx)/2), y, 1, stCol)
 		}
-		vector.DrawFilledCircle(c, kx, ky, mixKnobR, knob, true)
-		drawTextRight(c, fmt.Sprintf("%d%%", int(math.Round(val*100))), rr.x+rr.w-mixPadX, rr.y+(rr.h-uiTextH)/2, colHUD)
+		y += mixStateH
+		labelCol := colDim
+		if r.kind == mixTrack && r.track == a.track {
+			labelCol = colNote // your track
+		}
+		for j, l := range []string{line1, line2} {
+			l = truncateW(l, col.w-4)
+			drawTextSmall(c, l, math.Round(col.x+(col.w-textWSmall(l))/2), y+float64(j)*16, labelCol)
+		}
 	}
-	foot := "up/down choose   left/right 5%   drag a slider   space play/pause"
-	drawText(c, foot, centreX(foot, card.x, card.w), card.y+card.h-mixFootH+12, colDim)
+	drawTextSmall(c, mixFoot, math.Round(card.x+(card.w-textWSmall(mixFoot))/2), card.y+card.h-mixFootH+12, colBarline)
 }
+
+// mixerChannel is a column's icon and its two label lines.
+func (a *App) mixerChannel(r mixerRow, short []string) (iconID, string, string) {
+	switch r.kind {
+	case mixMaster:
+		return icSpeakerOn, "Master", ""
+	case mixClick:
+		return icMetronome, "Metronome", ""
+	case mixBacking:
+		return icMixer, "Backing", "track"
+	}
+	_, icon := instrumentOf(a.sc.Tracks[r.track])
+	name := short[r.track]
+	line1, line2 := name, ""
+	if j := strings.Index(name, " · "); j >= 0 {
+		line1, line2 = name[:j], name[j+len(" · "):]
+	}
+	return icon, fmt.Sprintf("%d %s", r.track+1, line1), line2
+}
+
+const mixFoot = "up/down choose   left/right 5%   drag a fader   space play/pause"

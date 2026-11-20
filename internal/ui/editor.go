@@ -234,13 +234,12 @@ func (e *Editor) Draw(screen *ebiten.Image) {
 		e.drawFirstSteps(screen)
 	}
 	if msg, isErr := e.message(); msg != "" {
-		col := colSounding
+		col := colNote
 		if isErr {
 			col = colMiss
 		}
-		drawText(screen, truncateW(msg, screenW-2*uiPadX), uiPadX, uiFooterY-20, col)
+		drawText(screen, truncateW(msg, screenW-2*uiPadX), uiPadX, pageBottom()-20, col)
 	}
-	drawFooter(screen, e.hintLine())
 
 	if e.modalUp() {
 		e.tip.hide()
@@ -407,7 +406,7 @@ func (e *Editor) systemHeight() float64 {
 	return edSysPadTop + float64(n-1)*edStringGap + edSysPadBottom + edSysGap
 }
 
-func gridBottom() float64 { return uiFooterY - 28 }
+func gridBottom() float64 { return pageBottom() - 28 }
 
 func systemOfBar(systems []edSystem, bar int) int {
 	for si, s := range systems {
@@ -505,12 +504,12 @@ func (e *Editor) drawBar(screen *ebiten.Image, tr *score.Track, box edBarBox, st
 	meter, tempo := e.barMarking(box.index, bar)
 	mx := float64(x) + 4
 	if meter != "" {
-		drawTextSmall(screen, meter, mx, strTop-13, colInferred)
+		drawTextSmall(screen, meter, mx, strTop-13, colDim)
 		mx += textWSmall(meter) + 10
 	}
 	if tempo != "" {
-		drawGlyph(screen, glyphNoteQuarter, rect{mx, strTop - 15, 12, 13}, colInferred)
-		drawTextSmall(screen, tempo, mx+13, strTop-13, colInferred)
+		drawGlyph(screen, glyphNoteQuarter, rect{mx, strTop - 15, 12, 13}, colDim)
+		drawTextSmall(screen, tempo, mx+13, strTop-13, colDim)
 	}
 
 	type pendingMark struct {
@@ -594,7 +593,7 @@ func (e *Editor) drawBar(screen *ebiten.Image, tr *score.Track, box edBarBox, st
 			}
 			col := colNote
 			if n.Inferred {
-				col = colInferred
+				col = colInferredNote
 			}
 			w := float32(textWMono(label))
 			vector.DrawFilledRect(screen, float32(bx-2), float32(ny-9), w+4, 18, bg(n.String), false)
@@ -612,7 +611,7 @@ func (e *Editor) drawBar(screen *ebiten.Image, tr *score.Track, box edBarBox, st
 		}
 	}
 	for _, m := range marks {
-		drawTextSmall(screen, m.s, m.x, m.y, colSounding)
+		drawTextSmall(screen, m.s, m.x, m.y, colTechMark)
 	}
 }
 
@@ -692,10 +691,10 @@ func (e *Editor) drawFirstSteps(screen *ebiten.Image) {
 	if e.doc.Track().Wind != nil {
 		lines, tail = windFirstStepsContent()
 	}
-	drawText(screen, "Writing a piece", edGridX, y, colInferred)
+	drawText(screen, "Writing a piece", edGridX, y, colDim)
 	for i, l := range lines {
 		ly := y + 26 + float64(i)*22
-		drawTextMono(screen, l.key, edGridX, ly, colSounding)
+		drawTextMono(screen, l.key, edGridX, ly, colNote)
 		drawText(screen, l.what, edGridX+64, ly, colHUD)
 	}
 	drawTextSmall(screen, tail, edGridX, y+26+float64(len(lines))*22+8, colHint)
@@ -1482,35 +1481,30 @@ func (e *Editor) leavePromptSpots(out *edLeaveChoice) []hotspot {
 func edPromptRect() rect { return rect{screenW/2 - 280, screenH/2 - 90, 560, 180} }
 
 func (e *Editor) drawLeavePrompt(screen *ebiten.Image) {
-	vector.DrawFilledRect(screen, 0, 0, float32(screenW), float32(screenH), colHelpDim, false)
+	vector.FillRect(screen, 0, 0, float32(screenW), float32(screenH), colHelpDim, false)
 	r := edPromptRect()
-	drawPanel(screen, r, colPanel, colSounding)
-	title := "This piece has unsaved changes"
-	drawTextScaled(screen, title, centreXScaled(title, r.x, r.w, dispS), r.y+22, dispS, colNote)
-	sub := "Save it before leaving?"
-	drawText(screen, sub, centreX(sub, r.x, r.w), r.y+62, colHUD)
+	y := drawDialogCard(screen, r, "Unsaved changes")
+	drawText(screen, "This piece has unsaved changes. Save it before leaving?", r.x+sp6, y, colDim)
 
 	bw, bh := 150.0, 34.0
-	y := r.y + r.h - bh - 16
+	by := r.y + r.h - bh - 16
 	for i, b := range []struct {
 		label string
-		key   string
 		r     rect
 	}{
-		{"Save", "S", rect{r.x + 16, y, bw, bh}},
-		{"Discard", "D", rect{r.x + 16 + bw + 12, y, bw, bh}},
-		{"Cancel", "esc", rect{r.x + r.w - bw - 16, y, bw, bh}},
+		{"Save", rect{r.x + 16, by, bw, bh}},
+		{"Discard", rect{r.x + 16 + bw + 12, by, bw, bh}},
+		{"Cancel", rect{r.x + r.w - bw - 16, by, bw, bh}},
 	} {
-		fill, edge := colPanel, colPanelEdge
-		if i == 0 {
-			fill, edge = colFocus, colInferred
+		kind := kitSecondary
+		switch i {
+		case 0:
+			kind = kitPrimary
+		case 1:
+			kind = kitDestructive
 		}
-		if e.ptr.over(b.r) {
-			edge = colNote
-		}
-		drawPanel(screen, b.r, fill, edge)
-		drawText(screen, b.label, centreX(b.label, b.r.x, b.r.w), b.r.y+4, colNote)
-		drawTextSmall(screen, b.key, b.r.x+(b.r.w-textWSmall(b.key))/2, b.r.y+20, colDim)
+		over := e.ptr.over(b.r)
+		drawKitButton(screen, b.r, b.label, -1, kind, btnState{hover: over, press: over && e.ptr.down})
 	}
 }
 

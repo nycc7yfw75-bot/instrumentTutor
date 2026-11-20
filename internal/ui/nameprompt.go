@@ -1,12 +1,12 @@
 package ui
 
 import (
+	"math"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
-	"github.com/hajimehoshi/ebiten/v2/vector"
 
 	"github.com/S95F/musicTutor/internal/progress"
 )
@@ -88,42 +88,36 @@ func (p *NamePrompt) Update() error {
 	return nil
 }
 
+// nameCard is the prompt's card, centred on the screen (REDESIGN §8).
+func nameCard() rect {
+	return rect{math.Round((screenW - 480) / 2), math.Round(screenH/2 - 120), 480, 236}
+}
+
 func (p *NamePrompt) fieldRect() rect {
-	return rect{(screenW - 420) / 2, screenH/2 - 10, 420, uiTextH + 20}
+	c := nameCard()
+	return rect{c.x + sp6, c.y + sp4 + sizeDisplayM + sp3 + uiTextH + sp3, c.w - 2*sp6, 40}
 }
 
 func (p *NamePrompt) saveRect() rect {
-	f := p.fieldRect()
-	label := "Save"
-	w := textW(label) + 2*settingsBtnPad
-	return rect{f.x + f.w - w, f.y + f.h + 16, w, settingsBtnH}
+	c := nameCard()
+	w := kitButtonW("Save", kitPrimary, false)
+	return rect{c.x + c.w - sp6 - w, c.y + c.h - sp4 - btnHPrimary, w, btnHPrimary}
 }
 
 func (p *NamePrompt) Draw(dst *ebiten.Image) {
 	dst.Fill(colBG)
-	x := drawEscButton(dst, escBackChip, &p.anim, p.ptr)
-	drawHeaderAt(dst, x, "Your name", "Your progress is saved under it", colDim)
+	drawEscButton(dst, escBackChip, &p.anim, p.ptr)
 
+	c := nameCard()
+	y := drawDialogCard(dst, c, "Your name")
+	drawText(dst, "What should we call you? Your progress is saved under it.", c.x+sp6, y, colDim)
 	f := p.fieldRect()
-	q := "What should we call you?"
-	drawText(dst, q, f.x, f.y-34, colNote)
-	drawPanel(dst, f, colPanel, colPanelEdge)
-	tx, ty := f.x+10, f.y+10
-	drawText(dst, p.name, tx, ty, colNote)
-	if int(p.clock*2)%2 == 0 { // the caret blinks once a second
-		cx := float32(tx + textW(p.name) + 1)
-		vector.FillRect(dst, cx, float32(ty-1), 2, uiTextH+2, colSounding, false)
-	}
+	drawField(dst, f, p.name, 0, int(p.clock*2)%2 == 0) // the caret blinks once a second
 	if p.err != "" {
-		drawText(dst, p.err, f.x, f.y+f.h+20, colClose)
+		drawText(dst, p.err, f.x, f.y+f.h+sp2, colClose)
 	}
-
+	drawTextSmall(dst, "Enter saves · Esc asks again later", c.x+sp6, c.y+c.h-sp4-btnHPrimary/2-8, colBarline)
 	s := p.saveRect()
-	fill, edge, tc := colPanel, colPanelEdge, colHUD
-	if p.ptr.over(s) {
-		fill, edge, tc = colHover, colDim, colNote
-	}
-	drawPanel(dst, s, fill, edge)
-	drawText(dst, "Save", centreX("Save", s.x, s.w), settingsBtnTextY(s), tc)
-	drawFooter(dst, "type your name   ·   enter save   ·   esc later")
+	over := p.ptr.over(s)
+	drawKitButton(dst, s, "Save", -1, kitPrimary, btnState{hover: over, press: over && p.ptr.down})
 }
