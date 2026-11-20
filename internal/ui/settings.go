@@ -11,6 +11,9 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
+
+	"github.com/S95F/musicTutor/internal/progress"
+	"github.com/S95F/musicTutor/internal/scoring"
 )
 
 const settingsDefaultRate = 48000
@@ -26,6 +29,8 @@ const (
 	srSyncTrim
 	// srTap starts a tap calibration (pluck along to clicks).
 	srTap
+	// srProfile renames the player.
+	srProfile
 )
 
 type calPhase int
@@ -350,6 +355,9 @@ func resolveDevice(opts []DeviceOption, id string) int {
 
 func (s *Settings) rebuild() {
 	s.rows = s.rows[:0]
+	if s.progress() != nil {
+		s.rows = append(s.rows, srProfile)
+	}
 	if s.hasDevices() {
 		s.rows = append(s.rows, srCapture, srPlayback, srCalibrate)
 		if s.canTap() {
@@ -511,6 +519,10 @@ func (s *Settings) adjust(d int) {
 		if d > 0 {
 			s.startCalibrationKind(true)
 		}
+	case srProfile:
+		if d > 0 {
+			s.askName()
+		}
 	}
 }
 
@@ -525,6 +537,8 @@ func (s *Settings) activate() {
 	switch r {
 	case srTap:
 		s.startCalibrationKind(true)
+	case srProfile:
+		s.askName()
 	case srCapture, srPlayback:
 		s.notice = ""
 		if s.deviceStateOf(r) == devUnchosen {
@@ -1202,6 +1216,20 @@ func (s *Settings) items() []settingsItem {
 	}
 	b.note(backend, colBarline)
 
+	if st := s.progress(); st != nil {
+		b.section("PROFILE")
+		name, xp, ok := st.Active()
+		value, label := "not set yet", "add name"
+		if ok {
+			lvl := xp.Level()
+			value, label = fmt.Sprintf("%s  ·  level %d, %s", name, lvl, scoring.Title(lvl)), "rename"
+		}
+		b.addRow("player", value, colHUD, settingsButton{label: label, act: func(s *Settings) {
+			s.focusRow(srProfile)
+			s.askName()
+		}})
+	}
+
 	b.section("AUDIO DEVICES")
 	if s.hasDevices() {
 		b.addRow("capture", deviceText(s.capture, s.capIdx, s.deviceStateOf(srCapture)), colHUD,
@@ -1496,4 +1524,18 @@ func (s *Settings) framesMS(frames int) float64 {
 		rate = settingsDefaultRate
 	}
 	return float64(frames) * 1000 / float64(rate)
+}
+
+func (s *Settings) progress() *progress.Store {
+	if s.sh == nil {
+		return nil
+	}
+	return s.sh.Services().Progress
+}
+
+// askName opens the name prompt over Settings.
+func (s *Settings) askName() {
+	if st := s.progress(); st != nil {
+		s.sh.Show(NewNamePrompt(s.sh, st))
+	}
 }

@@ -20,8 +20,9 @@ const (
 type curve struct{ x1, y1, x2, y2 float64 }
 
 var (
-	curveEnter = curve{0.32, 0.72, 0, 1} // appearing
-	curveExit  = curve{0.55, 0, 1, 0.45} // leaving
+	curveEnter = curve{0.32, 0.72, 0, 1}  // appearing
+	curveExit  = curve{0.55, 0, 1, 0.45}  // leaving
+	curveMove  = curve{0.77, 0, 0.175, 1} // moving or resizing in place
 )
 
 func bez(a, b, t float64) float64 {

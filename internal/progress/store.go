@@ -137,6 +137,9 @@ func Open() (*Store, error) {
 	return openAt(p, time.Now)
 }
 
+// OpenFile opens progress kept at path (tests, and a portable install).
+func OpenFile(path string) (*Store, error) { return openAt(path, time.Now) }
+
 func openAt(path string, now func() time.Time) (*Store, error) {
 	s := &Store{path: path, now: now, f: File{Version: version, Profiles: map[string]*Profile{}}}
 	data, err := os.ReadFile(path)

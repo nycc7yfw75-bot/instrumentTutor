@@ -109,3 +109,6 @@ func limit(buf []float32) {
 		buf[i] = float32(math.Copysign(y, float64(s)))
 	}
 }
+
+// SampleRate is the engine's output sample rate.
+func (e *Engine) SampleRate() int { return e.sampleRate }

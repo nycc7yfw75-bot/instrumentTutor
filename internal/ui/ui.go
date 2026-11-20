@@ -125,6 +125,7 @@ type App struct {
 
 	tip tips // hover tooltips carrying each menu item's key
 
+	game gameUI // scoring, excitement, XP: the game layer
 	mixerUI
 	warnListUI
 	inputHintUI
@@ -182,6 +183,7 @@ func (a *App) SetQuitAll(fn func()) { a.quitAll = fn }
 func (a *App) Update() error {
 	a.frame++
 	a.syncLive()
+	a.gameStep()
 	a.checkAudioStalled()
 
 	a.stepPlayhead()
@@ -207,12 +209,21 @@ func (a *App) Update() error {
 		a.updateWarnList()
 		return nil
 	}
+	if a.gameModal() {
+		return nil
+	}
+	if a.reviewModal() {
+		return nil
+	}
 	if a.warningVisible() && inpututil.IsKeyJustPressed(ebiten.KeyD) {
 		a.dismissWarning()
 		return nil
 	}
 	if escButtonPressed(a.backChip(), a.ptr) {
 		return errQuit
+	}
+	if a.gameClick(a.ptr) {
+		return nil
 	}
 	if err := a.handleKeys(); err != nil {
 		return err
@@ -273,6 +284,10 @@ func (a *App) handleKeys() error {
 			a.cycleTrack(-1)
 		} else {
 			a.cycleTrack(1)
+		}
+	case inpututil.IsKeyJustPressed(ebiten.KeyP):
+		if a.game.sess != nil {
+			a.toggleReview()
 		}
 	case inpututil.IsKeyJustPressed(ebiten.KeyT):
 		a.tunerView = !a.tunerView
@@ -711,6 +726,8 @@ var practiceBindings = []practiceBinding{
 		Enabled: func(a *App) bool { return a.waitCtl },
 		Caveat:  liveInputCaveat(func(a *App) bool { return a.waitCtl })},
 
+	{Group: "practice", Keys: "P", Desc: "Review your last pass: the timing of every note, and where you rushed or dragged",
+		Enabled: func(a *App) bool { return a.game.review.pass != nil }},
 	{Group: "practice", Keys: "+ / -", Desc: "Zoom the notation in / out (or the wheel over it)"},
 
 	{Group: "session", Keys: "S", Hint: "S settings", Desc: "Settings, without leaving the piece",
@@ -872,6 +889,8 @@ func (a *App) drawTab(screen *ebiten.Image) {
 		vector.StrokeLine(screen, x, tabTop-14, x, float32(bandBottom+14), 2, colBarline, false)
 	}
 
+	a.drawGhosts(screen, tickToX, posTick)
+
 	vector.StrokeLine(screen, phX, tabTop-24, phX, float32(bandBottom+24), 2, colPlayhead, false)
 
 }
@@ -904,6 +923,10 @@ func (a *App) drawHUD(screen *ebiten.Image, l practiceLayout) {
 	}
 	if a.live {
 		a.drawLiveHUD(screen)
+	}
+	if a.game.sess != nil {
+		a.drawGameHUD(screen)
+	} else if a.live {
 		a.drawLegend(screen)
 	}
 	if msg := a.bpmMessage(); msg != "" {

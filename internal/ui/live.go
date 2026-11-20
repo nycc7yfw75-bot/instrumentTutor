@@ -161,6 +161,8 @@ func (a *App) syncLive() {
 		}
 	}
 
+	a.gameResults(rs)
+
 	a.live = status != nil
 	if status != nil {
 		a.levelDB, a.dropped = status()
@@ -240,7 +242,15 @@ func (a *App) drawLiveHUD(screen *ebiten.Image) {
 	tx := x0 + meterW*float32(57.0/60.0)
 	vector.StrokeLine(screen, tx, y0-2, tx, y0+meterH+2, 1, colBarline, false)
 
-	drawTextRight(screen, liveStatsLine(a.stats), screenW-uiPadX, float64(y0)+18, colHUD)
+	line := liveStatsLine(a.stats)
+	if a.game.sess != nil {
+		pass := a.game.sess.Pass()
+		if !a.game.passOn {
+			pass = a.game.lastSummary
+		}
+		line = gameStatsLine(a.stats, pass)
+	}
+	drawTextRight(screen, line, screenW-uiPadX, float64(y0)+18, colHUD)
 	if a.dropped > 0 {
 		d := fmt.Sprintf("dropped %d samples", a.dropped)
 		if hint == "" {

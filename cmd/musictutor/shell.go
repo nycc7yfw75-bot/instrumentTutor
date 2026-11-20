@@ -19,7 +19,9 @@ import (
 	"github.com/S95F/musicTutor/internal/audio"
 	"github.com/S95F/musicTutor/internal/engine"
 	"github.com/S95F/musicTutor/internal/live"
+	"github.com/S95F/musicTutor/internal/progress"
 	"github.com/S95F/musicTutor/internal/score"
+	"github.com/S95F/musicTutor/internal/scoring"
 	"github.com/S95F/musicTutor/internal/ui"
 )
 
@@ -34,7 +36,14 @@ func runShell(initialPath string) error {
 	opener := &shellOpener{prefs: prefs}
 	defer opener.CloseCurrent()
 
+	store, perr := progress.Open()
+	if perr != nil {
+		fmt.Fprintln(os.Stderr, "warning: progress unavailable, playing without saving it:", perr)
+		store = nil
+	}
+	opener.store = store
 	svc := ui.Services{Opener: opener, Prefs: prefs, Library: pieceLibrary{}}
+	svc.Progress = store
 
 	if b := audio.Available(); b != nil {
 		svc.Audio = &shellAudio{backend: b, prefs: prefs}
@@ -53,6 +62,10 @@ func runShell(initialPath string) error {
 
 	browser.SetNewPiece(func() { opener.showEditor(nil, "") })
 	browser.SetEditPiece(opener.editPiece)
+
+	if store != nil && store.NeedsProfile() {
+		sh.Show(ui.NewNamePrompt(sh, store))
+	}
 
 	if initialPath != "" {
 		browser.OfferDialogResult(initialPath, "")
@@ -480,6 +493,7 @@ func (a *shellAudio) CalibrateContext(ctx context.Context, captureID, playbackID
 type shellOpener struct {
 	prefs *shellPrefs
 	shell *ui.Shell
+	store *progress.Store // nil: progress is not saved
 
 	browser *ui.Browser
 
@@ -671,6 +685,13 @@ func (o *shellOpener) Open(path string) (ui.Screen, []string, error) {
 	}
 	if msg := composeBanner(conds); msg != "" {
 		app.SetLiveWarning(msg)
+	}
+	if o.store != nil {
+		capID, playID := o.prefs.Devices()
+		conf, ok := o.prefs.confidenceFor(capID, playID)
+		_, hasOff := o.prefs.offsetFor(capID, playID)
+		app.SetProgress(o.store, progress.SongID(sc), sc.Title, path, ok && hasOff && conf >= scoring.CredibleConfidence)
+		app.SetNameAsker(func() { o.shell.Show(ui.NewNamePrompt(o.shell, o.store)) })
 	}
 	o.cur = &openPiece{path: path, app: app, eng: eng}
 	return app, warns, nil

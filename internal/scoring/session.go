@@ -40,6 +40,10 @@ func NewSession(sc *score.Score, track, sampleRate int, credible bool) *Session 
 // Credible reports whether this session's XP and excitement count.
 func (s *Session) Credible() bool { return s.credible }
 
+// SetCredible changes the gate mid-session (wait mode switched on or off,
+// audio dropped): an uncredible session's excitement stops moving.
+func (s *Session) SetCredible(c bool) { s.credible = c }
+
 // Add takes one result from the practice scorer and returns the judgements
 // it completes: one for a single note, none while a chord's other notes
 // are still to come, one for the chord once they have all arrived.
@@ -138,6 +142,9 @@ func (s *Session) EndPass() Summary {
 	s.pass = Summary{}
 	return p
 }
+
+// Pass is the pass so far.
+func (s *Session) Pass() Summary { return s.pass }
 
 // Run is everything judged since the session started.
 func (s *Session) Run() Summary { return s.run }

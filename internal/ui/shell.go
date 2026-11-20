@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
+
+	"github.com/S95F/musicTutor/internal/progress"
 )
 
 type Screen interface {
@@ -30,6 +32,9 @@ type Services struct {
 	Audio AudioServices
 
 	Library Library
+
+	// Progress is the player's saved progress; nil turns the game layer off.
+	Progress *progress.Store
 }
 
 type PieceInfo struct {
