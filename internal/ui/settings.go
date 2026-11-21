@@ -1243,6 +1243,11 @@ func (s *Settings) items() []settingsItem {
 		b.addRow("player", value, colHUD, settingsButton{label: label, act: func(s *Settings) {
 			s.focusRow(srProfile)
 			s.askName()
+		}}, settingsButton{label: "profiles", act: func(s *Settings) {
+			s.focusRow(srProfile)
+			if s.sh != nil {
+				s.sh.Show(NewProfilesScreen(s.sh, st))
+			}
 		}})
 		if s.hasCareer() {
 			cs := st.Career()

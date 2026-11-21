@@ -61,6 +61,10 @@ type Profile struct {
 	// Practice, by "songID#track", never removed.
 	Career   career.State              `json:"career"`
 	Mastered map[string]career.Mastery `json:"mastered,omitempty"`
+	// Tint is the profile's colour in battles, 0..5 (BATTLES.md §3).
+	Tint int `json:"tint"`
+	// Battles is the profile's battle record (BATTLES.md §8.2).
+	Battles BattleRecord `json:"battles"`
 }
 
 // Best is a song track's best scored results.
@@ -215,7 +219,7 @@ func (s *Store) CreateProfile(name string) (id string, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	id = newID()
-	s.f.Profiles[id] = &Profile{Name: name, Created: s.now(), Level: 1}
+	s.f.Profiles[id] = &Profile{Name: name, Created: s.now(), Level: 1, Tint: s.freeTintLocked()}
 	s.f.ActiveProfile = id
 	return id, s.saveLocked()
 }

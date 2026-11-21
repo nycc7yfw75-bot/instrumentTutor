@@ -119,3 +119,17 @@ const (
 	dispL = sizeDisplayL / fontBody // 32
 	dispX = sizeDisplayX / fontBody // 48
 )
+
+// Profile tints p1..p6 (BATTLES.md §3): one per local player, never the
+// brand amber and never a verdict colour.
+var profileTints = [6]color.RGBA{
+	hex(0x6FA8DC), // p1 blue
+	hex(0xB48EDB), // p2 violet
+	hex(0x4FC1D9), // p3 cyan
+	hex(0xE58FB5), // p4 pink
+	hex(0x9AA6C7), // p5 slate
+	hex(0xC9B79C), // p6 sand
+}
+
+// profileTint is a profile's colour.
+func profileTint(i int) color.RGBA { return profileTints[((i%6)+6)%6] }
