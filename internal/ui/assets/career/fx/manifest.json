@@ -1,0 +1,12 @@
+{
+  "group": "fx",
+  "sprites": [
+    {"name": "phone", "image": "placeholder:phone", "frameW": 4, "frameH": 4, "anims": [{"name": "glow", "frames": 2, "row": 0}], "anchor": [2, 4], "layer": "fx", "pos": [0, 0]},
+    {"name": "beam", "image": "placeholder:beam:stadium", "frameW": 32, "frameH": 120, "anims": [{"name": "still", "frames": 1, "row": 0}], "anchor": [16, 0], "layer": "lights", "pos": [0, 0]},
+    {"name": "confetti", "image": "placeholder:confetti", "frameW": 4, "frameH": 4, "anims": [{"name": "fall", "frames": 3, "row": 0}], "anchor": [2, 2], "layer": "fx", "pos": [0, 0]},
+    {"name": "boo", "image": "placeholder:boo", "frameW": 24, "frameH": 10, "anims": [{"name": "puff", "frames": 3, "row": 0}], "anchor": [12, 10], "layer": "fx", "pos": [0, 0]},
+    {"name": "flames", "image": "placeholder:flames", "frameW": 16, "frameH": 16, "anims": [{"name": "burn", "frames": 3, "row": 0}], "anchor": [8, 16], "layer": "fx", "pos": [0, 0]},
+    {"name": "star", "image": "placeholder:star", "frameW": 16, "frameH": 16, "anims": [{"name": "unlit", "frames": 1, "row": 0}, {"name": "lit", "frames": 1, "row": 1}], "anchor": [8, 8], "layer": "fx", "pos": [0, 0]},
+    {"name": "rec", "image": "placeholder:rec", "frameW": 6, "frameH": 6, "anims": [{"name": "blink", "frames": 2, "row": 0}], "anchor": [3, 3], "layer": "fx", "pos": [452, 24]}
+  ]
+}

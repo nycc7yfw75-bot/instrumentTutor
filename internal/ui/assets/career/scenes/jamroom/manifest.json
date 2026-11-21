@@ -1,0 +1,9 @@
+{
+  "group": "scenes/jamroom",
+  "sprites": [
+    {"name": "sky", "image": "placeholder:sky:jamroom", "frameW": 480, "frameH": 200, "anims": [{"name": "still", "frames": 1, "row": 0}], "anchor": [0, 0], "layer": "backdrop", "pos": [0, 0]},
+    {"name": "interior", "image": "placeholder:interior:jamroom", "frameW": 480, "frameH": 200, "anims": [{"name": "still", "frames": 1, "row": 0}], "anchor": [0, 0], "layer": "interior", "pos": [0, 0]},
+    {"name": "lights", "image": "placeholder:lights:jamroom", "frameW": 480, "frameH": 200, "anims": [{"name": "cycle", "frames": 4, "row": 0}], "anchor": [0, 0], "layer": "lights", "pos": [0, 0]},
+    {"name": "stage", "image": "placeholder:stage:jamroom", "frameW": 480, "frameH": 200, "anims": [{"name": "still", "frames": 1, "row": 0}], "anchor": [0, 0], "layer": "stage", "pos": [0, 0]}
+  ]
+}

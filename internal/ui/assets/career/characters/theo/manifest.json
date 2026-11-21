@@ -1,0 +1,8 @@
+{
+  "group": "characters/theo",
+  "sprites": [
+    {"name": "guitarist", "image": "placeholder:guitarist:theo", "frameW": 32, "frameH": 48,
+     "anims": [{"name": "idle", "frames": 2, "row": 0}, {"name": "strum", "frames": 4, "row": 1}, {"name": "cheer", "frames": 2, "row": 2}, {"name": "bow", "frames": 3, "row": 3}, {"name": "slump", "frames": 3, "row": 4}],
+     "anchor": [16, 48], "layer": "guitarist", "pos": [140, 168]}
+  ]
+}

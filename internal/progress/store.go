@@ -12,12 +12,13 @@ import (
 	"time"
 
 	"github.com/S95F/musicTutor/internal/appconfig"
+	"github.com/S95F/musicTutor/internal/career"
 	"github.com/S95F/musicTutor/internal/scoring"
 )
 
 const (
 	fileName     = "progress.json"
-	version      = 1
+	version      = 2   // 2: career and mastery (CAREER.md §5.2)
 	backupCopies = 3   // progress.json.1 .. .3, rotated on every save
 	maxPassLog   = 200 // passes kept per profile
 	maxReplays   = 300 // best-pass replays kept per profile
@@ -56,6 +57,10 @@ type Profile struct {
 	Badges map[string]time.Time `json:"badges,omitempty"`
 	// Totals are the counters the badges read.
 	Totals Totals `json:"totals"`
+	// Career is the tour (CAREER.md §5.2); Mastered the songs mastered in
+	// Practice, by "songID#track", never removed.
+	Career   career.State              `json:"career"`
+	Mastered map[string]career.Mastery `json:"mastered,omitempty"`
 }
 
 // Best is a song track's best scored results.
@@ -122,6 +127,9 @@ type Store struct {
 	// sessionSecs is this run of the app's playing time (Five More
 	// Minutes); it is not saved.
 	sessionSecs float64
+
+	// readOnly: the file was saved by a newer HEADLINER; never write it.
+	readOnly bool
 }
 
 // Path is where progress.json lives: beside config.json.
@@ -161,10 +169,19 @@ func openAt(path string, now func() time.Time) (*Store, error) {
 		return nil, fmt.Errorf("progress: reading %s: %w", path, err)
 	}
 	var f File
-	if err := json.Unmarshal(data, &f); err != nil || f.Version != version {
+	if err := json.Unmarshal(data, &f); err != nil || f.Version < 1 {
 		bad := fmt.Sprintf("%s.bad-%s", path, now().Format("20060102-150405"))
 		_ = os.Rename(path, bad)
 		return s, nil
+	}
+	if f.Version > version {
+		// Saved by a newer HEADLINER: read it, never write over it.
+		s.readOnly = true
+	} else if f.Version < version {
+		// An older schema: keep a copy, then carry every field forward. New
+		// fields start empty; nothing is dropped.
+		_ = os.WriteFile(fmt.Sprintf("%s.v%d", path, f.Version), data, 0o644)
+		f.Version = version
 	}
 	if f.Profiles == nil {
 		f.Profiles = map[string]*Profile{}
@@ -254,6 +271,9 @@ func newID() string {
 // saveLocked writes progress.json atomically, first rotating the previous
 // copies (progress.json -> .1 -> .2 -> .3).
 func (s *Store) saveLocked() error {
+	if s.readOnly {
+		return errNewerSave
+	}
 	data, err := json.MarshalIndent(s.f, "", "  ")
 	if err != nil {
 		return fmt.Errorf("progress: encoding: %w", err)
@@ -283,4 +303,15 @@ func (s *Store) saveLocked() error {
 		return fmt.Errorf("progress: saving: %w", err)
 	}
 	return nil
+}
+
+// errNewerSave stops a write over a progress file from a newer HEADLINER.
+var errNewerSave = errors.New("progress: this progress was saved by a newer HEADLINER; update to keep playing with it")
+
+// ReadOnly reports progress saved by a newer HEADLINER, which is shown but
+// never written over.
+func (s *Store) ReadOnly() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.readOnly
 }

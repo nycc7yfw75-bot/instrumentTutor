@@ -1,0 +1,9 @@
+{
+  "group": "scenes/studio",
+  "sprites": [
+    {"name": "sky", "image": "placeholder:sky:studio", "frameW": 480, "frameH": 200, "anims": [{"name": "still", "frames": 1, "row": 0}], "anchor": [0, 0], "layer": "backdrop", "pos": [0, 0]},
+    {"name": "interior", "image": "placeholder:interior:studio", "frameW": 480, "frameH": 200, "anims": [{"name": "still", "frames": 1, "row": 0}], "anchor": [0, 0], "layer": "interior", "pos": [0, 0]},
+    {"name": "lights", "image": "placeholder:lights:studio", "frameW": 480, "frameH": 200, "anims": [{"name": "cycle", "frames": 4, "row": 0}], "anchor": [0, 0], "layer": "lights", "pos": [0, 0]},
+    {"name": "stage", "image": "placeholder:stage:studio", "frameW": 480, "frameH": 200, "anims": [{"name": "still", "frames": 1, "row": 0}], "anchor": [0, 0], "layer": "stage", "pos": [0, 0]}
+  ]
+}

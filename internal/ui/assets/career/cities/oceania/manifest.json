@@ -1,0 +1,6 @@
+{
+  "group": "cities/oceania",
+  "sprites": [
+    {"name": "skyline", "image": "placeholder:skyline:oceania", "frameW": 480, "frameH": 200, "anims": [{"name": "still", "frames": 1, "row": 0}], "anchor": [0, 0], "layer": "city", "pos": [0, 0]}
+  ]
+}

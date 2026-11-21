@@ -1,0 +1,9 @@
+{
+  "group": "audio",
+  "sprites": [],
+  "sounds": [
+    {"name": "bed", "file": "placeholder:crowd-bed", "loop": true, "levelDB": -18},
+    {"name": "cheer", "file": "placeholder:cheer", "loop": false, "levelDB": -14},
+    {"name": "boo", "file": "placeholder:boo", "loop": false, "levelDB": -16}
+  ]
+}

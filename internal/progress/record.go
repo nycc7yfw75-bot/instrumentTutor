@@ -6,6 +6,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/S95F/musicTutor/internal/career"
 	"github.com/S95F/musicTutor/internal/scoring"
 )
 
@@ -34,6 +35,7 @@ type Recorded struct {
 	Logged    bool     // a pass long enough to judge (>= 8 notes) went into the history
 	NewBest   bool     // it set the song track's best accuracy
 	NewBadges []string // badges this pass earned (IDs)
+	Mastered  bool     // this pass mastered its song (CAREER.md §2), for the first time
 }
 
 // RecordPass files a finished pass under the active profile and saves. It
@@ -64,6 +66,16 @@ func (s *Store) RecordPass(p Pass) (Recorded, error) {
 		prof.Practice.Songs[p.SongID] += p.Seconds
 	}
 	out.NewBadges = s.evalBadges(prof, p, now, lastBefore, firstToday)
+	if p.Summary.Judged >= scoring.MinJudgedNotes && career.Masters(p.FullRun, p.Credible, p.TempoScale, p.Summary.Accuracy()) {
+		key := fmt.Sprintf("%s#%d", p.SongID, p.Track)
+		if prof.Mastered == nil {
+			prof.Mastered = map[string]career.Mastery{}
+		}
+		if _, had := prof.Mastered[key]; !had {
+			prof.Mastered[key] = career.Mastery{Date: now, Accuracy: p.Summary.Accuracy(), TightMean: p.Summary.Tightness().MeanMs}
+			out.Mastered = true
+		}
+	}
 
 	if p.Summary.Judged >= scoring.MinJudgedNotes {
 		bars := fmt.Sprintf("%d-%d", p.FromBar, p.ToBar)
