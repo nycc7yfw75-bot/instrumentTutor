@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/vector"
 
 	"github.com/S95F/musicTutor/internal/career"
 	"github.com/S95F/musicTutor/internal/scene"
@@ -43,6 +44,11 @@ type stage struct {
 	cheerUntil float64 // a streak cheer, until this clock time
 	streak     int     // excitement's non-miss streak count, seen last frame
 	booPuffs   []booPuff
+
+	// The choreography's controls (CAREER.md §9).
+	lightLevel float64 // 0 dark .. 1 up
+	walkX      float64 // the guitarist's x while walking on; 0 = on the mark
+	crowdPose  string  // forces the crowd's animation ("" = by mood)
 }
 
 type booPuff struct{ x, y, t float64 }
@@ -50,7 +56,7 @@ type booPuff struct{ x, y, t float64 }
 func newStage(g career.Gig, crowd string, preset int) *stage {
 	return &stage{
 		tier: tierSlug(g.Tier, g.Recording), region: g.City.Region, preset: preset,
-		recording: g.Recording, crowd: crowd, img: ebiten.NewImage(scene.BaseW, scene.BaseH),
+		recording: g.Recording, crowd: crowd, img: ebiten.NewImage(scene.BaseW, scene.BaseH), lightLevel: 1,
 	}
 }
 
@@ -149,6 +155,9 @@ func (s *stage) draw() *ebiten.Image {
 	s.drawGuitarist(img)
 	s.drawCrowd(img, true)
 	s.drawFX(img)
+	if s.lightLevel < 1 {
+		vector.FillRect(img, 0, 0, scene.BaseW, scene.BaseH, withAlpha(colBG, 0.75*(1-s.lightLevel)), false)
+	}
 	return img
 }
 
@@ -176,6 +185,9 @@ func (s *stage) drawCrowd(img *ebiten.Image, front bool) {
 		anim, fps = "idle", 1.5
 	case s.crowd == career.CrowdTough && s.excitement < career.BooLowExcitement:
 		anim, fps = "crossed", 1
+	}
+	if s.crowdPose != "" {
+		anim, fps = s.crowdPose, 4
 	}
 	frontN := min(n, 6)
 	for i := 0; i < n; i++ {
@@ -224,7 +236,11 @@ func (s *stage) drawGuitarist(img *ebiten.Image) {
 	if reduceMotion && s.mood == moodPlaying {
 		frame = 0
 	}
-	drawSprite(img, group, "guitarist", anim, frame, 140, 168, 1)
+	x := 140.0
+	if s.walkX != 0 {
+		x, anim, frame = math.Round(s.walkX), "idle", int(s.walkX/6)%2 // walking on, whole pixels
+	}
+	drawSprite(img, group, "guitarist", anim, frame, x, 168, 1)
 }
 
 func (s *stage) drawFX(img *ebiten.Image) {

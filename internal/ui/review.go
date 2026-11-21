@@ -26,6 +26,7 @@ type passReview struct {
 	ghosts     []ghost
 	xp         int
 	scored     bool
+	mastered   bool // this run mastered its song (CAREER.md §2)
 	peak       scoring.Band
 	from, to   int64
 	label      string // "Bars 3–6 · 70% speed"
@@ -236,6 +237,9 @@ func (a *App) paintReview(c *ebiten.Image, card rect) {
 	p := r.pass
 	drawPanel(c, card, colPanel, colPanelEdge)
 	drawTextScaled(c, "Pass review", card.x+reviewPad, card.y+14, dispM, colNote)
+	if p.mastered {
+		a.drawMasteredStamp(c, card.x+reviewPad+textWScaled("Pass review", dispM)+sp4, card.y+14)
+	}
 	drawTextRight(c, p.label, card.x+card.w-reviewPad, card.y+18, colDim)
 
 	// Header stats arrive as pieces: accuracy, tightness, XP, peak.
@@ -391,5 +395,36 @@ func (a *App) paintReviewTab(c *ebiten.Image, p *passReview) {
 	for _, gh := range p.ghosts {
 		ny := float32(top + float64(gh.str-1)*reviewTabGap)
 		drawGhost(clip, gh, ghostAlpha, tickToX(gh.start), tickToX(gh.start+gh.offTicks), ny, sizeMono)
+	}
+}
+
+// drawMasteredStamp is the "Song mastered" moment (CAREER.md §9): the
+// MASTERED stamp pops in three steps with a burst of sparks, then the
+// line that the song can now be played at gigs.
+func (a *App) drawMasteredStamp(c *ebiten.Image, x, y float64) {
+	t := a.game.review.t
+	if reduceMotion {
+		t = 10
+	}
+	const at = 0.3
+	if t < at {
+		return
+	}
+	step := stepIndex(t-at, 3)
+	py := y + 2
+	if step < 2 {
+		py -= float64(2 - step) // the pop: two pixels, one, settled
+	}
+	w := drawPill(c, x, py, "MASTERED", pillBrand)
+	if step < 3 && !reduceMotion { // the spark burst, three steps outward
+		r := float64(6 + step*6)
+		cx, cy := x+w/2, py+pillH/2
+		for i := 0; i < 8; i++ {
+			ang := float64(i) * math.Pi / 4
+			vector.FillRect(c, float32(math.Round(cx+math.Cos(ang)*(w/2+r))), float32(math.Round(cy+math.Sin(ang)*(pillH/2+r))), 2, 2, tokBrand, false)
+		}
+	}
+	if t >= at+0.3 {
+		drawText(c, "Now available for gigs", x+w+sp3, py+(pillH-uiTextH)/2, colDim)
 	}
 }

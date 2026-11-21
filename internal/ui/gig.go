@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/S95F/musicTutor/internal/scene"
+
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
@@ -38,7 +40,8 @@ const (
 	gigBetween
 	gigEnd
 	gigBooed
-	gigFailed // a song would not open
+	gigFailed      // a song would not open
+	gigTierCleared // the tier-cleared moment, after the end card
 )
 
 // GigScreen plays a gig.
@@ -74,6 +77,8 @@ type GigScreen struct {
 
 	confirm      bool // "Leave the stage?"
 	confirmFocus int  // 0 Cancel (the default), 1 Leave
+	loaded       int  // the song idx the open view plays, or -1
+	cheered      bool // the intro's cheer has played
 	err          string
 }
 
@@ -95,7 +100,7 @@ func NewGigScreen(sh *Shell, st *progress.Store, g career.Gig, crowd string, rev
 		preset = st.Career().Character
 	}
 	return &GigScreen{sh: sh, st: st, gig: g, crowd: crowd, reveal: reveal, set: set,
-		load: load, close: close, sound: sound, stage: newStage(g, crowd, preset), credible: true}
+		load: load, close: close, sound: sound, stage: newStage(g, crowd, preset), credible: true, loaded: -1}
 }
 
 const (
@@ -103,8 +108,12 @@ const (
 	gigRevealHold   = 1.0
 )
 
-// startSong opens song idx and starts it.
-func (s *GigScreen) startSong() {
+// loadSong opens song idx (without starting it); false if it would not
+// open, the gig then stopping with the reason.
+func (s *GigScreen) loadSong() bool {
+	if s.app != nil && s.loaded == s.idx {
+		return true
+	}
 	if s.close != nil && s.app != nil {
 		s.close()
 	}
@@ -113,14 +122,23 @@ func (s *GigScreen) startSong() {
 	if err != nil {
 		s.err = fmt.Sprintf("could not open %s: %v", songName(s.set[s.idx]), err)
 		s.setPhase(gigFailed)
-		return
+		return false
 	}
 	app.SetGigMode(career.ExcitementStart(s.crowd), career.DrainMult(s.crowd))
-	s.app = app
+	s.app, s.loaded = app, s.idx
 	if s.sound != nil && !s.gig.Recording {
 		s.audio = s.sound(app)
 	}
-	app.eng.Play()
+	return true
+}
+
+// startSong opens song idx and starts it.
+func (s *GigScreen) startSong() {
+	if !s.loadSong() {
+		return
+	}
+	s.stage.lightLevel, s.stage.walkX, s.stage.crowdPose = 1, 0, ""
+	s.app.eng.Play()
 	s.setPhase(gigPlaying)
 	s.stage.setMood(moodPlaying)
 }
@@ -147,12 +165,20 @@ func (s *GigScreen) Update() error {
 	skip := inpututil.IsKeyJustPressed(ebiten.KeySpace) || (s.ptr.pressed && s.phase != gigEnd && s.phase != gigBooed)
 	switch s.phase {
 	case gigIntro:
+		if s.app == nil && !s.loadSong() {
+			return nil
+		}
+		s.choreoIntro(dt)
 		hold := gigIntroSeconds
-		if s.reveal {
+		if s.reveal && s.crowd == career.CrowdTough {
 			hold += gigRevealHold
 		}
 		if s.phaseT >= hold || skip || reduceMotion {
 			s.startSong()
+		}
+	case gigTierCleared:
+		if s.phaseT >= tierClearedSeconds || skip || inpututil.IsKeyJustPressed(ebiten.KeyEnter) || reduceMotion {
+			return s.leave()
 		}
 	case gigPlaying:
 		s.updatePlaying(dt)
@@ -309,11 +335,17 @@ func (s *GigScreen) cardRect() rect {
 func (s *GigScreen) updateEnd() error {
 	back, retry := s.endButtons()
 	s.stage.step(uiFrameSeconds(), 0, 0, 0)
+	if s.phase != gigFailed && s.phaseT < s.endReadyAt() && !reduceMotion {
+		if inpututil.IsKeyJustPressed(ebiten.KeySpace) || s.ptr.pressed {
+			s.phaseT = s.endReadyAt() // skip to the end state
+		}
+		return nil
+	}
 	switch {
 	case inpututil.IsKeyJustPressed(ebiten.KeyEscape), inpututil.IsKeyJustPressed(ebiten.KeyEnter):
-		return s.leave()
+		return s.backToTour()
 	case s.ptr.pressed && s.ptr.over(back):
-		return s.leave()
+		return s.backToTour()
 	case s.phase == gigBooed && (inpututil.IsKeyJustPressed(ebiten.KeyR) || (s.ptr.pressed && s.ptr.over(retry))):
 		s.retry()
 	}
@@ -383,11 +415,22 @@ func (s *GigScreen) Draw(dst *ebiten.Image) {
 	drawSceneFilled(dst, s.stage.draw(), band)
 
 	switch s.phase {
+	case gigTierCleared:
+		s.drawTierCleared(dst)
+		return
 	case gigIntro:
 		s.drawIntro(dst, band)
 	case gigBetween:
 		next := songName(s.set[s.idx+1])
-		s.drawTitleCard(dst, band, fmt.Sprintf("Song %d of %d", s.idx+2, len(s.set)), next, "Space starts it now")
+		// The title card fades in, holds, and fades out before the next song.
+		a := math.Min(1, s.phaseT/durToastIn)
+		if left := career.BetweenSongsSeconds - s.phaseT; left < durToastOut {
+			a = math.Max(0, left/durToastOut)
+		}
+		if reduceMotion {
+			a = 1
+		}
+		s.drawTitleCard(dst, band, fmt.Sprintf("Song %d of %d", s.idx+2, len(s.set)), next, "Space starts it now", a)
 	case gigEnd, gigBooed, gigFailed:
 		s.drawEndCard(dst)
 	}
@@ -404,16 +447,20 @@ func (s *GigScreen) drawBareHeader(dst *ebiten.Image) {
 }
 
 // drawTitleCard is a centred card over the scene band.
-func (s *GigScreen) drawTitleCard(dst *ebiten.Image, band rect, kicker, title, foot string) {
+func (s *GigScreen) drawTitleCard(dst *ebiten.Image, band rect, kicker, title, foot string, alpha float64) {
+	if alpha <= 0 {
+		return
+	}
 	w := math.Max(360, textWScaled(title, dispL)+2*sp8)
 	h := 128.0
 	r := rect{math.Round((screenW - w) / 2), math.Round(band.y + (band.h-h)/2), w, h}
-	notchedFill(dst, r, withAlpha(colPanel, 0.94))
-	notchedStroke(dst, r, 1, colPanelEdge)
-	drawSectionHeader(dst, math.Round(r.x+(r.w-textWScaled(spaced(kicker), dispS))/2), r.y+sp4, 0, kicker, 0)
-	drawTextScaled(dst, title, math.Round(r.x+(r.w-textWScaled(title, dispL))/2), r.y+sp4+sizeDisplayS+sp3, dispL, colNote)
+	notchedFill(dst, r, withAlpha(colPanel, 0.94*alpha))
+	notchedStroke(dst, r, 1, withAlpha(colPanelEdge, alpha))
+	k := spaced(kicker)
+	drawTextScaled(dst, k, math.Round(r.x+(r.w-textWScaled(k, dispS))/2), r.y+sp4, dispS, withAlpha(colBarline, alpha))
+	drawTextScaled(dst, title, math.Round(r.x+(r.w-textWScaled(title, dispL))/2), r.y+sp4+sizeDisplayS+sp3, dispL, withAlpha(colNote, alpha))
 	if foot != "" {
-		drawTextSmall(dst, foot, math.Round(r.x+(r.w-textWSmall(foot))/2), r.y+r.h-sp4-14, colBarline)
+		drawTextSmall(dst, foot, math.Round(r.x+(r.w-textWSmall(foot))/2), r.y+r.h-sp4-14, withAlpha(colBarline, alpha))
 	}
 }
 
@@ -421,19 +468,35 @@ func (s *GigScreen) drawTitleCard(dst *ebiten.Image, band rect, kicker, title, f
 // attempt (the full choreography is §9).
 func (s *GigScreen) drawIntro(dst *ebiten.Image, band rect) {
 	foot := fmt.Sprintf("%d %s · Space starts", len(s.set), plural(len(s.set), "song", "songs"))
-	s.drawTitleCard(dst, band, career.Tiers[s.gig.Tier-1].Name+" · "+s.gig.City.Name, s.gig.Venue, foot)
-	if s.reveal && s.crowd == career.CrowdTough && s.phaseT > 0.6 {
+	a := math.Min(1, s.phaseT/durOverlayIn)
+	if reduceMotion {
+		a = 1
+	}
+	s.drawTitleCard(dst, band, career.Tiers[s.gig.Tier-1].Name+" · "+s.gig.City.Name, s.gig.Venue, foot, a)
+	if s.reveal && s.crowd == career.CrowdTough && (s.phaseT >= 1.9 || reduceMotion) {
 		w := textWScaled("TOUGH CROWD", dispM)
 		x := math.Round((screenW - w) / 2)
 		y := band.y + band.h/2 + 64 + sp3
 		drawTextScaled(dst, "TOUGH CROWD", x, y, dispM, colMiss)
-		f := stepIndex(s.phaseT-0.6, 3)
+		f := stepIndex(s.phaseT-1.9, 3) // the flames pop in three steps
 		drawSpriteOn(dst, "fx", "flames", "burn", min(2, f), x-sp4, y+28, 2)
 		drawSpriteOn(dst, "fx", "flames", "burn", min(2, f), x+w+sp4+16, y+28, 2)
 	}
 }
 
 func (s *GigScreen) drawEndCard(dst *ebiten.Image) {
+	t := s.phaseT
+	if reduceMotion || s.phase == gigFailed {
+		t = 1e6 // end states at once
+	}
+	cardAt := endCardAt
+	if s.phase == gigBooed {
+		cardAt = booCardAt
+	}
+	if t < cardAt {
+		return // the bow, or the boos, come first
+	}
+	rollAt := endCardAt + 5*starStep
 	vector.FillRect(dst, 0, 0, float32(screenW), float32(screenH), withAlpha(colBG, 0.45), false)
 	card := s.cardRect()
 	res := s.result
@@ -461,22 +524,27 @@ func (s *GigScreen) drawEndCard(dst *ebiten.Image) {
 		drawText(dst, "Unscored: calibrate your timing in Settings to earn", x, y, colDim)
 		drawText(dst, "stars and Fame. The XP from your notes still counts.", x, y+uiTextH, colDim)
 	default:
+		// The stars, one at a time, 150 ms apart; each pops in three steps.
 		for i := 0; i < 5; i++ {
-			anim := "unlit"
-			if i < res.stars {
+			anim, scale := "unlit", 2
+			litAt := endCardAt + float64(i)*starStep
+			if i < res.stars && t >= litAt {
 				anim = "lit"
+				if stepIndex(t-litAt, 3) < 2 {
+					scale = 3
+				}
 			}
-			drawSpriteOn(dst, "fx", "star", anim, 0, x+16+float64(i)*40, y+16, 2)
+			drawSpriteOn(dst, "fx", "star", anim, 0, x+16+float64(i)*40, y+16, scale)
 		}
 		line := fmt.Sprintf("Accuracy %d%%", int(math.Round(res.accuracy*100)))
 		if res.reward.BonusXP > 0 {
-			line += fmt.Sprintf("  ·  +%d XP", res.reward.BonusXP)
+			line += fmt.Sprintf("  ·  +%d XP", rolled(res.reward.BonusXP, t, rollAt))
 		}
 		if res.reward.Fame > 0 {
-			line += fmt.Sprintf("  ·  +%d Fame", res.reward.Fame)
+			line += fmt.Sprintf("  ·  +%d Fame", rolled(res.reward.Fame, t, rollAt))
 		}
 		drawText(dst, line, x, y+44, colNote)
-		if res.reward.NewBest {
+		if res.reward.NewBest && t >= rollAt+durRoll {
 			drawPill(dst, x, y+44+uiTextH+sp2, "NEW BEST", pillBrand)
 		}
 		if t := res.reward.TierCleared; t > 0 {
@@ -484,6 +552,9 @@ func (s *GigScreen) drawEndCard(dst *ebiten.Image) {
 		}
 	}
 	back, retry := s.endButtons()
+	if t < s.endReadyAt() {
+		return
+	}
 	drawKitButton(dst, back, "Back to tour", -1, kitPrimary, btnState{hover: s.ptr.over(back)})
 	if s.phase == gigBooed {
 		drawKitButton(dst, retry, "Retry", -1, kitSecondary, btnState{hover: s.ptr.over(retry)})
@@ -509,7 +580,8 @@ func (s *GigScreen) drawConfirm(dst *ebiten.Image) {
 func (s *GigScreen) ShotState(kind string) {
 	switch kind {
 	case "intro-tough":
-		s.reveal, s.phaseT = true, 1.6
+		s.reveal, s.phaseT = true, 2.4
+		s.choreoIntro(0)
 	case "playing":
 		s.startSong()
 	case "booed":
@@ -517,11 +589,122 @@ func (s *GigScreen) ShotState(kind string) {
 		s.total = scoring.Summary{Judged: 20, SumScore: 12}
 		s.finish(true)
 		s.stage.moodT = 1
+		s.phaseT = 10
 	case "end":
 		s.startSong()
 		s.total = scoring.Summary{Judged: 40, SumScore: 36}
 		s.exciteSum, s.exciteTime = 70*60, 60
 		s.finish(false)
 		s.stage.setMood(moodSongEnd)
+		s.phaseT = 10
 	}
+}
+
+// ---- Choreography (CAREER.md §9; Space skips each to its end) ----
+
+const (
+	tierClearedSeconds = 2.5
+	endCardAt          = 0.6  // the bow, then the card
+	booCardAt          = 1.2  // the boos, the dimming, the slump, then the card
+	starStep           = 0.15 // between stars
+)
+
+// choreoIntro runs the gig's intro (≤ 2.5 s): the lights off, the card,
+// the lights up in four steps, the guitarist walking on in whole pixels,
+// the crowd's cheer, and a first tough crowd's reveal.
+func (s *GigScreen) choreoIntro(dt float64) {
+	t := s.phaseT
+	st := s.stage
+	switch {
+	case t < 0.3:
+		st.lightLevel = 0
+	case t < 0.7:
+		st.lightLevel = math.Floor((t-0.3)/0.4*4) / 4 // steps4
+	default:
+		st.lightLevel = 1
+	}
+	switch {
+	case t < 0.7:
+		st.walkX = -16
+	case t < 1.4:
+		st.walkX = -16 + 156*curveMove.at((t-0.7)/0.7) // travel to the mark
+	default:
+		st.walkX = 0
+	}
+	st.crowdPose = ""
+	if t >= 1.4 && !s.cheered {
+		s.cheered = true
+		if s.audio != nil {
+			s.audio.Cheer()
+		}
+	}
+	if t >= 1.4 && t < 1.9 && !s.gig.Recording {
+		st.crowdPose = "jump" // the cheer swell
+	}
+	if s.reveal && s.crowd == career.CrowdTough && t >= 1.9 {
+		st.crowdPose = "crossed"
+	}
+	st.step(dt, career.ExcitementStart(s.crowd), 0, 0)
+}
+
+// endReadyAt is when the end card's buttons arrive.
+func (s *GigScreen) endReadyAt() float64 {
+	if s.phase == gigBooed {
+		return booCardAt + 0.2
+	}
+	return endCardAt + 5*starStep + durRoll + 0.3
+}
+
+// rolled is a number counting up across durRoll from start (a roll).
+func rolled(n int, t, start float64) int {
+	if reduceMotion || t >= start+durRoll {
+		return n
+	}
+	if t <= start {
+		return 0
+	}
+	return int(math.Round(float64(n) * curveEnter.at((t-start)/durRoll)))
+}
+
+// drawTierCleared is the tier-cleared moment: the tier's name, the next
+// tier's venue sliding in, where the player is booked next, Fame rolling.
+func (s *GigScreen) drawTierCleared(dst *ebiten.Image) {
+	dst.Fill(colBG)
+	t := s.phaseT
+	tier := s.result.reward.TierCleared
+	name := career.Tiers[tier-1].Name + " cleared"
+	drawTextScaled(dst, name, math.Round((screenW-textWScaled(name, dispX))/2), screenH*0.16, dispX, tokBrand)
+	next, ok := career.TierByNum(tier + 1)
+	if !ok || s.st == nil {
+		return
+	}
+	c := s.st.Career()
+	g := c.Route()[next.Num-1][0]
+	img := ebiten.NewImage(scene.BaseW, scene.BaseH)
+	drawVenue(img, tierSlug(next.Num, false), g.City.Region, 0)
+	area := rect{0, screenH * 0.3, screenW, screenH * 0.42}
+	slide := 1.0
+	if !reduceMotion {
+		slide = curveMove.at(math.Min(1, t/durTravel))
+	}
+	area.x += math.Round((1 - slide) * screenW)
+	drawSceneFilled(dst, img, area)
+	img.Deallocate()
+	booked := fmt.Sprintf("Booked: %s, %s", next.Name, g.City.Name)
+	drawText(dst, booked, math.Round((screenW-textW(booked))/2), area.y+area.h+sp6, colNote)
+	fame := fmt.Sprintf("Fame %d", c.Fame-s.result.reward.Fame+rolled(s.result.reward.Fame, t, durTravel))
+	drawTextScaled(dst, fame, math.Round((screenW-textWScaled(fame, dispM))/2), area.y+area.h+sp6+uiTextH+sp4, dispM, colNote)
+}
+
+// backToTour leaves the end card: through the tier-cleared moment when
+// this gig cleared its tier.
+func (s *GigScreen) backToTour() error {
+	if s.phase == gigEnd && s.result != nil && s.result.reward.TierCleared > 0 {
+		if s.app != nil {
+			s.app.eng.Pause()
+		}
+		s.setPhase(gigTierCleared)
+		return nil
+	}
+	return s.leave()
 }

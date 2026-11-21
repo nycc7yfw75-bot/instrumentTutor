@@ -237,7 +237,7 @@ func (a *App) endPass(tick int64) {
 		g.xpView.aim(xp.TotalXP, rec.LeveledUp)
 	}
 	if rv := g.review.pass; rv != nil && rv.from == passFrom && rv.to == passTo {
-		rv.xp, rv.scored = rec.XP, credible
+		rv.xp, rv.scored, rv.mastered = rec.XP, credible, rec.Mastered
 	}
 	if rec.XP > 0 {
 		g.toasts = append(g.toasts, xpToast{xp: rec.XP})

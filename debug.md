@@ -366,6 +366,23 @@ You need one mastered song (see 12) and calibrated timing.
   Notes:
 - [ ] Not calibrated: the gig still plays but ends "Unscored": no stars or Fame; XP from your notes still counts.
   Notes:
+
+## 12d. Career: the little moments
+
+Space skips each of these to its end. With Settings → reduce motion on, each one appears finished at once.
+
+- [ ] **Gig intro** (about 2 seconds): the stage starts dark, the venue card fades in, the lights come up in four steps, your guitarist walks on from the left to their spot, the crowd jumps and cheers. On a first tough-crowd gig the TOUGH CROWD flames pop up and the crowd crosses its arms for a moment longer.
+  Notes:
+- [ ] **Between songs:** the "Song 2 of 3" card fades in and fades out before the next song.
+  Notes:
+- [ ] **Gig end:** the guitarist bows first, then the card: stars light one by one (each pops), the XP and Fame numbers count up, then NEW BEST, then the buttons.
+  Notes:
+- [ ] **Booed off:** boos and BOO puffs, the lights dim in steps, the guitarist slumps, and only then the "Booed off" card.
+  Notes:
+- [ ] **Clearing a tier** (3 gigs of a tier at 3 stars or more): after the end card, Back to tour first shows "<Tier> cleared", the next venue sliding in, "Booked: Jam room, <city>", and your Fame counting up. Space or a click carries on to the tour.
+  Notes:
+- [ ] **Song mastered:** finish a song in Practice that masters it (full run, 100% speed, 90%+). The pass review opens with an amber MASTERED stamp that pops with a burst of sparks, then "Now available for gigs".
+  Notes:
 - [ ] Anything that looks wrong, ugly or confusing (screen and what you saw):
   Notes:
 

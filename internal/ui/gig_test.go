@@ -2,6 +2,7 @@ package ui
 
 import (
 	"errors"
+	"math"
 	"testing"
 
 	"github.com/S95F/musicTutor/internal/career"
@@ -96,5 +97,63 @@ func TestTheGigTakesTheKeysAwayFromPractice(t *testing.T) {
 	}
 	if e := a.gigExcitement(); e.Value != 30 || e.DrainMult != 1.5 {
 		t.Errorf("a tough gig's excitement starts at %v draining x%v", e.Value, e.DrainMult)
+	}
+}
+
+func TestTheIntroBringsTheLightsUpAndWalksTheGuitaristOn(t *testing.T) {
+	s, _ := gigFixture(t, career.CrowdNormal, nil)
+	at := func(sec float64) {
+		s.phaseT = sec
+		s.choreoIntro(0.016)
+	}
+	at(0.1)
+	if s.stage.lightLevel != 0 || s.stage.walkX != -16 {
+		t.Errorf("at 0.1 s: lights %.2f, guitarist at %.0f; the stage starts dark, the guitarist off it", s.stage.lightLevel, s.stage.walkX)
+	}
+	at(0.5)
+	if l := s.stage.lightLevel; l <= 0 || l >= 1 || l*4 != math.Floor(l*4) {
+		t.Errorf("at 0.5 s the lights are at %.3f; they come up in four steps", l)
+	}
+	at(1.0)
+	if x := s.stage.walkX; x <= -16 || x >= 140 {
+		t.Errorf("at 1.0 s the guitarist is at %.1f, want walking on", x)
+	}
+	at(1.5)
+	if !s.cheered || s.stage.walkX != 0 || s.stage.crowdPose != "jump" {
+		t.Errorf("at 1.5 s: cheered %v, x %.0f, crowd %q; the guitarist is on the mark and the crowd cheers", s.cheered, s.stage.walkX, s.stage.crowdPose)
+	}
+}
+
+func TestTheEndCardWaitsForTheBowAndSpaceSkipsIt(t *testing.T) {
+	s, _ := gigFixture(t, career.CrowdNormal, nil)
+	s.total = scoring.Summary{Judged: 40, SumScore: 36}
+	s.exciteSum, s.exciteTime = 70*60, 60
+	s.finish(false)
+	if ready := s.endReadyAt(); ready > 2.5 {
+		t.Errorf("the end sequence takes %.2f s; CAREER.md §9 allows 2.5", ready)
+	}
+	if got := rolled(100, endCardAt+5*starStep+durRoll/2, endCardAt+5*starStep); got <= 0 || got >= 100 {
+		t.Errorf("halfway through the roll the XP reads %d", got)
+	}
+	if rolled(100, 0, 1) != 0 || rolled(100, 9, 1) != 100 {
+		t.Error("the roll should start at 0 and end on the number")
+	}
+}
+
+func TestClearingATierShowsTheMomentBeforeTheTour(t *testing.T) {
+	s, st := gigFixture(t, career.CrowdNormal, nil)
+	st.UpdateCareer(func(c *career.State) {
+		r := c.Route()[0]
+		c.FinishGig(r[1], career.Result{Stars: 3})
+		c.FinishGig(r[2], career.Result{Stars: 3})
+	})
+	s.total = scoring.Summary{Judged: 40, SumScore: 40}
+	s.exciteSum, s.exciteTime = 90*60, 60
+	s.finish(false)
+	if s.result.reward.TierCleared != 1 {
+		t.Fatalf("the third 3-star gig did not clear the Bedroom: %+v", s.result.reward)
+	}
+	if err := s.backToTour(); err != nil || s.phase != gigTierCleared {
+		t.Errorf("Back to tour went to phase %v (err %v); the tier-cleared moment comes first", s.phase, err)
 	}
 }
