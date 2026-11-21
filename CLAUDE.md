@@ -45,7 +45,8 @@ Not doing: XP for minutes played, leaderboards, subscriptions, 3D graphics, bund
 ## Owner's setup
 
 - Audio: Marshall CODE 25 over USB, used as both input and output. It cannot do loopback calibration.
-- Pieces folder: `C:\Users\Dell\AppData\Roaming\musictutor\pieces`
+- Save + pieces folder (ONLINE.md §A2–A3): dev builds (`go build`) use `C:\Users\Dell\AppData\Roaming\headliner-dev` (pieces in `pieces\`); installed releases use `...\Roaming\headliner`. Both started as copies of the old `...\Roaming\musictutor`, which is kept untouched.
+- Release signing key: `C:\Users\Dell\.headliner-signing\release.key` (never commit; it is the repo secret HEADLINER_SIGNING_KEY).
 - Main song: `Dire Straits-Sultans Of Swing-10-29-2026.gp` (fingerstyle/legato — expect false misses).
 - Reference test song (simple picked notes): `First steps on guitar.gtab`.
 - Career profile stage/band name: editable in the app (no default needed).

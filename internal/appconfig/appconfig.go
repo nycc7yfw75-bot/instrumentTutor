@@ -9,16 +9,19 @@ import (
 	"strings"
 )
 
-const EnvConfigDir = "MUSICTUTOR_CONFIG_DIR"
+const EnvConfigDir = "HEADLINER_CONFIG_DIR"
+
+// LegacyEnvConfigDir is still honoured when EnvConfigDir is unset.
+const LegacyEnvConfigDir = "MUSICTUTOR_CONFIG_DIR"
 
 const CurrentVersion = 4
 
 var ErrNewerVersion = errors.New("config file is from a newer version of musicTutor")
 
 const (
-	dirName    = "musictutor"
-	oldDirName = "guitartutor"
-	fileName   = "config.json"
+	legacyDirName = "musictutor"
+	oldDirName    = "guitartutor"
+	fileName      = "config.json"
 )
 
 type Config struct {
@@ -54,6 +57,11 @@ type Config struct {
 
 	// Pieces remembers each piece's practice setup, keyed by file path.
 	Pieces map[string]PieceSetup `json:"pieces,omitempty"`
+
+	// UpdateChannel is "stable" (the default) or "beta" (ONLINE.md §A6).
+	UpdateChannel string `json:"updateChannel,omitempty"`
+	// SkipVersion is an update the player chose to skip.
+	SkipVersion string `json:"skipVersion,omitempty"`
 }
 
 // PieceSetup is where a piece was left: reopening it starts here. Every
@@ -115,19 +123,18 @@ const (
 )
 
 func Path() (string, error) {
-	if dir := os.Getenv(EnvConfigDir); dir != "" {
+	if dir := envDir(); dir != "" {
 		return filepath.Join(dir, fileName), nil
 	}
 	base, err := os.UserConfigDir()
 	if err != nil {
 		return "", fmt.Errorf("appconfig: locating user config dir: %w", err)
 	}
-	migrateOldDir(base)
 	return filepath.Join(base, dirName, fileName), nil
 }
 
 func migrateOldDir(base string) {
-	newDir := filepath.Join(base, dirName)
+	newDir := filepath.Join(base, legacyDirName)
 	if _, err := os.Stat(newDir); err == nil || !os.IsNotExist(err) {
 		return
 	}
@@ -164,36 +171,61 @@ func Load() (Config, error) {
 }
 
 func (c *Config) rehomePaths() {
-	if os.Getenv(EnvConfigDir) != "" {
+	if envDir() != "" {
 		return
 	}
 	base, err := os.UserConfigDir()
 	if err != nil {
 		return
 	}
+	// guitartutor was renamed to musictutor: follow it once the old
+	// folder is gone.
 	oldDir := filepath.Join(base, oldDirName)
-	newDir := filepath.Join(base, dirName)
-	if _, err := os.Stat(oldDir); !os.IsNotExist(err) {
-		return
-	}
-	if _, err := os.Stat(newDir); err != nil {
-		return
-	}
-	prefix := oldDir + string(filepath.Separator)
-	rehome := func(p string) string {
-		if rest, ok := strings.CutPrefix(p, prefix); ok {
-			return filepath.Join(newDir, rest)
+	legacy := filepath.Join(base, legacyDirName)
+	if _, err := os.Stat(oldDir); os.IsNotExist(err) {
+		if _, err := os.Stat(legacy); err == nil {
+			c.rehome(oldDir, legacy, false)
 		}
-		return p
+	}
+	// The Headliner folder is a copy of an earlier one (Prepare): point at
+	// the copies, wherever the copied file is really there.
+	for _, from := range seedSources() {
+		c.rehome(filepath.Join(base, from), filepath.Join(base, dirName), true)
+	}
+}
+
+// rehome moves every remembered path under from to the same place under
+// to; with mustExist only when that file exists there.
+func (c *Config) rehome(from, to string, mustExist bool) {
+	prefix := from + string(filepath.Separator)
+	move := func(p string) string {
+		rest, ok := strings.CutPrefix(p, prefix)
+		if !ok {
+			return p
+		}
+		np := filepath.Join(to, rest)
+		if mustExist {
+			if _, err := os.Stat(np); err != nil {
+				return p
+			}
+		}
+		return np
 	}
 	for i, p := range c.Recents {
-		c.Recents[i] = rehome(p)
+		c.Recents[i] = move(p)
 	}
 	for i, p := range c.Created {
-		c.Created[i] = rehome(p)
+		c.Created[i] = move(p)
 	}
-	c.LastBrowseDir = rehome(c.LastBrowseDir)
-	c.SoundFontPath = rehome(c.SoundFontPath)
+	c.LastBrowseDir = move(c.LastBrowseDir)
+	c.SoundFontPath = move(c.SoundFontPath)
+	if len(c.Pieces) > 0 {
+		pieces := make(map[string]PieceSetup, len(c.Pieces))
+		for k, v := range c.Pieces {
+			pieces[move(k)] = v
+		}
+		c.Pieces = pieces
+	}
 }
 
 func (c *Config) migrate() {

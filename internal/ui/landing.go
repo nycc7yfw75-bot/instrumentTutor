@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"math"
+	"sync"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
@@ -31,7 +32,32 @@ type Landing struct {
 
 	venue *ebiten.Image // the Perform door's stage, at base resolution
 	clock float64
+
+	// Updates (ONLINE.md §A6): offered only from here.
+	upMu      sync.Mutex
+	upOffer   *UpdateOffer
+	notice    string // e.g. "Update rolled back"
+	landed    func() // called once, the first time the page is up
+	landedRan bool
 }
+
+// OfferUpdate queues an update offer; it shows when the landing page is
+// the top screen. Safe from any goroutine.
+func (l *Landing) OfferUpdate(o UpdateOffer) {
+	l.upMu.Lock()
+	l.upOffer = &o
+	l.upMu.Unlock()
+}
+
+// SetNotice shows a line under the wordmark. Safe from any goroutine.
+func (l *Landing) SetNotice(s string) {
+	l.upMu.Lock()
+	l.notice = s
+	l.upMu.Unlock()
+}
+
+// OnLanded runs fn once, when the landing page first updates.
+func (l *Landing) OnLanded(fn func()) { l.landed = fn }
 
 // NewLanding makes the landing page.
 func NewLanding(sh *Shell) *Landing { return &Landing{sh: sh} }
@@ -214,6 +240,20 @@ func (l *Landing) landingBindings() []helpBinding {
 func (l *Landing) Update() error {
 	l.ptr = readPointer()
 	l.clock += uiFrameSeconds()
+	if !l.landedRan {
+		l.landedRan = true
+		if l.landed != nil {
+			l.landed()
+		}
+	}
+	l.upMu.Lock()
+	offer := l.upOffer
+	l.upOffer = nil
+	l.upMu.Unlock()
+	if offer != nil && l.sh != nil {
+		l.sh.Show(NewUpdatePrompt(l.sh, *offer))
+		return nil
+	}
 	if l.helpOpen {
 		if helpDismissed(l.ptr) {
 			l.helpOpen = false
@@ -290,6 +330,12 @@ func (l *Landing) Draw(dst *ebiten.Image) {
 	ll := l.layout()
 	drawWordmark(dst, pgMargin, pgMargin)
 	drawTextSmall(dst, "Open mic to arena", pgMargin, pgMargin+sizeDisplayL+sp1, colDim)
+	l.upMu.Lock()
+	notice := l.notice
+	l.upMu.Unlock()
+	if notice != "" {
+		drawTextSmall(dst, notice, pgMargin, pgMargin+sizeDisplayL+sp1+16, colClose)
+	}
 	l.drawStrip(dst, ll, dt)
 	for i, d := range l.doors() {
 		l.drawDoor(dst, ll.doors[i], d, dt)

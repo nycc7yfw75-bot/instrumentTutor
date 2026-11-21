@@ -28,8 +28,12 @@ import (
 func runShell(initialPath string) error {
 	cfg, err := appconfig.Load()
 	if err != nil {
-
 		fmt.Fprintln(os.Stderr, "warning: config unreadable, starting with defaults:", err)
+		if !errors.Is(err, appconfig.ErrNewerVersion) {
+			if bad, qerr := appconfig.QuarantineConfig(); qerr == nil {
+				fmt.Fprintln(os.Stderr, "the damaged config was kept as", bad)
+			}
+		}
 	}
 	seedLibrary()
 	prefs := &shellPrefs{cfg: cfg}
@@ -55,6 +59,7 @@ func runShell(initialPath string) error {
 	sh, browser := ui.NewBrowserShell(svc)
 	landing := ui.NewLanding(sh)
 	sh.Replace(landing)
+	opener.wireUpdates(landing, store)
 	landing.SetPractice(func() { sh.Show(browser) })
 	landing.SetSettings(func() { opener.showSettings(nil) })
 	if store != nil {
@@ -220,6 +225,7 @@ func (o *shellOpener) showSettings(app *ui.App) {
 		return
 	}
 	st := ui.NewSettings(o.shell)
+	st.SetSystem(o.systemHooks())
 
 	st.SetFilePicker(func(exts []string, chosen func(string)) {
 		if !o.sfDialog.CompareAndSwap(false, true) {
@@ -256,6 +262,7 @@ type shellPrefs struct {
 	saveMu sync.Mutex
 	mu     sync.Mutex
 	cfg    appconfig.Config
+	frozen bool // the saves on disk were just replaced: never write
 }
 
 func (p *shellPrefs) Recents() []string {
@@ -371,6 +378,9 @@ func (p *shellPrefs) SetDevices(cap, play string) {
 func (p *shellPrefs) Save() error {
 	p.saveMu.Lock()
 	defer p.saveMu.Unlock()
+	if p.frozen {
+		return nil
+	}
 	return p.snapshot().Save()
 }
 
@@ -542,6 +552,10 @@ type shellOpener struct {
 
 	// cur is the piece on screen, so its setup can be saved when it is left.
 	cur *openPiece
+
+	landing  *ui.Landing
+	updates  updateState
+	restored bool // saves were replaced: nothing in memory may be written
 }
 
 type openPiece struct {

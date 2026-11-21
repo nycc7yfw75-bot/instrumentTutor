@@ -21,6 +21,7 @@ import (
 	"github.com/S95F/musicTutor/internal/score/textfmt"
 	"github.com/S95F/musicTutor/internal/synth"
 	"github.com/S95F/musicTutor/internal/ui"
+	"github.com/S95F/musicTutor/internal/update"
 	"github.com/S95F/musicTutor/internal/wavio"
 )
 
@@ -37,9 +38,16 @@ const playerReadAhead = 100 * time.Millisecond
 
 const playerBufferBytes = int(int64(playerReadAhead)*sampleRate/int64(time.Second)) * bytesPerFrame
 
-var version = "0.1.0-dev"
-
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == update.ApplyFlag {
+		// The update helper (ONLINE.md §A6): swap the new version in, watch it
+		// start, roll back if it can't. No window, no saves touched.
+		logUpdate(update.RunHelper(os.Args[2:]))
+		return
+	}
+	if len(os.Args) < 2 || !isInfoCommand(os.Args[1]) {
+		prepareFolders()
+	}
 
 	if len(os.Args) < 2 {
 		if err := runShell(""); err != nil {
@@ -51,7 +59,7 @@ func main() {
 	var err error
 	switch os.Args[1] {
 	case "version", "-version", "--version":
-		fmt.Println("musictutor", version)
+		fmt.Println("headliner", displayVersion())
 	case "help", "-h", "--help":
 		usage(os.Stdout)
 	case "play":

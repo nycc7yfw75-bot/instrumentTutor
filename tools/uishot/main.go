@@ -75,6 +75,17 @@ func main() {
 
 func build(which, piece string) (ui.Screen, error) {
 	switch which {
+	case "about":
+		ui.Build = ui.BuildInfo{Version: "v0.1.0-beta.1", Channel: "beta", Repo: "owner/headliner"}
+		ch := "beta"
+		return ui.NewAboutScreen(nil, ui.SystemHooks{
+			Channel: func() string { return ch }, SetChannel: func(c string) { ch = c }, CheckNow: func() {},
+			Status: func() string { return "Up to date (v0.1.0-beta.1)." },
+			Export: func() (string, error) { return "", nil }, Import: func() error { return nil }, OpenFolder: func() {},
+			Backups: func() []ui.BackupEntry { return nil }, Restore: func(string) error { return nil },
+		}), nil
+	case "update-offer":
+		return ui.NewUpdatePrompt(nil, ui.UpdateOffer{Version: "v0.2.0", Notes: "## What's new\n- Battles: records and the Records tab\n- Eight battle riffs\n- Headliner now updates itself"}), nil
 	case "landing", "career-setup", "perform":
 		st := shotProgress()
 		if which == "career-setup" {

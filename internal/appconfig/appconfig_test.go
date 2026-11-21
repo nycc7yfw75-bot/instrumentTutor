@@ -28,7 +28,7 @@ func TestPathDefaultUsesUserConfigDir(t *testing.T) {
 	if err != nil {
 		t.Skipf("os.UserConfigDir unavailable: %v", err)
 	}
-	if want := filepath.Join("musictutor", "config.json"); !strings.HasSuffix(p, want) {
+	if want := filepath.Join("headliner", "config.json"); !strings.HasSuffix(p, want) {
 		t.Errorf("Path = %q, want suffix %q", p, want)
 	}
 }
@@ -519,7 +519,7 @@ func TestMigrateOldDirAdoptsGuitartutor(t *testing.T) {
 	migrateOldDir(base)
 
 	for _, name := range []string{fileName, filepath.Join("pieces", "my.gtab")} {
-		if _, err := os.Stat(filepath.Join(base, dirName, name)); err != nil {
+		if _, err := os.Stat(filepath.Join(base, legacyDirName, name)); err != nil {
 			t.Errorf("after migration, %s: %v", name, err)
 		}
 	}
@@ -530,7 +530,7 @@ func TestMigrateOldDirAdoptsGuitartutor(t *testing.T) {
 
 func TestMigrateOldDirNeverOverwrites(t *testing.T) {
 	base := t.TempDir()
-	for _, dir := range []string{dirName, oldDirName} {
+	for _, dir := range []string{legacyDirName, oldDirName} {
 		if err := os.MkdirAll(filepath.Join(base, dir), 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -544,7 +544,7 @@ func TestMigrateOldDirNeverOverwrites(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(base, oldDirName, fileName)); err != nil {
 		t.Errorf("the old directory was disturbed: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(base, dirName, fileName)); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(base, legacyDirName, fileName)); !os.IsNotExist(err) {
 		t.Error("migration wrote into an existing musictutor directory")
 	}
 }
@@ -554,7 +554,7 @@ func TestRehomePathsFollowsTheMigration(t *testing.T) {
 	t.Setenv(EnvConfigDir, "")
 	t.Setenv("XDG_CONFIG_HOME", base)
 	t.Setenv("AppData", base)
-	if err := os.MkdirAll(filepath.Join(base, dirName), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(base, legacyDirName), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -567,7 +567,7 @@ func TestRehomePathsFollowsTheMigration(t *testing.T) {
 	}
 	c.rehomePaths()
 
-	want := filepath.Join(base, dirName, "pieces", "riff.gtab")
+	want := filepath.Join(base, legacyDirName, "pieces", "riff.gtab")
 	if c.Recents[0] != want {
 		t.Errorf("recent = %q, want %q", c.Recents[0], want)
 	}
@@ -577,7 +577,7 @@ func TestRehomePathsFollowsTheMigration(t *testing.T) {
 	if c.Created[0] != want {
 		t.Errorf("created = %q, want %q", c.Created[0], want)
 	}
-	if wantDir := filepath.Join(base, dirName, "pieces"); c.LastBrowseDir != wantDir {
+	if wantDir := filepath.Join(base, legacyDirName, "pieces"); c.LastBrowseDir != wantDir {
 		t.Errorf("browse dir = %q, want %q", c.LastBrowseDir, wantDir)
 	}
 

@@ -1,6 +1,10 @@
 # musicTutor
 [![CI](https://github.com/S95F/musicTutor/actions/workflows/ci.yml/badge.svg)](https://github.com/S95F/musicTutor/actions/workflows/ci.yml)
 
+## Download Headliner
+
+This fork is **Headliner**, a guitar career game built on musicTutor. Get the latest installer from the [Releases page](https://github.com/nycc7yfw75-bot/instrumentTutor/releases/latest); [docs/INSTALL_FOR_FRIENDS.md](docs/INSTALL_FOR_FRIENDS.md) walks through it.
+
 Plug in your guitar — or mic up your sax. Load a piece. Practice it properly.
 
 musicTutor is an open-source practice companion written in Go, built first for guitarists and now growing past them. You import a piece of music (or write one in a simple text format), and the app plays it back — synthesized from the score, with a metronome and scrolling notation: tablature for a fretted track, a pitch ladder of written note names for a wind one — while you play along on your real instrument. Loop the hard bars, slow them down, and let the app ramp the tempo back up as you nail each pass. It listens to your playing and tells you which notes you hit.

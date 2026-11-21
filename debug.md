@@ -459,6 +459,48 @@ Do these in order; they build on each other.
 - [ ] **It's saved.** Close HEADLINER and open it again. Records and each profile's XP are as you left them. The profile list in Settings → Profiles shows each profile's W / L / D.
   Notes:
 
+## 14. Headliner's own folder, backups and About
+
+From now on the copy you run from the project folder (`musictutor.exe`) is a **dev build**: it keeps its saves in `C:\Users\Dell\AppData\Roaming\headliner-dev`, which started as an exact copy of your old `musictutor` folder (made 2026-11-22). The old folder is untouched. The installed game (once released) uses `...\Roaming\headliner`.
+
+- [ ] Start `musictutor.exe`. Next to the HEADLINER wordmark there's a small **DEV** pill.
+  Notes:
+- [ ] Your name, level, career, battle records and songs (Sultans, the battle riffs) are all there, as before.
+  Notes:
+- [ ] Settings → scroll to **HEADLINER** → **about & updates** → **open**. You see the version ("Dev build…"), the musicTutor credit, "Updates are switched off in dev builds", the four data buttons, and the font credits.
+  Notes:
+- [ ] **Export progress**: a save box opens; save it to the Desktop. A zip appears there, and the screen says where it went.
+  Notes:
+- [ ] **Open save folder**: Explorer opens `headliner-dev`.
+  Notes:
+- [ ] **Import progress**: pick the zip you just exported. Headliner closes by itself. Start it again: everything is as it was. (A copy of what was there before is in the save folder's `backups`.)
+  Notes:
+- [ ] **Restore a backup**: a list of backups with dates. Pick the newest: Headliner closes; start it again and nothing is lost. Esc or Cancel closes the list without doing anything.
+  Notes:
+- [ ] Damaged save: close Headliner, open `headliner-dev\progress.json` in Notepad, delete everything, type `oops`, save. Start Headliner: you start fresh (if it asks for a name and hometown, type anything), and on the main screen a red line under the wordmark says your progress file was damaged and points to Restore a backup. Do that (pick the newest backup): Headliner closes; start it again and your progress is back.
+  Notes:
+
+## 15. Installing and updating (after the first release)
+
+Needs the two one-time steps in `docs/RELEASING.md` first (the signing secret; the repo made public). Then:
+
+- [ ] Tag `v0.1.0-beta.1` as `docs/RELEASING.md` says. GitHub → Actions → **Release** goes green; Releases shows four files.
+  Notes:
+- [ ] Download `Headliner-Setup-0.1.0-beta.1.exe` and install (SmartScreen: More info → Run anyway). Headliner opens with **no** DEV pill and your progress (copied from the old `musictutor` folder into `...\Roaming\headliner`; the old folder now has a `MIGRATED_TO_HEADLINER.txt`).
+  Notes:
+- [ ] Settings → About & updates: "Version v0.1.0-beta.1 · Beta channel", Stable/Beta buttons, **Check now** says "Up to date".
+  Notes:
+- [ ] Play something so it saves. Then tag `v0.1.0-beta.2` (with a CHANGELOG section). Open the installed Headliner: on the main screen "Headliner 0.1.0-beta.2 is available" with the notes and Update now · Later · Skip this version.
+  Notes:
+- [ ] **Update now**: a bar fills (Downloading… %), Headliner closes and opens again by itself. About shows beta.2; your progress is intact; `...\Roaming\headliner\backups` has a new backup.
+  Notes:
+- [ ] **Later** closes the box (it comes back next start); **Skip this version** stops offering that version (Check now still shows it).
+  Notes:
+- [ ] Rollback (I'll make the broken build for this test when you're ready): a release that quits on start. Update to it: Headliner tries twice, then comes back on the version you had with "The update wouldn't start, so Headliner went back…".
+  Notes:
+- [ ] Uninstall from Windows Settings → Apps: the box says your progress is not deleted, and `...\Roaming\headliner` is still there afterwards.
+  Notes:
+
 ---
 
 ## 11. Overall feel (check this last)

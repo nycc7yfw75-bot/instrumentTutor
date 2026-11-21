@@ -37,6 +37,8 @@ const (
 	srMotion
 	// srCareer changes the hometown or guitarist (CAREER.md §5.1).
 	srCareer
+	// srAbout opens About & updates (ONLINE.md §A1, §A6, §A7).
+	srAbout
 )
 
 type calPhase int
@@ -155,6 +157,8 @@ func calibrateWith(ctx context.Context, a AudioServices, captureID, playbackID s
 
 type Settings struct {
 	sh *Shell
+
+	system *SystemHooks // About & updates; nil hides the row
 
 	anim animator
 
@@ -381,6 +385,9 @@ func (s *Settings) rebuild() {
 	if s.motionPrefs() != nil {
 		s.rows = append(s.rows, srMotion)
 	}
+	if s.system != nil {
+		s.rows = append(s.rows, srAbout)
+	}
 	if s.cur >= len(s.rows) {
 		s.cur = len(s.rows) - 1
 	}
@@ -562,6 +569,8 @@ func (s *Settings) activate() {
 		s.openCareer()
 	case srMotion:
 		s.setReduceMotion(!reduceMotion)
+	case srAbout:
+		s.openAbout()
 	case srCapture, srPlayback:
 		s.notice = ""
 		if s.deviceStateOf(r) == devUnchosen {
@@ -1376,6 +1385,17 @@ func (s *Settings) items() []settingsItem {
 			s.setReduceMotion(!reduceMotion)
 		}})
 	}
+	if s.system != nil {
+		b.section("HEADLINER")
+		v := Build.Version
+		if Build.Dev {
+			v = "dev build"
+		}
+		b.addRow("about & updates", v+"  ·  updates, backups, export, credits", colHUD, settingsButton{label: "open", act: func(s *Settings) {
+			s.focusRow(srAbout)
+			s.openAbout()
+		}})
+	}
 
 	return b.out
 }
@@ -1660,5 +1680,17 @@ func (s *Settings) hasCareer() bool {
 func (s *Settings) openCareer() {
 	if st := s.progress(); st != nil && s.sh != nil {
 		s.sh.Show(NewCareerSetup(s.sh, st))
+	}
+}
+
+// SetSystem shows the About & updates row.
+func (s *Settings) SetSystem(h SystemHooks) {
+	s.system = &h
+	s.rebuild()
+}
+
+func (s *Settings) openAbout() {
+	if s.sh != nil && s.system != nil {
+		s.sh.Show(NewAboutScreen(s.sh, *s.system))
 	}
 }

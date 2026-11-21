@@ -135,6 +135,8 @@ type Store struct {
 
 	// readOnly: the file was saved by a newer HEADLINER; never write it.
 	readOnly bool
+	// quarantined is where an unreadable progress.json was moved aside.
+	quarantined string
 }
 
 // Path is where progress.json lives: beside config.json.
@@ -177,6 +179,7 @@ func openAt(path string, now func() time.Time) (*Store, error) {
 	if err := json.Unmarshal(data, &f); err != nil || f.Version < 1 {
 		bad := fmt.Sprintf("%s.bad-%s", path, now().Format("20060102-150405"))
 		_ = os.Rename(path, bad)
+		s.quarantined = bad // the app offers to restore a backup (ONLINE.md §A7)
 		return s, nil
 	}
 	if f.Version > version {
@@ -186,6 +189,7 @@ func openAt(path string, now func() time.Time) (*Store, error) {
 		// An older schema: keep a copy, then carry every field forward. New
 		// fields start empty; nothing is dropped.
 		_ = os.WriteFile(fmt.Sprintf("%s.v%d", path, f.Version), data, 0o644)
+		_, _ = appconfig.BackupSaves(filepath.Dir(path), "migration")
 		f.Version = version
 	}
 	if f.Profiles == nil {
@@ -319,4 +323,16 @@ func (s *Store) ReadOnly() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.readOnly
+}
+
+// Quarantined is where an unreadable progress.json was moved when this
+// store opened ("" if it was fine): the app then offers a backup.
+func (s *Store) Quarantined() string { return s.quarantined }
+
+// Freeze stops every further write: the file on disk was just replaced
+// (an import or a restored backup) and the app is closing.
+func (s *Store) Freeze() {
+	s.mu.Lock()
+	s.readOnly = true
+	s.mu.Unlock()
 }

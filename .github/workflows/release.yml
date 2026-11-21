@@ -1,0 +1,110 @@
+# Release (ONLINE.md §A5): a pushed tag v* builds Headliner, its installer
+# and portable zip, signs the checksums, and publishes a GitHub Release.
+# v1.2.0 is Stable; v1.3.0-beta.1 (anything with "-") is Beta and is
+# published as a pre-release.
+#
+# Needs the repo secret HEADLINER_SIGNING_KEY (see docs/RELEASING.md).
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.26.x
+          cache: true
+
+      - uses: msys2/setup-msys2@v2
+        id: msys2
+        with:
+          msystem: UCRT64
+          install: mingw-w64-ucrt-x86_64-gcc
+          path-type: inherit
+
+      - name: Put gcc on PATH
+        shell: pwsh
+        run: Add-Content $env:GITHUB_PATH "${{ steps.msys2.outputs.msys2-location }}\ucrt64\bin"
+
+      - name: Work out the version
+        id: ver
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          ver="${tag#v}"
+          channel=stable
+          case "$ver" in *-*) channel=beta ;; esac
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "ver=$ver" >> "$GITHUB_OUTPUT"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+
+      - name: Test
+        shell: bash
+        env:
+          CGO_ENABLED: "1"
+        run: go test ./... -count=1
+
+      - name: Build headliner.exe
+        shell: bash
+        env:
+          CGO_ENABLED: "1"
+        run: |
+          mkdir -p dist
+          go build -trimpath \
+            -ldflags "-s -w -H windowsgui -X main.version=${{ steps.ver.outputs.tag }} -X main.channel=${{ steps.ver.outputs.channel }} -X main.repo=${GITHUB_REPOSITORY}" \
+            -o dist/headliner.exe ./cmd/musictutor
+
+      - name: Portable zip
+        shell: pwsh
+        run: |
+          Copy-Item LICENSE, NOTICE.md dist/
+          Compress-Archive -Path dist/headliner.exe, dist/LICENSE, dist/NOTICE.md `
+            -DestinationPath "dist/headliner-${{ steps.ver.outputs.ver }}-windows-amd64.zip"
+
+      - name: Installer (Inno Setup)
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=${{ steps.ver.outputs.ver }}" installer/headliner.iss
+
+      - name: Checksums and signature
+        shell: bash
+        env:
+          HEADLINER_SIGNING_KEY: ${{ secrets.HEADLINER_SIGNING_KEY }}
+        run: |
+          cd dist
+          go run ../tools/releasesign -sums "Headliner-Setup-${{ steps.ver.outputs.ver }}.exe" "headliner-${{ steps.ver.outputs.ver }}-windows-amd64.zip"
+          go run ../tools/releasesign -sign SHA256SUMS
+          go run ../tools/releasesign -verify SHA256SUMS
+
+      - name: Release notes from CHANGELOG.md
+        shell: bash
+        run: |
+          awk -v v="${{ steps.ver.outputs.ver }}" '
+            $0 ~ "^## \\[" v "\\]" {on=1; next}
+            on && /^## \[/ {exit}
+            on {print}
+          ' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then echo "Headliner ${{ steps.ver.outputs.tag }}" > notes.md; fi
+
+      - name: Publish the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pre=""
+          if [ "${{ steps.ver.outputs.channel }}" = beta ]; then pre="--prerelease"; fi
+          gh release create "${{ steps.ver.outputs.tag }}" $pre \
+            --title "Headliner ${{ steps.ver.outputs.tag }}" --notes-file notes.md \
+            "dist/Headliner-Setup-${{ steps.ver.outputs.ver }}.exe" \
+            "dist/headliner-${{ steps.ver.outputs.ver }}-windows-amd64.zip" \
+            dist/SHA256SUMS dist/SHA256SUMS.sig

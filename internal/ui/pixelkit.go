@@ -345,7 +345,13 @@ func drawWordmark(dst *ebiten.Image, x, y float64) float64 {
 		drawTextScaled(dst, s, tx, y, dispL, tokBrand)
 		tx += textWScaled(s, dispL) + wordmarkTrack
 	}
-	return tx - wordmarkTrack - x
+	tx -= wordmarkTrack
+	if Build.Dev {
+		// A dev build (ONLINE.md §A3): its saves are kept apart.
+		tx += sp3
+		tx += drawPill(dst, tx, y+(sizeDisplayL-pillH)/2, "DEV", pillWarn)
+	}
+	return tx - x
 }
 
 // drawDialogCard draws a prompt's card (REDESIGN §8): a notched surface
