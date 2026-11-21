@@ -421,6 +421,19 @@ You need calibrated timing for your turns to count.
 - [ ] At the end: a trophy star drops, "<name> wins!" (or "A draw!" / the tie-break in words), a table of every turn's score and accuracy, totals, then **Rematch**, **New battle**, **Done**.
   Notes:
 
+## 13c. Battles: the battle riffs
+
+Eight short riffs written for battles, in your pieces folder under `battles`.
+
+- [ ] In New battle, switch Material to **Battle riffs**. Eight songs, easiest first: Basement Groove, Porch Light (Easy); Highway Hum, Neon Alley (Medium); Glass Teeth, Static Bloom (Hard); Midnight Sprint, Overdrive Sermon (Expert).
+  Notes:
+- [ ] Each riff is 16 bars in four 4-bar phrases. With Phrase bars 4 and Exchanges 4, every phrase gets one turn each.
+  Notes:
+- [ ] Play an Easy and a Medium one yourself in a battle (against Basement Benny is fine). The notes sit under your fingers and sound like a riff, not a scale exercise. The Easy and Medium ones have a bass line playing along.
+  Notes:
+- [ ] Try one Hard or Expert riff at 50–60% speed. Say if any bar feels unplayable.
+  Notes:
+
 ---
 
 ## 11. Overall feel (check this last)
@@ -439,4 +452,4 @@ You need calibrated timing for your turns to count.
 
 ## Not built yet (don't test these)
 
-- Battles, and the note highway (key Y).
+- Battle records, the battle XP bonus and the Records tab (next stage), and the note highway (key Y).
