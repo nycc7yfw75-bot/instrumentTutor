@@ -322,6 +322,21 @@ A day counts when the song has been **playing** for 5 minutes or more that day. 
 
 - [ ] Nothing crashed during any of the above.
   Notes:
+
+## 12b. Career: the tour map
+
+- [ ] On the landing page click **Perform** (or press **G**). The tour map opens: your city big at the top, "Bedroom · 0 / 3 gigs at 3 stars", Fame top right. A road with five stops (Bedroom, Jam room, Pub gigs, Opening act, Stadium); the current one has an amber outline.
+  Notes:
+- [ ] Below the road: five cards (Gig 1–4 and a Recording session) with fictional venue names (e.g. "The Spare Room on Juniper Street"), your city, "1 song", and five grey stars. The recording card says "No crowd · judged on accuracy and tightness".
+  Notes:
+- [ ] Before you've mastered a song the Bedroom says **locked**, the cards are dimmed, and "TO BOOK BEDROOM" lists "Level 1" (green tick) and "1 mastered song" (not yet).
+  Notes:
+- [ ] Click another stop on the road: the road slides over to it. Press ↑ / ↓: it jumps at once. ← / → choose a card.
+  Notes:
+- [ ] Once a song is mastered: click a Bedroom card twice (or press Enter): a **Setlist** box lists your mastered songs with difficulty and best %. Click one (or Space): a numbered amber box marks its place in the set. **Play gig** lights up when the set is full. Esc closes the box.
+  Notes:
+- [ ] Next time you open the same gig, the setlist you used last is already picked.
+  Notes:
 - [ ] Anything that looks wrong, ugly or confusing (screen and what you saw):
   Notes:
 

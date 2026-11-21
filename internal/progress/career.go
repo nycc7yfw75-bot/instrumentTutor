@@ -3,6 +3,7 @@ package progress
 import (
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -56,10 +57,10 @@ func (s *Store) AddXP(xp int) (leveledUp bool, err error) {
 
 // MasteredSong is one mastered song+track.
 type MasteredSong struct {
-	SongID string
-	Track  int
-	Title  string
-	Path   string
+	SongID     string
+	Track      int
+	Title      string
+	Path       string
 	Difficulty string // "Easy".."Expert", or "" if never saved
 	career.Mastery
 }
@@ -83,6 +84,12 @@ func (s *Store) Mastered() []MasteredSong {
 		info := prof.Songs[id]
 		out = append(out, MasteredSong{SongID: id, Track: track, Title: info.Title, Path: info.Path, Difficulty: info.Difficulty, Mastery: m})
 	}
+	sort.Slice(out, func(i, j int) bool {
+		if a, b := strings.ToLower(out[i].Title), strings.ToLower(out[j].Title); a != b {
+			return a < b
+		}
+		return out[i].SongID+fmt.Sprint(out[i].Track) < out[j].SongID+fmt.Sprint(out[j].Track)
+	})
 	return out
 }
 

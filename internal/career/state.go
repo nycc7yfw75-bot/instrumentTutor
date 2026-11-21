@@ -27,7 +27,7 @@ type GigRecord struct {
 }
 
 // Started reports a career set up on first launch (§5.1).
-func (s *State) Started() bool { return s.Hometown != "" }
+func (s State) Started() bool { return s.Hometown != "" }
 
 // Setup records the first-launch choices.
 func (s *State) Setup(hometown string, character int, seed int64) {
@@ -65,7 +65,7 @@ func (s *State) record(id string) *GigRecord {
 }
 
 // Record is a gig's record (a zero one before the first attempt).
-func (s *State) Record(id string) GigRecord {
+func (s State) Record(id string) GigRecord {
 	if r := s.Gigs[id]; r != nil {
 		return *r
 	}

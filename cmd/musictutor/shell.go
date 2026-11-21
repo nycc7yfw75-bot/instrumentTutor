@@ -57,6 +57,9 @@ func runShell(initialPath string) error {
 	sh.Replace(landing)
 	landing.SetPractice(func() { sh.Show(browser) })
 	landing.SetSettings(func() { opener.showSettings(nil) })
+	if store != nil {
+		landing.SetPerform(func() { sh.Show(opener.performScreen()) })
+	}
 	opener.shell = sh
 	opener.browser = browser
 	browser.SetSettingsOpener(func() { opener.showSettings(nil) })
@@ -865,4 +868,12 @@ func needsCareerSetup(st *progress.Store) bool {
 	}
 	c := st.Career()
 	return !c.Started() && !st.ReadOnly()
+}
+
+// performScreen opens the tour map (CAREER.md §4.3); its Play gig button
+// starts a gig (§3).
+func (o *shellOpener) performScreen() *ui.PerformScreen {
+	ps := ui.NewPerformScreen(o.shell, o.store)
+	o.wireGigs(ps)
+	return ps
 }

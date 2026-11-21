@@ -74,7 +74,7 @@ func main() {
 
 func build(which, piece string) (ui.Screen, error) {
 	switch which {
-	case "landing", "career-setup":
+	case "landing", "career-setup", "perform":
 		st := shotProgress()
 		if which == "career-setup" {
 			return ui.NewCareerSetup(nil, st), nil
@@ -84,6 +84,9 @@ func build(which, piece string) (ui.Screen, error) {
 		l := ui.NewLanding(sh)
 		l.SetPractice(func() {})
 		l.SetPerform(func() {})
+		if which == "perform" {
+			return ui.NewPerformScreen(sh, st), nil
+		}
 		l.SetSettings(func() {})
 		return l, nil
 
