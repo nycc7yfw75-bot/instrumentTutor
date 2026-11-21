@@ -16,7 +16,7 @@ import (
 func TestMigrationKeepsAllScoringData(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "progress.json")
-	v1 := `{"version":1,"activeProfile":"abc","profiles":{"abc":{"name":"Aarsh","xp":{"totalXP":1234},"level":4,
+	v1 := `{"version":1,"activeProfile":"abc","profiles":{"abc":{"name":"Alex","xp":{"totalXP":1234},"level":4,
 	"bests":{"s#0":{"accuracy":0.91,"tightMean":4,"tempo":1}},"passes":[{"song":"s","xp":42}],
 	"practice":{"days":{"2026-11-20":600}},"songs":{"s":{"title":"Riff","path":"C:/r.gtab"}},
 	"badges":{"slow-clean":"2026-11-20T10:00:00Z"}}}}`
@@ -28,7 +28,7 @@ func TestMigrationKeepsAllScoringData(t *testing.T) {
 		t.Fatal(err)
 	}
 	name, xp, ok := s.Active()
-	if !ok || name != "Aarsh" || xp.TotalXP != 1234 {
+	if !ok || name != "Alex" || xp.TotalXP != 1234 {
 		t.Fatalf("after migration the player is %q with %d XP", name, xp.TotalXP)
 	}
 	if acc, ok := s.BestAccuracy("s", 0); !ok || acc != 0.91 {

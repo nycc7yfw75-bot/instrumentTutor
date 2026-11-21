@@ -46,3 +46,13 @@ Thumbs.db
 
 # Claude Code local session data
 .claude/
+
+# The owner's own setup notes for Claude Code (personal; never committed)
+/CLAUDE.local.md
+
+# Release builds and the signing key, should one ever land here
+/headliner.exe
+*.key
+
+# The owner's manual test checklist (personal; kept on the laptop, not published)
+/debug.md

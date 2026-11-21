@@ -114,12 +114,12 @@ func TestNamePromptSavesAndRenames(t *testing.T) {
 	if err := p.save(); err != nil || p.err == "" {
 		t.Errorf("an empty name: err %v, message %q; want it refused with a message", err, p.err)
 	}
-	p.name = "Aaditya"
+	p.name = "Alex"
 	if err := p.save(); err != errQuit {
 		t.Fatalf("saving a name returned %v, want the prompt to close", err)
 	}
 	p = NewNamePrompt(nil, st)
-	if p.name != "Aaditya" {
+	if p.name != "Alex" {
 		t.Errorf("rename prompt starts with %q, want the current name", p.name)
 	}
 	p.name = "Ady"

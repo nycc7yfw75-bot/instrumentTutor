@@ -12,13 +12,13 @@ func TestBattlesAreFiledPerProfileAndSurviveAReopen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, _ := s.CreateProfile("Aarsh")
+	a, _ := s.CreateProfile("Alex")
 	b, _ := s.AddProfile("Friend")
 	xpBefore := func(id string) int { p, _ := s.Profile(id); return p.XP.TotalXP }
 	a0, b0 := xpBefore(a), xpBefore(b)
 
-	// Aarsh beats Friend and Benny: +50 XP to Aarsh, nothing to Friend.
-	log := BattleLog{Material: "Riff", Participants: []string{"Aarsh", "Friend", "Basement Benny"}, Totals: []int{900, 700, 600}, Winner: "Aarsh"}
+	// Alex beats Friend and Benny: +50 XP to Alex, nothing to Friend.
+	log := BattleLog{Material: "Riff", Participants: []string{"Alex", "Friend", "Basement Benny"}, Totals: []int{900, 700, 600}, Winner: "Alex"}
 	if _, err := s.RecordBattle(a, BattleFiling{Log: log, Total: 900, Scored: true, Overall: OutcomeWin,
 		Against: map[string]int{"profile:" + b: OutcomeWin, "rival:Basement Benny": OutcomeWin}, BonusXP: 50}); err != nil {
 		t.Fatal(err)
@@ -41,13 +41,13 @@ func TestBattlesAreFiledPerProfileAndSurviveAReopen(t *testing.T) {
 	ra, _ := s2.BattleRecordOf(a)
 	rb, _ := s2.BattleRecordOf(b)
 	if ra.Totals != (BattleTotals{Wins: 1}) || rb.Totals != (BattleTotals{Losses: 1}) {
-		t.Errorf("after a reopen: Aarsh %+v, Friend %+v", ra.Totals, rb.Totals)
+		t.Errorf("after a reopen: Alex %+v, Friend %+v", ra.Totals, rb.Totals)
 	}
 	if rb.PerOpponent["rival:Basement Benny"].Wins != 1 || rb.PerOpponent["profile:"+a].Losses != 1 {
 		t.Errorf("Friend's record per opponent: %+v", rb.PerOpponent)
 	}
-	if ra.Best != 900 || len(ra.Log) != 1 || ra.Log[0].Winner != "Aarsh" {
-		t.Errorf("Aarsh's best %d, log %+v", ra.Best, ra.Log)
+	if ra.Best != 900 || len(ra.Log) != 1 || ra.Log[0].Winner != "Alex" {
+		t.Errorf("Alex's best %d, log %+v", ra.Best, ra.Log)
 	}
 	if p, _ := s2.Profile(a); p.Record.Wins != 1 {
 		t.Error("the profile card doesn't show the win")
@@ -56,7 +56,7 @@ func TestBattlesAreFiledPerProfileAndSurviveAReopen(t *testing.T) {
 
 func TestAnUnscoredBattleIsLoggedButNotCounted(t *testing.T) {
 	s, _ := OpenFile(filepath.Join(t.TempDir(), "progress.json"))
-	a, _ := s.CreateProfile("Aarsh")
+	a, _ := s.CreateProfile("Alex")
 	s.RecordBattle(a, BattleFiling{Log: BattleLog{Material: "Riff"}, Total: 5000, Overall: OutcomeLoss})
 	r, _ := s.BattleRecordOf(a)
 	if r.Totals != (BattleTotals{}) || r.Best != 0 || len(r.Log) != 1 {
@@ -66,7 +66,7 @@ func TestAnUnscoredBattleIsLoggedButNotCounted(t *testing.T) {
 
 func TestTheBattleLogKeepsTheLast50(t *testing.T) {
 	s, _ := OpenFile(filepath.Join(t.TempDir(), "progress.json"))
-	a, _ := s.CreateProfile("Aarsh")
+	a, _ := s.CreateProfile("Alex")
 	for i := 0; i < 60; i++ {
 		s.RecordBattle(a, BattleFiling{Log: BattleLog{Material: fmt.Sprint(i)}, Scored: true, Overall: OutcomeDraw})
 	}

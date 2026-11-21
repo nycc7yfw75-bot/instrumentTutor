@@ -183,7 +183,7 @@ One `TIMING` object + one config per element in code, as above.
 ```
 With 3–4 participants the cards enter from left and right alternately.
 
-**B2.3 Turn banner** — "EXCHANGE 2 / 4 — AADITYA" fades in + translateY −12→0, `toastIn`; "Pass the guitar" sub-line follows 90ms later (only if the previous turn was a different human). On Ready: banner exits `toastOut`, then the count-in starts (chained, not overlapped).
+**B2.3 Turn banner** — "EXCHANGE 2 / 4 — ALEX" fades in + translateY −12→0, `toastIn`; "Pass the guitar" sub-line follows 90ms later (only if the previous turn was a different human). On Ready: banner exits `toastOut`, then the count-in starts (chained, not overlapped).
 
 **B2.4 Scoreboard**
 - Active participant: a `brand` underline under their name — the battle screen's main amber accent (the LIVE pill switches to its outline style in battles). It slides to the next participant, `move` `easeInOut`, as the turn changes.

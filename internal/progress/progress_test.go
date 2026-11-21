@@ -75,7 +75,7 @@ func TestFirstLaunchAsksForANameThenRemembersIt(t *testing.T) {
 	if _, err := s.CreateProfile("  "); err == nil {
 		t.Error("an empty name was accepted")
 	}
-	if _, err := s.CreateProfile("Aaditya the very long-named player"); err != nil {
+	if _, err := s.CreateProfile("Alex the very long-named player"); err != nil {
 		t.Fatal(err)
 	}
 	again, err := openAt(path, clockAt(now))
@@ -86,10 +86,10 @@ func TestFirstLaunchAsksForANameThenRemembersIt(t *testing.T) {
 	if !ok || again.NeedsProfile() || len([]rune(name)) != maxNameRunes {
 		t.Errorf("after reopening: profile %q (ok %v); want the name kept, cut to %d letters", name, ok, maxNameRunes)
 	}
-	if err := again.Rename("Aaditya"); err != nil {
+	if err := again.Rename("Alex"); err != nil {
 		t.Fatal(err)
 	}
-	if name, _, _ := again.Active(); name != "Aaditya" {
+	if name, _, _ := again.Active(); name != "Alex" {
 		t.Errorf("renamed profile reads %q", name)
 	}
 }

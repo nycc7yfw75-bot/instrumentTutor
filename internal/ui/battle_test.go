@@ -10,7 +10,7 @@ import (
 
 func battleFixture(t *testing.T, calibrated bool) (*BattleSetup, *App) {
 	t.Helper()
-	st := tempStore(t, "Aarsh")
+	st := tempStore(t, "Alex")
 	a := newApp(t, 8)
 	deps := BattleDeps{
 		Songs:      func() []PieceInfo { return []PieceInfo{{Path: "riff.gtab", Title: "Riff"}} },

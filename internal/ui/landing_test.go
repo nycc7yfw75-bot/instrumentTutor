@@ -9,7 +9,7 @@ import (
 
 func landingFixture(t *testing.T) *Landing {
 	t.Helper()
-	st := tempStore(t, "Aarsh")
+	st := tempStore(t, "Alex")
 	st.UpdateCareer(func(c *career.State) { c.Setup("Mumbai", 1, 42) })
 	l := NewLanding(NewShell(Services{Prefs: &browserFakePrefs{}, Progress: st}, nil))
 	l.SetPractice(func() {})
@@ -75,12 +75,12 @@ func TestCareerSetupSavesNameHometownAndGuitarist(t *testing.T) {
 	if c.editing {
 		t.Fatal("a profile without a career opened the setup in edit mode")
 	}
-	c.name, c.city, c.char = "Aarsh", 2, 3 // Bangalore, Sol
+	c.name, c.city, c.char = "Alex", 2, 3 // Bangalore, Sol
 	if err := c.trySave(); err != errQuit {
 		t.Fatalf("saving returned %v", err)
 	}
 	cs := st.Career()
-	if name, _, _ := st.Active(); name != "Aarsh" || cs.Hometown != "Bangalore" || cs.Character != 3 || cs.RouteSeed == 0 {
+	if name, _, _ := st.Active(); name != "Alex" || cs.Hometown != "Bangalore" || cs.Character != 3 || cs.RouteSeed == 0 {
 		t.Errorf("saved %q, %+v", name, cs)
 	}
 	// Changing the hometown later asks first.

@@ -146,7 +146,7 @@ If `docs/CAREER.md` has landed, Battles is entered from the landing page's **Bat
 - **Crowd meter** under it (§4.3): 2 players = 24-block pixel tug-of-war bar with a pixel crowd marker; 3–4 players = split bar in profile tints.
 - **Middle: tab** — the current phrase only, using the practice tab renderer (verdicts, live ghosts).
 - **Turn flow:**
-  1. Banner: "EXCHANGE 2 / 4 — PLAYER: Aaditya" (+ "pass the guitar" if the previous turn was a different human).
+  1. Banner: "EXCHANGE 2 / 4 — PLAYER: Alex" (+ "pass the guitar" if the previous turn was a different human).
   2. Human: "Ready" (Space) → sound check if first turn → count-in 1 bar → play phrase → result card.
   3. Bot: 1 s "Rusher Rex is up…" → plays → result card.
   4. **Result card**: turn accuracy, tightness label, turnScore, then crowd swing and total — chained, never simultaneous (MOTION §B2.5). Space jumps to the end; auto-advance 3 s after the last step.

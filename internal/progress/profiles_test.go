@@ -10,14 +10,14 @@ func TestSeveralProfilesShareTheLaptop(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, _ := s.CreateProfile("Aarsh")
+	a, _ := s.CreateProfile("Alex")
 	b, err := s.AddProfile("Friend")
 	if err != nil {
 		t.Fatal(err)
 	}
 	ps := s.Profiles()
 	if len(ps) != 2 || !ps[0].Active || ps[0].ID != a {
-		t.Fatalf("profiles %+v; Aarsh stays active, first", ps)
+		t.Fatalf("profiles %+v; Alex stays active, first", ps)
 	}
 	if ps[0].Tint == ps[1].Tint {
 		t.Error("two profiles share a tint")
@@ -28,7 +28,7 @@ func TestSeveralProfilesShareTheLaptop(t *testing.T) {
 	if name, _, _ := s.Active(); name != "Friend" {
 		t.Errorf("active is %q after switching", name)
 	}
-	if err := s.RenameProfile(a, "Aarsh V"); err != nil {
+	if err := s.RenameProfile(a, "Alex V"); err != nil {
 		t.Fatal(err)
 	}
 	if long, _ := s.AddProfile("A name that is far too long to fit"); long != "" {

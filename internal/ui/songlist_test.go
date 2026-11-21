@@ -116,7 +116,7 @@ func cardBrowser(t *testing.T, name string) *Browser {
 }
 
 func TestCardShowsEveryBadgeEarnedFirst(t *testing.T) {
-	b := cardBrowser(t, "Aarsh")
+	b := cardBrowser(t, "Alex")
 	ms := b.cardMedals()
 	if len(ms) != len(progress.Badges) {
 		t.Fatalf("the card knows %d badges, want all %d", len(ms), len(progress.Badges))
@@ -132,7 +132,7 @@ func TestCardShowsEveryBadgeEarnedFirst(t *testing.T) {
 }
 
 func TestBKeyOpensTheBadges(t *testing.T) {
-	b := cardBrowser(t, "Aarsh")
+	b := cardBrowser(t, "Alex")
 	if err := b.handleKey(ebiten.KeyB); err != nil {
 		t.Fatal(err)
 	}

@@ -553,7 +553,7 @@ func (s *BattleScreen) drawVS(dst *ebiten.Image) {
 	drawText(dst, sub, math.Round((screenW-textW(sub))/2), y+96, colDim)
 }
 
-// drawBanner is the turn banner: "EXCHANGE 2 / 4 — PLAYER: Aaditya".
+// drawBanner is the turn banner: "EXCHANGE 2 / 4 — PLAYER: Alex".
 func (s *BattleScreen) drawBanner(dst *ebiten.Image) {
 	p := s.participant(s.player)
 	c := s.cardRect(620, 170)

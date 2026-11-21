@@ -1,12 +1,16 @@
 # CLAUDE.md
 
-Private fork of `S95F/instrumentTutor`, being turned into a guitar career game.
-The full build plan lives at `D:\AARSH\Projects\GuitarCareer\musicTutor → Guitar Career Game Build Plan.md`.
+Fork of `S95F/instrumentTutor`, being turned into a guitar career game (Headliner).
+The owner's own setup (audio gear, save folders, test songs, the build plan's location)
+is in `CLAUDE.local.md`, which is not committed.
 
 ## Owner
 
 The owner is a guitarist, not a programmer. Test steps for them must be written as
 "click this, play that, you should see X". No jargon.
+
+`debug.md` (repo root) is the owner's manual test checklist. It is gitignored (personal):
+keep adding each feature's tests to it, but never commit it.
 
 ## Build and test (Windows, run from Git Bash)
 
@@ -21,7 +25,7 @@ CGO_ENABLED=1 go build ./cmd/musictutor
 
 ## Git
 
-- Work on branch `career-mode`. `origin` = private repo (nycc7yfw75-bot/instrumentTutor),
+- Work on feature branches. `origin` = the owner's repo (nycc7yfw75-bot/instrumentTutor, public),
   `upstream` = the original developer's repo. Never push to `upstream`, never open PRs upstream.
 - Commit only after the owner has tested on the guitar and said it works.
 
@@ -42,12 +46,7 @@ Not doing: XP for minutes played, leaderboards, subscriptions, 3D graphics, bund
 - `docs/PROGRESS.md` — scoring, combo, streaks, badges (Phase 2). Build as written.
 - `docs/HIGHWAY.md` — note highway (Phase 4). Build as written; toggle key is **Y** (V = mixer).
 
-## Owner's setup
+## Product decisions
 
-- Audio: Marshall CODE 25 over USB, used as both input and output. It cannot do loopback calibration.
-- Save + pieces folder (ONLINE.md §A2–A3): dev builds (`go build`) use `C:\Users\Dell\AppData\Roaming\headliner-dev` (pieces in `pieces\`); installed releases use `...\Roaming\headliner`. Both started as copies of the old `...\Roaming\musictutor`, which is kept untouched.
-- Release signing key: `C:\Users\Dell\.headliner-signing\release.key` (never commit; it is the repo secret HEADLINER_SIGNING_KEY).
-- Main song: `Dire Straits-Sultans Of Swing-10-29-2026.gp` (fingerstyle/legato — expect false misses).
-- Reference test song (simple picked notes): `First steps on guitar.gtab`.
 - Career profile stage/band name: editable in the app (no default needed).
 - Setlists for live shows: chosen by the player, not suggested.

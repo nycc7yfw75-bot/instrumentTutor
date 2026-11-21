@@ -440,7 +440,7 @@ func shotProgress() *progress.Store {
 	if err != nil {
 		return nil
 	}
-	if _, err := st.CreateProfile("Aarsh"); err != nil {
+	if _, err := st.CreateProfile("Alex"); err != nil {
 		return nil
 	}
 	pass := func(tempo, acc float64, secs float64) {
@@ -479,7 +479,7 @@ func seedBattles(st *progress.Store) {
 		{"Highway Hum", "Session Player (Medium)", "session:Medium", 1040, 860},
 		{"Neon Alley", "Basement Benny", "rival:Basement Benny", 980, 702},
 	} {
-		o, winner := progress.OutcomeWin, "Aarsh"
+		o, winner := progress.OutcomeWin, "Alex"
 		switch {
 		case x.mine < x.theirs:
 			o, winner = progress.OutcomeLoss, x.opp
@@ -487,7 +487,7 @@ func seedBattles(st *progress.Store) {
 			o, winner = progress.OutcomeDraw, ""
 		}
 		st.RecordBattle(me, progress.BattleFiling{Scored: true, Total: x.mine, Overall: o, Against: map[string]int{x.key: o},
-			Log: progress.BattleLog{Date: day.AddDate(0, 0, i), Material: x.mat, Participants: []string{"Aarsh", x.opp},
+			Log: progress.BattleLog{Date: day.AddDate(0, 0, i), Material: x.mat, Participants: []string{"Alex", x.opp},
 				Totals: []int{x.mine, x.theirs}, Winner: winner}})
 	}
 }

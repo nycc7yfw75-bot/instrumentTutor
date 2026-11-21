@@ -7,7 +7,7 @@ For the owner. Plain steps; each one says what you should see.
 Every update is checked against a signature, so nobody can slip a fake
 update in. The signing key was made on your laptop and lives at:
 
-    C:\Users\Dell\.headliner-signing\release.key
+    %USERPROFILE%\.headliner-signing\release.key
 
 Keep that file safe and private: never commit it, never paste it anywhere
 public. Back it up somewhere only you can reach (a USB stick). If it's

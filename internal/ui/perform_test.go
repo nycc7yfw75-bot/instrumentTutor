@@ -11,7 +11,7 @@ import (
 // masteredStore is a profile with a career and n mastered songs.
 func masteredStore(t *testing.T, n int) *progress.Store {
 	t.Helper()
-	st := tempStore(t, "Aarsh")
+	st := tempStore(t, "Alex")
 	st.UpdateCareer(func(c *career.State) { c.Setup("London", 0, 7) })
 	for i := 0; i < n; i++ {
 		st.RecordPass(progress.Pass{SongID: string(rune('a' + i)), Title: "Song " + string(rune('A'+i)), TempoScale: 1,
