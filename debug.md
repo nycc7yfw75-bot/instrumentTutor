@@ -206,7 +206,9 @@ A day counts when the song has been **playing** for 5 minutes or more that day. 
 
 ---
 
-## 8c. Player card and badges (start screen)
+## 8c. Player card and badges
+
+Update: the player card moved to the top of the landing page (section 12): name, level, XP, Fame, streak and the badge tiles are there now, and A opens every badge. The badge tests below still apply; read "start screen card" as "landing page".
 
 - [ ] Top right of the start screen there's a card with your **name**, **LV 1 · Bedroom Player**, "10 / 100 XP" and an amber XP bar. Settings (cog) and Help (?) are in its top-right corner and still open Settings and Help.
   Notes:
@@ -313,15 +315,10 @@ A day counts when the song has been **playing** for 5 minutes or more that day. 
   Notes:
 - [ ] Settings → PROFILE now has a **career** row ("Mumbai · Rae"). Click **change**: pick a different hometown and Save. A "Change hometown?" box asks first; **Cancel** is highlighted by default (Enter = Cancel). Click **Change hometown** to confirm; the Perform door now names cities from the new hometown.
   Notes:
-- [ ] Your old progress is safe: level, XP, badges and streak are the same as before the update. A file `progress.json.v1` (the old save) now sits next to `progress.json` in `C:SERSDELLAPPDATAROAMINGMUSICTUTOR`.
-  NOTES:
+- [ ] Your old progress is safe: level, XP, badges and streak are the same as before the update. A file `progress.json.v1` (the old save) now sits next to `progress.json` in `C:\Users\Dell\AppData\Roaming\musictutor\`.
+  Notes:
 
 ---
-
-## 11. OVERALL FEEL
-
-- [ ] Nothing crashed during any of the above.
-  Notes:
 
 ## 12b. Career: the tour map
 
@@ -384,6 +381,24 @@ Space skips each of these to its end. With Settings → reduce motion on, each o
 - [ ] **Clearing a tier** (3 gigs of a tier at 3 stars or more): after the end card, Back to tour first shows "<Tier> cleared", the next venue sliding in, "Booked: Jam room, <city>", and your Fame counting up. Space or a click carries on to the tour.
   Notes:
 - [ ] **Song mastered:** finish a song in Practice that masters it (full run, 100% speed, 90%+). The pass review opens with an amber MASTERED stamp that pops with a burst of sparks, then "Now available for gigs".
+  Notes:
+
+---
+
+## 13. Battles: profiles
+
+- [ ] Settings → PROFILE → **profiles**: the Profiles screen lists everyone who plays here, each with a guitar in their own colour, name, "LV … · title" and a record "0W 0L 0D". The one playing has a **PLAYING** tag.
+  Notes:
+- [ ] **New profile** (or N): type a name (20 letters at most), Save. **Rename** (or R) changes the highlighted one. **Play as this** (or Enter, or clicking a row twice) switches who's playing: the landing page shows their name, level and badges.
+  Notes:
+- [ ] **Delete** (or Del): "Delete <name>?" says their level, XP, badges, career and battle record will be lost. **Cancel** is highlighted (Enter = Cancel); **Delete profile** removes them.
+  Notes:
+
+---
+
+## 11. Overall feel (check this last)
+
+- [ ] Nothing crashed during any of the above.
   Notes:
 - [ ] Anything that looks wrong, ugly or confusing (screen and what you saw):
   Notes:
