@@ -33,7 +33,7 @@ func riff(t *testing.T, bars int) *score.Score {
 func players(n int) []Participant {
 	out := make([]Participant, n)
 	for i := range out {
-		out[i] = Participant{Name: string(rune('A' + i)), Kind: Human, TempoScale: 1}
+		out[i] = Participant{Name: string(rune('A' + i)), Kind: KindHuman, TempoScale: 1}
 	}
 	return out
 }

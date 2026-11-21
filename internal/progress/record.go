@@ -2,6 +2,7 @@ package progress
 
 import (
 	"fmt"
+	"strings"
 	"math"
 	"sort"
 	"time"
@@ -192,4 +193,39 @@ func lastDayBefore(days map[string]float64, today string) string {
 		}
 	}
 	return last
+}
+
+// StoredPass is a stored best pass and the bars it covers (as numbered on
+// screen), for a battle's "your own ghost" (BATTLES.md §5.2).
+type StoredPass struct {
+	FromBar, ToBar int
+	Replay
+}
+
+// StoredPasses lists a profile's stored best passes for a song track.
+// profileID "" means the active profile.
+func (s *Store) StoredPasses(profileID, songID string, track int) []StoredPass {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	prof := s.active()
+	if profileID != "" {
+		prof = s.f.Profiles[profileID]
+	}
+	if prof == nil {
+		return nil
+	}
+	prefix := fmt.Sprintf("%s#%d#", songID, track)
+	var out []StoredPass
+	for key, r := range prof.Replays {
+		if !strings.HasPrefix(key, prefix) {
+			continue
+		}
+		var from, to int
+		if _, err := fmt.Sscanf(key[len(prefix):], "%d-%d", &from, &to); err != nil {
+			continue
+		}
+		out = append(out, StoredPass{FromBar: from, ToBar: to, Replay: *r})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].FromBar < out[j].FromBar })
+	return out
 }

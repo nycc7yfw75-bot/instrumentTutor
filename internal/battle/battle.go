@@ -13,14 +13,14 @@ import (
 type Kind int
 
 const (
-	Human   Kind = iota // a local profile
-	Rival               // a named rival bot
-	Ghost               // a profile's stored best pass
-	Session             // the difficulty slider bot
+	KindHuman   Kind = iota // a local profile
+	KindRival               // a named rival bot
+	KindGhost               // a profile's stored best pass
+	KindSession             // the difficulty slider bot
 )
 
 // IsBot reports a participant the computer plays.
-func (k Kind) IsBot() bool { return k != Human }
+func (k Kind) IsBot() bool { return k != KindHuman }
 
 // Participant is one player in a battle.
 type Participant struct {
@@ -33,7 +33,7 @@ type Participant struct {
 
 // Tempo is the participant's tempo: a human's chosen handicap, else full.
 func (p Participant) Tempo() float64 {
-	if p.Kind == Human && p.TempoScale > 0 {
+	if p.Kind == KindHuman && p.TempoScale > 0 {
 		return math.Max(HumanTempoMin, math.Min(HumanTempoMax, p.TempoScale))
 	}
 	return 1
@@ -262,7 +262,7 @@ type Result struct {
 func (b *Battle) Result() Result {
 	r := Result{Totals: b.Totals(), Winner: -1}
 	for _, t := range b.turns {
-		if !t.Scored && b.Setup.Participants[t.Player].Kind == Human {
+		if !t.Scored && b.Setup.Participants[t.Player].Kind == KindHuman {
 			r.Unscored = true
 			return r
 		}
