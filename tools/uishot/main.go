@@ -7,6 +7,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -204,6 +205,31 @@ func build(which, piece string) (ui.Screen, error) {
 		app.SetLiveWarning(fmt.Sprintf("imported with %d warnings: %s (and %d more)", len(w), w[0], len(w)-1))
 		app.SetWarnListOpen(true)
 		return app, nil
+	case "battle-setup", "battle-vs", "battle-banner", "battle-result", "battle-results":
+		eng.ClearLoop()
+		st := shotProgress()
+		st.AddProfile("Friend")
+		deps := ui.BattleDeps{
+			Songs:      func() []ui.PieceInfo { return []ui.PieceInfo{{Path: piece, Title: "Fixture Riff", Difficulty: "Easy"}} },
+			LoadScore:  func(string) (*score.Score, error) { return s, nil },
+			Calibrated: func() bool { return true },
+			Open:       func(string, int) (*ui.App, error) { return app, nil },
+			Close:      func() {},
+		}
+		bs := ui.NewBattleSetup(nil, st, deps)
+		if which == "battle-setup" {
+			return bs, nil
+		}
+		setup, ok := bs.SetupForShot()
+		if !ok {
+			return nil, fmt.Errorf("battle setup failed")
+		}
+		scr, err := ui.NewBattleScreen(nil, st, deps, setup, nil)
+		if err != nil {
+			return nil, err
+		}
+		scr.ShotState(strings.TrimPrefix(which, "battle-"))
+		return scr, nil
 	case "gig", "gig-tough", "gig-booed", "gig-end":
 		eng.ClearLoop()
 		eng.SeekTick(s.Tracks[0].Bars[1].Start)

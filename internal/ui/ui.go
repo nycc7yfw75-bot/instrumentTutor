@@ -58,6 +58,7 @@ type App struct {
 	flatFor   float64
 	chrome    chromeMotion // the header and HUD's small motions (MOTION §A)
 	gig       *gigMode     // non-nil while this view plays a gig (CAREER.md §3)
+	botTurn   bool         // a battle bot is playing: the input is not judged
 
 	zoom float64
 

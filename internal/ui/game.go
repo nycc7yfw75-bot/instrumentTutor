@@ -121,6 +121,10 @@ func (a *App) gameStep() {
 	if g.sess == nil {
 		return
 	}
+	if a.botTurn {
+		g.wasPlaying = false // the next human turn starts a fresh pass
+		return
+	}
 	defer func() {
 		// The game layer must never take a practice session down with it.
 		if r := recover(); r != nil {

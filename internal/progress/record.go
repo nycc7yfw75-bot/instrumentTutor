@@ -2,9 +2,9 @@ package progress
 
 import (
 	"fmt"
-	"strings"
 	"math"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/S95F/musicTutor/internal/career"

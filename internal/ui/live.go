@@ -144,6 +144,9 @@ func (a *App) syncLive() {
 	}
 	a.warnAsserted = posted
 
+	if a.botTurn {
+		rs = nil // a bot is playing: nothing the input does counts
+	}
 	if len(rs) > 0 && a.verdicts == nil {
 		a.verdicts = make(map[noteKey]practice.Verdict)
 	}

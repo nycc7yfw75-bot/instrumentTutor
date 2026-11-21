@@ -394,6 +394,33 @@ Space skips each of these to its end. With Settings → reduce motion on, each o
 - [ ] **Delete** (or Del): "Delete <name>?" says their level, XP, badges, career and battle record will be lost. **Cancel** is highlighted (Enter = Cancel); **Delete profile** removes them.
   Notes:
 
+## 13b. Battles: playing a battle
+
+You need calibrated timing for your turns to count.
+
+- [ ] The landing page now has a third door, **Battles** (or press **B**). It opens **New battle**: Material (Your songs / Battle riffs), Song, Track, Section, Player 1–4, Phrase bars, Exchanges. ↑ ↓ move between rows, ← → change the highlighted row (Shift+← → or the second pair of arrows change a player's speed or which rival).
+  Notes:
+- [ ] Player 1 is you (**Profile**) at 100%. Lower your speed: the row shows e.g. "60%  counts as ×0.77" (playing slower counts for less, but you can still win).
+  Notes:
+- [ ] Player 2 can be a **Rival** (Basement Benny and Rusher Rex are open at level 1; locked ones read "Rival: ???  Unlocks at level N"), a **Ghost** (someone's best pass on this section), or the **Session Player** (Easy / Medium / Hard / Expert). Players 3 and 4 can be added the same way or left as Nobody.
+  Notes:
+- [ ] Start battle explains itself when it can't go: a locked rival, the same profile twice, "Play this section once to create a ghost", or timing not calibrated (then a **Calibrate** button opens Settings). A short section warns that it has fewer exchanges than asked.
+  Notes:
+- [ ] **Start battle**: the names slide in with **VS**. On top a scoreboard (picture, name, BOT tag, running total, a dot per exchange) and a crowd meter; the tab below.
+  Notes:
+- [ ] Each turn starts with a banner "EXCHANGE 1 / 4" and who's up. On your turn press **Space**. Your first turn starts with a **sound check**: pluck your open strings one at a time until it says "Heard you". Then one bar of count-in and you play the phrase at your speed. If two people share the laptop, the banner says "Pass the guitar to <name>".
+  Notes:
+- [ ] A bot's turn plays the phrase as written; its hits, closes and misses appear on the tab as it goes (its misses are not silent: only shown).
+  Notes:
+- [ ] After each turn a card adds up, one line at a time: accuracy, timing, "+score", the total and the crowd's swing. Space skips ahead; it carries on by itself after 3 seconds.
+  Notes:
+- [ ] The crowd meter leans toward whoever is ahead; a small amber star sits above the leader and slides when the lead changes. With 3–4 players it's a bar split by each player's share.
+  Notes:
+- [ ] Esc during a battle: "Abandon battle? No record will be saved", Cancel highlighted.
+  Notes:
+- [ ] At the end: a trophy star drops, "<name> wins!" (or "A draw!" / the tie-break in words), a table of every turn's score and accuracy, totals, then **Rematch**, **New battle**, **Done**.
+  Notes:
+
 ---
 
 ## 11. Overall feel (check this last)

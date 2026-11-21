@@ -59,6 +59,7 @@ func runShell(initialPath string) error {
 	landing.SetSettings(func() { opener.showSettings(nil) })
 	if store != nil {
 		landing.SetPerform(func() { sh.Show(opener.performScreen()) })
+		landing.SetBattles(opener.showBattleSetup)
 	}
 	opener.shell = sh
 	opener.browser = browser
