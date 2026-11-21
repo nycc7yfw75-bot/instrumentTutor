@@ -88,3 +88,7 @@ func tierMult(t Tier) float64 {
 	}
 	return 1
 }
+
+// Judgeable reports a note the scorer can judge fairly: not dead, bent or
+// a grace note (those are excluded from every total).
+func Judgeable(ev score.NoteEvent) bool { return ev.Tech&unjudgeable == 0 }
