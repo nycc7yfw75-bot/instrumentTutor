@@ -57,6 +57,7 @@ type App struct {
 	piecePath string
 	flatFor   float64
 	chrome    chromeMotion // the header and HUD's small motions (MOTION §A)
+	gig       *gigMode     // non-nil while this view plays a gig (CAREER.md §3)
 
 	zoom float64
 
@@ -172,6 +173,16 @@ func (a *App) Update() error {
 
 	a.stepPlayhead()
 	a.ptr = readPointer()
+	if a.gig != nil {
+		// A gig is one take: the gig screen owns the keys. Only the mixer
+		// (V) opens, for the crowd's volume.
+		if a.mixer.open {
+			a.updateMixer()
+		} else if inpututil.IsKeyJustPressed(ebiten.KeyV) {
+			a.toggleMixer()
+		}
+		return nil
+	}
 
 	if a.bpmEntry || a.helpOpen || a.mixer.open || a.warnList.open {
 
@@ -801,7 +812,9 @@ func (a *App) noteCue(start, dur int64, str int, inferred bool, pos float64, pos
 func (a *App) drawHUD(screen *ebiten.Image, l practiceLayout) {
 	a.trackSignal()
 	a.drawPracticeHeader(screen)
-	a.drawTransport(screen, l, a.ptr)
+	if a.gig == nil {
+		a.drawTransport(screen, l, a.ptr) // a gig has no controls
+	}
 	a.drawTrackStrip(screen, l, a.ptr)
 	a.drawPracticeHUD(screen)
 	a.drawTimeline(screen, l, a.ptr)

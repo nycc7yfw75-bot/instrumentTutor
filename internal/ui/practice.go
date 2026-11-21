@@ -31,9 +31,21 @@ const (
 	zNameW     = 24.0 // string names at the left of the staff
 )
 
+// stageBandH is the performance scene's band (CAREER.md §6.1). It takes the
+// toolbar's place while a gig is drawn; 0 everywhere else.
+var stageBandH float64
+
+// toolbarSlot is the height between the header and the track bar.
+func toolbarSlot() float64 {
+	if stageBandH > 0 {
+		return stageBandH
+	}
+	return zToolbarH
+}
+
 func zToolbarY() float64  { return zHeaderH }
-func zTrackBarY() float64 { return zHeaderH + zToolbarH }
-func zBodyY() float64     { return zHeaderH + zToolbarH + zTrackBarH }
+func zTrackBarY() float64 { return zHeaderH + toolbarSlot() }
+func zBodyY() float64     { return zTrackBarY() + zTrackBarH }
 
 // timelineZoneY is the top of the bottom zone: the timeline and its line.
 func timelineZoneY() float64 { return screenH - pgMargin - zTimelineH }

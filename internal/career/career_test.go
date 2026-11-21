@@ -189,3 +189,10 @@ func TestRequirementsAndTheNextStep(t *testing.T) {
 		t.Errorf("Opening act requirements %+v; want 4 with only the level met", reqs)
 	}
 }
+
+func TestRecordingScoreRewardsTightTiming(t *testing.T) {
+	tight, loose := RecordingScore(0.9, 2, 8), RecordingScore(0.9, 30, 40)
+	if tight <= loose || Stars(tight) < 4 {
+		t.Errorf("tight %.3f (%d stars), loose %.3f; tight timing should rate higher", tight, Stars(tight), loose)
+	}
+}

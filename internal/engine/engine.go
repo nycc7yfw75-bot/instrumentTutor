@@ -99,6 +99,14 @@ type Engine struct {
 	backOffset   float64
 	backGain     float64
 
+	// The crowd channel (crowd.go).
+	crowdBed                           []float32
+	crowdPos                           int
+	crowdGain, crowdLevel, crowdTarget float64
+	crowdSet                           bool
+	sting                              []float32
+	stingPos                           int
+
 	limit      bool
 	masterGain float64
 	clickGain  float64
@@ -432,6 +440,7 @@ func (e *Engine) RenderFrames(left, right []float32) {
 	clear(right)
 	e.mu.Lock()
 	e.render(left, right)
+	e.mixCrowd(left, right)
 	scaleBuf(left, e.masterGain)
 	scaleBuf(right, e.masterGain)
 	if e.limit {

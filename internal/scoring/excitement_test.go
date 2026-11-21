@@ -96,3 +96,16 @@ func TestExcitementBands(t *testing.T) {
 		}
 	}
 }
+
+func TestAToughCrowdStartsLowerAndDrainsFaster(t *testing.T) {
+	e := NewExcitementAt(30, 1.5)
+	e.Tick(2, Playing)
+	if want := 30 - DrainPerSecond*1.5*2; e.Value != want {
+		t.Errorf("after 2 s a tough crowd is at %.1f, want %.1f", e.Value, want)
+	}
+	n := NewExcitement()
+	n.Tick(2, Playing)
+	if n.Value != ExcitementStart-DrainPerSecond*2 {
+		t.Errorf("a normal crowd drains at %.1f", ExcitementStart-n.Value)
+	}
+}

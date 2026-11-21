@@ -150,7 +150,7 @@ func (a *App) gameStep() {
 	switch {
 	case playing && !g.wasPlaying:
 		// Playback starts: a fresh pass, and excitement back to 50.
-		g.sess.Excitement = scoring.NewExcitement()
+		g.sess.Excitement = a.gigExcitement()
 		a.startPass(a.eng.PosTick())
 	case !playing && g.wasPlaying:
 		// A pause or the song's end closes the pass.
@@ -211,7 +211,7 @@ func (a *App) endPass(tick int64) {
 	passFrom, passTo := min(g.passStart, tick), max(g.passStart, tick)
 	if rv := a.makeReview(sum, g.passJudges, passFrom, passTo); rv != nil {
 		g.review.pass = rv
-		if tick >= a.sc.End() && !g.review.ov.open {
+		if tick >= a.sc.End() && !g.review.ov.open && a.gig == nil {
 			defer a.openReview(true) // a full run ended: show how it went
 		}
 	}

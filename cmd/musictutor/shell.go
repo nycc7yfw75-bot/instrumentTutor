@@ -546,6 +546,7 @@ type openPiece struct {
 	path string
 	app  *ui.App
 	eng  *engine.Engine
+	gig  bool // opened for a gig: its setup is not the practice setup
 }
 
 // setupOf reads where a piece is: track, tempo, playhead, loop, mutes, mixer.
@@ -577,7 +578,7 @@ func applySetup(s appconfig.PieceSetup, eng *engine.Engine) {
 
 // saveCurrent remembers the on-screen piece's setup in the config file.
 func (o *shellOpener) saveCurrent() {
-	if o.cur == nil {
+	if o.cur == nil || o.cur.gig {
 		return
 	}
 	o.prefs.setPiece(o.cur.path, setupOf(o.cur.app, o.cur.eng))
@@ -602,6 +603,18 @@ func (o *shellOpener) switchTrack(path string, track int) error {
 }
 
 func (o *shellOpener) Open(path string) (ui.Screen, []string, error) {
+	app, warns, err := o.open(path, nil)
+	if err != nil {
+		return nil, warns, err // a nil *App must not become a non-nil Screen
+	}
+	return app, warns, nil
+}
+
+// gigOpen is how a gig opens a song (CAREER.md §3): on its mastered track,
+// a one-bar count-in, the saved practice setup neither applied nor saved.
+type gigOpen struct{ track int }
+
+func (o *shellOpener) open(path string, gig *gigOpen) (*ui.App, []string, error) {
 
 	sc, warns, err := load(path)
 	if err != nil {
@@ -617,6 +630,9 @@ func (o *shellOpener) Open(path string) (ui.Screen, []string, error) {
 		return nil, warns, err
 	}
 	countIn := o.prefs.CountIn()
+	if gig != nil {
+		countIn = sc.Meters.At(0).Num // one bar, fixed
+	}
 	eng := engine.New(sc, engine.Options{
 		SampleRate:   sampleRate,
 		Voices:       fac,
@@ -626,6 +642,12 @@ func (o *shellOpener) Open(path string) (ui.Screen, []string, error) {
 
 	display := defaultTrack(sc)
 	setup, remembered := o.prefs.piece(path)
+	if gig != nil {
+		remembered = false
+		if gig.track >= 0 && gig.track < len(sc.Tracks) {
+			display = gig.track
+		}
+	}
 	if remembered {
 		if setup.Track >= 0 && setup.Track < len(sc.Tracks) {
 			display = setup.Track
@@ -728,7 +750,7 @@ func (o *shellOpener) Open(path string) (ui.Screen, []string, error) {
 		app.SetProgress(o.store, progress.SongID(sc), sc.Title, path, ok && hasOff && conf >= scoring.CredibleConfidence)
 		app.SetNameAsker(func() { o.shell.Show(ui.NewNamePrompt(o.shell, o.store)) })
 	}
-	o.cur = &openPiece{path: path, app: app, eng: eng}
+	o.cur = &openPiece{path: path, app: app, eng: eng, gig: gig != nil}
 	return app, warns, nil
 }
 

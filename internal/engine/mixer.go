@@ -9,6 +9,7 @@ type Mix struct {
 	Master  float64
 	Click   float64
 	Backing float64
+	Crowd   float64 // the crowd channel, when a gig has one
 	Tracks  []float64
 }
 
@@ -30,6 +31,7 @@ func (e *Engine) Mix() Mix {
 		Master:  e.masterGain,
 		Click:   e.clickGain,
 		Backing: e.backGain,
+		Crowd:   e.crowdGain,
 		Tracks:  append([]float64(nil), e.trackGain...),
 	}
 }
@@ -42,6 +44,9 @@ func (e *Engine) SetMix(m Mix) {
 	e.masterGain = clampGain(m.Master)
 	e.clickGain = clampGain(m.Click)
 	e.backGain = clampGain(m.Backing)
+	if e.crowdSet {
+		e.crowdGain = clampGain(m.Crowd)
+	}
 	if len(m.Tracks) == len(e.trackGain) {
 		for i, g := range m.Tracks {
 			e.trackGain[i] = clampGain(g)

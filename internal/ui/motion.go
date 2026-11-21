@@ -141,6 +141,7 @@ func (c curve) inverse(v float64) float64 {
 // (fully shown); turning it around mid-way carries on from where it is.
 type presence struct {
 	open     bool
+	used     bool // set once: a presence never opened stays gone
 	progress float64 // linear time through the current direction's curve
 	value    float64 // eased, what gets drawn
 }
@@ -149,6 +150,7 @@ func (p *presence) set(open bool) {
 	if open == p.open {
 		return
 	}
+	p.used = true
 	p.open = open
 	// Re-enter the other curve at the point that draws the same value, so a
 	// reversal never jumps.
@@ -160,6 +162,10 @@ func (p *presence) set(open bool) {
 }
 
 func (p *presence) step(dt float64) {
+	if !p.used {
+		p.value = 0 // never opened: nothing to fade out
+		return
+	}
 	if p.open {
 		p.progress += dt / overlayInSeconds
 		if p.progress > 1 {

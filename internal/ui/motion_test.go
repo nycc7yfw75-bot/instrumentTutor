@@ -82,3 +82,20 @@ func TestReduceMotionRowSavesAndEverythingStillFits(t *testing.T) {
 
 // scoringXPHalfLevel is a total halfway into level 1.
 func scoringXPHalfLevel() int { return 50 }
+
+// A closed overlay that was never opened must not flash on its first
+// frames (it used to "fade out" from fully shown).
+func TestANeverOpenedOverlayStaysHidden(t *testing.T) {
+	var p presence
+	p.step(0.016)
+	if p.visible() {
+		t.Errorf("a never-opened overlay shows at %.2f", p.value)
+	}
+	p.set(true)
+	p.step(1)
+	p.set(false)
+	p.step(0.01)
+	if !p.visible() {
+		t.Error("a closing overlay should still be fading out")
+	}
+}

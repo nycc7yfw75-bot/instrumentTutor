@@ -85,3 +85,30 @@ func TestABadManifestIsRefused(t *testing.T) {
 		t.Errorf("a zero-width frame loaded: %v", err)
 	}
 }
+
+func TestCrowdSoundsAreBoundedAndTheBedLoops(t *testing.T) {
+	for _, name := range []string{"bed", "cheer", "boo"} {
+		s := CrowdSound(name, 48000)
+		if len(s) < 48000 {
+			t.Fatalf("%s is %d samples", name, len(s))
+		}
+		peak := float32(0)
+		for _, v := range s {
+			if v > peak {
+				peak = v
+			} else if -v > peak {
+				peak = -v
+			}
+		}
+		if peak == 0 || peak > 0.5 {
+			t.Errorf("%s peaks at %.2f; want sound, at most 0.5", name, peak)
+		}
+	}
+	bed := CrowdSound("bed", 48000)
+	if d := bed[len(bed)-1] - bed[0]; d > 0.1 || d < -0.1 {
+		t.Errorf("the bed jumps by %.2f where it loops", d)
+	}
+	if CrowdSound("nope", 48000) != nil {
+		t.Error("an unknown sound made noise")
+	}
+}

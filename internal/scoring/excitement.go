@@ -35,11 +35,20 @@ type Excitement struct {
 	Value  float64
 	Peak   float64
 	streak int // consecutive non-miss notes
+	// DrainMult speeds the drain (a tough crowd: 1.5); 0 means 1.
+	DrainMult float64
 }
 
 // NewExcitement starts the bar for a fresh playback.
 func NewExcitement() Excitement {
 	return Excitement{Value: ExcitementStart, Peak: ExcitementStart}
+}
+
+// NewExcitementAt starts the bar at start, draining mult times as fast
+// (a gig's crowd, CAREER.md §3.2).
+func NewExcitementAt(start, mult float64) Excitement {
+	start = max(0, min(ExcitementMax, start))
+	return Excitement{Value: start, Peak: start, DrainMult: mult}
 }
 
 // Note raises the bar for one judged note.
@@ -76,7 +85,11 @@ func (e *Excitement) Tick(seconds float64, t Transport) {
 	if t != Playing || seconds <= 0 {
 		return
 	}
-	e.set(e.Value - DrainPerSecond*seconds)
+	mult := e.DrainMult
+	if mult <= 0 {
+		mult = 1
+	}
+	e.set(e.Value - DrainPerSecond*mult*seconds)
 }
 
 func (e *Excitement) set(v float64) {
@@ -96,3 +109,6 @@ func (e Excitement) Band() Band {
 	}
 	return Cold
 }
+
+// Streak is the current run of non-miss notes.
+func (e Excitement) Streak() int { return e.streak }

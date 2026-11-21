@@ -337,6 +337,35 @@ A day counts when the song has been **playing** for 5 minutes or more that day. 
   Notes:
 - [ ] Next time you open the same gig, the setlist you used last is already picked.
   Notes:
+
+## 12c. Career: playing a gig
+
+You need one mastered song (see 12) and calibrated timing.
+
+- [ ] Tour map → a Bedroom gig → pick the song → **Play gig**. The venue's name appears on a card over the stage for about 2 seconds (Space skips it).
+  Notes:
+- [ ] The screen splits: **the stage on top** (your guitarist on the left, the crowd on the right, lights), **the tab below** with its usual hit/close/miss shapes, and the progress line at the bottom. There are no practice buttons.
+  Notes:
+- [ ] One bar of count-in, then the song plays at **100% speed** whatever speed you practised at. Space, arrows, A/B/L, ↑ ↓, W and Tab do nothing during the gig.
+  Notes:
+- [ ] Your guitarist strums in time with the song. Play well and the crowd moves more: sway → nod → jump → arms up with phone lights. Every 10 notes in a row without a miss, one person cheers.
+  Notes:
+- [ ] You hear a **crowd murmur** under the song that gets louder as the crowd gets excited, and a **cheer** at the end of each song. Press **V**: the mixer has a **Crowd** column (start: quiet, about −18 dB) you can turn up or down.
+  Notes:
+- [ ] At the end of the song: the guitarist bows, confetti falls, the crowd cheers. With more songs in the set, a "Song 2 of 3" card shows the next title for 4 seconds (Space starts it sooner).
+  Notes:
+- [ ] After the last song a **Set complete** card shows your stars (1–5), accuracy, "+N XP" (50 × stars × tier) and "+N Fame", and **NEW BEST** if it beat your best. **Back to tour** returns to the map, where the gig card now shows its stars.
+  Notes:
+- [ ] Playing the same gig again at the same stars gives no more Fame (only a better result adds Fame).
+  Notes:
+- [ ] **Leaving early:** press Esc during a gig. "Leave the stage?" asks; **Cancel** is highlighted (Enter = stay). Choose **Leave the stage**: you're back on the tour, the gig gets no stars, XP for notes you played is kept.
+  Notes:
+- [ ] **Tough crowd:** start the app with the dev setting `HEADLINER_FORCE_TOUGH=1` (ask me to make a shortcut) and play a gig you haven't played before. The intro card shows **TOUGH CROWD** with flames. The crowd starts cooler and cools faster; below a low point they cross their arms and "BOO" puffs appear. If the bar hits zero after the first 10 seconds of a song, you're **Booed off**: the crowd boos, the lights dim, the guitarist slumps, the card says 0 stars and your XP is kept; **Retry** starts again. Afterwards the gig's card shows TOUGH CROWD with little flames.
+  Notes:
+- [ ] **Recording session** (the fifth card): no crowd, no crowd sound, a red **REC** light blinks while you play. It's rated on accuracy and how steady your timing was.
+  Notes:
+- [ ] Not calibrated: the gig still plays but ends "Unscored": no stars or Fame; XP from your notes still counts.
+  Notes:
 - [ ] Anything that looks wrong, ugly or confusing (screen and what you saw):
   Notes:
 

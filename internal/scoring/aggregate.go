@@ -98,3 +98,11 @@ func (t Tightness) SpreadLabel() string {
 	}
 	return "uneven"
 }
+
+// Merge adds another summary's notes to this one (a gig's set is the sum
+// of its songs).
+func (s *Summary) Merge(o Summary) {
+	s.Judged += o.Judged
+	s.SumScore += o.SumScore
+	s.offsets = append(s.offsets, o.offsets...)
+}

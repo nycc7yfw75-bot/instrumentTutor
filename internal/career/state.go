@@ -38,10 +38,10 @@ func (s *State) Setup(hometown string, character int, seed int64) {
 }
 
 // Route is this career's tour.
-func (s *State) Route() [][]Gig { return Route(s.Hometown, s.RouteSeed) }
+func (s State) Route() [][]Gig { return Route(s.Hometown, s.RouteSeed) }
 
 // GigByID finds a gig on this career's route.
-func (s *State) GigByID(id string) (Gig, bool) {
+func (s State) GigByID(id string) (Gig, bool) {
 	for _, tier := range s.Route() {
 		for _, g := range tier {
 			if g.ID == id {
@@ -247,4 +247,12 @@ var Characters = []Character{
 	{"Theo", "Long curly hair, band tee, black guitar"},
 	{"Mina", "Shaved sides, leather vest, red guitar"},
 	{"Sol", "Beanie and flannel, natural-wood guitar"},
+}
+
+// RecordingScore rates a recording session (no crowd, CAREER.md §4.3):
+// judged on accuracy and tightness — the timing's average drift and its
+// spread, each costing up to a quarter of the score by 60 ms.
+func RecordingScore(accuracy, meanMs, spreadMs float64) float64 {
+	tight := 1 - math.Min(1, (math.Abs(meanMs)+spreadMs)/60)
+	return GigAccuracyWeight*accuracy + GigExcitementWeight*tight
 }

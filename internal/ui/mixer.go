@@ -30,6 +30,7 @@ const (
 	mixClick
 	mixBacking
 	mixTrack
+	mixCrowd // a gig's crowd (CAREER.md §6.4)
 )
 
 type mixerRow struct {
@@ -48,6 +49,9 @@ func (a *App) mixerRows() []mixerRow {
 	rows := []mixerRow{{kind: mixMaster, label: "Master"}, {kind: mixClick, label: "Metronome"}}
 	if a.eng.HasBacking() {
 		rows = append(rows, mixerRow{kind: mixBacking, label: "Backing track"})
+	}
+	if a.eng.HasCrowd() {
+		rows = append(rows, mixerRow{kind: mixCrowd, label: "Crowd"})
 	}
 	for i := range a.sc.Tracks {
 		if len(rows) >= mixMaxRows {
@@ -104,6 +108,8 @@ func mixGet(m engine.Mix, r mixerRow) float64 {
 		return m.Click
 	case mixBacking:
 		return m.Backing
+	case mixCrowd:
+		return m.Crowd
 	}
 	if r.track < len(m.Tracks) {
 		return m.Tracks[r.track]
@@ -121,6 +127,8 @@ func (a *App) mixSet(r mixerRow, v float64) {
 		m.Click = v
 	case mixBacking:
 		m.Backing = v
+	case mixCrowd:
+		m.Crowd = v
 	default:
 		if r.track >= len(m.Tracks) {
 			return
@@ -320,6 +328,8 @@ func (a *App) mixerChannel(r mixerRow, short []string) (iconID, string, string) 
 		return icMetronome, "Metronome", ""
 	case mixBacking:
 		return icMixer, "Backing", "track"
+	case mixCrowd:
+		return icMic, "Crowd", ""
 	}
 	_, icon := instrumentOf(a.sc.Tracks[r.track])
 	name := short[r.track]

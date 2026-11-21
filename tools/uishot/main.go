@@ -204,6 +204,24 @@ func build(which, piece string) (ui.Screen, error) {
 		app.SetLiveWarning(fmt.Sprintf("imported with %d warnings: %s (and %d more)", len(w), w[0], len(w)-1))
 		app.SetWarnListOpen(true)
 		return app, nil
+	case "gig", "gig-tough", "gig-booed", "gig-end":
+		eng.ClearLoop()
+		eng.SeekTick(s.Tracks[0].Bars[1].Start)
+		st := shotProgress()
+		st.UpdateCareer(func(c *career.State) { c.Setup("Bangalore", 2, 42) })
+		st.RecordPass(progress.Pass{SongID: progress.SongID(s), Title: "Fixture Riff", Path: piece, TempoScale: 1, Credible: true,
+			FullRun: true, Seconds: 20, Difficulty: scoring.Easy, Summary: scoring.Summary{Judged: 20, SumScore: 19}})
+		app.SetLiveStatus(func() (float64, int64) { return -14, 0 })
+		app.SetProgress(st, progress.SongID(s), "Fixture Riff", piece, true)
+		app.OfferResults(sampleResults(s))
+		g := st.Career().Route()[2][0]
+		crowd := career.CrowdNormal
+		if which != "gig" && which != "gig-end" {
+			crowd = career.CrowdTough
+		}
+		gs := ui.NewGigScreen(nil, st, g, crowd, false, st.Mastered(), func(progress.MasteredSong, bool) (*ui.App, error) { return app, nil }, func() {}, nil)
+		gs.ShotState(map[string]string{"gig": "playing", "gig-tough": "intro-tough", "gig-booed": "booed", "gig-end": "end"}[which])
+		return gs, nil
 	case "practice-live":
 		app.SetLiveStatus(func() (float64, int64) { return -14, 0 })
 		app.SetWaitControl(true)
