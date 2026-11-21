@@ -434,6 +434,31 @@ Eight short riffs written for battles, in your pieces folder under `battles`.
 - [ ] Try one Hard or Expert riff at 50–60% speed. Say if any bar feels unplayable.
   Notes:
 
+## 13d. Battles: records and XP
+
+Do these in order; they build on each other.
+
+- [ ] **Two players.** Make a second profile (Settings → Profiles) if you haven't. New battle: Player 1 you at 100%, Player 2 the other profile at 70% ("counts as ×0.84" shows). Play it through, handing over the guitar when the banner says. At the end, each exchange's scores in the table add up to the totals.
+  Notes:
+- [ ] The winner sees "+25 XP" under their total (with 3 players +50, with 4 +75). A draw gives +10 each. The loser gets no bonus and loses nothing.
+  Notes:
+- [ ] **Records tab.** In the Battles screen click **Records** at the top (or press **R**). Your wins / losses / draws, your best battle, and under "Last battles" the one you just played with its date, song, everyone's totals and "Won" / "Draw" / "<name> won". ← → switch to the other profile: their record shows the same battle from their side.
+  Notes:
+- [ ] Under "Against": Basement Benny and Rusher Rex by name; the rivals you haven't unlocked are grey silhouettes reading "??? unlocks at level N".
+  Notes:
+- [ ] **Benny.** Battle Basement Benny. Afterwards his row in Records shows the result.
+  Notes:
+- [ ] **Your ghost.** Play a section once on its own (normal practice, listening on). Then New battle on that song and section with Player 2 = Ghost of you. It replays your pass; the result is filed under "Ghosts".
+  Notes:
+- [ ] **Four players.** You, the other profile, Benny and the Session Player. The turn order changes each exchange, and the crowd meter becomes a bar split four ways.
+  Notes:
+- [ ] **A tie.** After the ghost step: New battle, Player 1 = Ghost of you, Player 2 = Ghost of you, Players 3–4 Nobody. Both replay the same pass, so the results say "A draw!" and "A draw: tied on points and on timing". (Nobody human played, so nothing is added to Records.)
+  Notes:
+- [ ] **Abandon.** Start a battle, press Esc, pick Abandon. Records shows no new battle.
+  Notes:
+- [ ] **It's saved.** Close HEADLINER and open it again. Records and each profile's XP are as you left them. The profile list in Settings → Profiles shows each profile's W / L / D.
+  Notes:
+
 ---
 
 ## 11. Overall feel (check this last)
@@ -452,4 +477,4 @@ Eight short riffs written for battles, in your pieces folder under `battles`.
 
 ## Not built yet (don't test these)
 
-- Battle records, the battle XP bonus and the Records tab (next stage), and the note highway (key Y).
+- The note highway (key Y).

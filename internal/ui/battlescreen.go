@@ -5,7 +5,9 @@ import (
 	"image/color"
 	"math"
 	"math/rand"
+	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -760,8 +762,92 @@ func (s *BattleScreen) drawResults(dst *ebiten.Image) {
 	}
 }
 
-// fileBattle saves the battle (§8): filled in by the records stage.
-func (s *BattleScreen) fileBattle() {}
+// fileBattle saves the battle on each human player's record with its XP
+// bonus (§8). Bots keep no record; an abandoned battle never gets here.
+func (s *BattleScreen) fileBattle() {
+	if s.filed || s.st == nil {
+		return
+	}
+	s.filed = true
+	r := s.result
+	ps := s.b.Setup.Participants
+	names := make([]string, len(ps))
+	for i, p := range ps {
+		names[i] = p.Name
+	}
+	log := progress.BattleLog{Date: time.Now(), Material: battleMaterialName(s.b.Setup.Material),
+		Participants: names, Totals: append([]int(nil), r.Totals...)}
+	if r.Winner >= 0 {
+		log.Winner = names[r.Winner]
+	}
+	for i, p := range ps {
+		if p.Kind != battle.KindHuman || p.ID == "" || i >= len(r.Totals) {
+			continue
+		}
+		f := progress.BattleFiling{Log: log, Total: r.Totals[i], Scored: !r.Unscored,
+			Overall: battleOutcome(r, i, -1), Against: map[string]int{}}
+		for j, q := range ps {
+			if j != i {
+				f.Against[opponentKey(q)] = battleOutcome(r, i, j)
+			}
+		}
+		if i < len(s.bonuses) {
+			f.BonusXP = s.bonuses[i]
+		}
+		_, _ = s.st.RecordBattle(p.ID, f)
+	}
+}
+
+// battleOutcome is player i's outcome overall (j < 0) or against player j:
+// the winner beat everyone; in a draw everyone drew; between two players
+// who didn't win, the higher total.
+func battleOutcome(r battle.Result, i, j int) int {
+	switch {
+	case r.Winner == i:
+		return progress.OutcomeWin
+	case r.Winner < 0:
+		return progress.OutcomeDraw
+	case j < 0 || r.Winner == j:
+		return progress.OutcomeLoss
+	case r.Totals[i] > r.Totals[j]:
+		return progress.OutcomeWin
+	case r.Totals[i] < r.Totals[j]:
+		return progress.OutcomeLoss
+	}
+	return progress.OutcomeDraw
+}
+
+// opponentKey names an opponent on a record (§8.2).
+func opponentKey(p battle.Participant) string {
+	switch p.Kind {
+	case battle.KindHuman:
+		return "profile:" + p.ID
+	case battle.KindRival:
+		return "rival:" + p.ID
+	case battle.KindSession:
+		return "session:" + p.ID
+	}
+	return "ghost"
+}
+
+// battleMaterialName is what a battle was played on, for the log.
+func battleMaterialName(m battle.Material) string {
+	name := m.Title
+	if name == "" {
+		name = strings.TrimSuffix(filepath.Base(m.Path), filepath.Ext(m.Path))
+	}
+	bars := 0
+	if m.Score != nil && m.Track < len(m.Score.Tracks) {
+		bars = len(m.Score.Tracks[m.Track].Bars)
+	}
+	if end := m.EndBar; m.StartBar > 0 || (end > 0 && end < bars) {
+		if end <= 0 {
+			end = bars
+		}
+		name += fmt.Sprintf(", bars %d-%d", m.StartBar+1, end)
+	}
+	return name
+}
 
 // ShotState puts the battle in a moment for the dev screenshot tool
 // (tools/uishot): "vs", "banner", "result" or "results".

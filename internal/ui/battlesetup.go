@@ -70,6 +70,11 @@ type BattleSetup struct {
 
 	focus int
 	start func(battle.Setup, []GhostEntry)
+
+	records    bool // the Records tab is open
+	recProfile int
+	recScroll  int
+	titleX     float64
 }
 
 // GhostEntry is a ghost participant's stored notes, per phrase.
@@ -330,6 +335,23 @@ func (b *BattleSetup) Update() error {
 	switch {
 	case inpututil.IsKeyJustPressed(ebiten.KeyEscape), escButtonPressed(escBackChip, b.ptr):
 		return errQuit
+	case inpututil.IsKeyJustPressed(ebiten.KeyR):
+		b.records = !b.records
+		return nil
+	}
+	if b.ptr.pressed {
+		for i, r := range b.titleTabs() {
+			if b.ptr.over(r) {
+				b.records = i == 1
+				return nil
+			}
+		}
+	}
+	if b.records {
+		b.updateRecords()
+		return nil
+	}
+	switch {
 	case inpututil.IsKeyJustPressed(ebiten.KeyUp):
 		b.focus = max(0, b.focus-1)
 	case inpututil.IsKeyJustPressed(ebiten.KeyDown), inpututil.IsKeyJustPressed(ebiten.KeyTab):
@@ -485,9 +507,12 @@ func (b *BattleSetup) Draw(dst *ebiten.Image) {
 	dst.Fill(colBG)
 	b.anim.tick()
 	l := b.layout()
-	x := drawEscButton(dst, escBackChip, &b.anim, b.ptr)
-	drawTextScaled(dst, "New battle", x, 14, dispL, colNote)
-	drawText(dst, "Trade bars, phrase by phrase", x+textWScaled("New battle", dispL)+sp4, 24, colDim)
+	b.titleX = drawEscButton(dst, escBackChip, &b.anim, b.ptr)
+	b.drawTitleTabs(dst)
+	if b.records {
+		b.drawRecords(dst)
+		return
+	}
 
 	labels := []string{"Material", "Song", "Track", "Section"}
 	for i := 0; i < battle.MaxParticipants; i++ {

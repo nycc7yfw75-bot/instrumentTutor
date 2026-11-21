@@ -31,3 +31,88 @@ type BattleLog struct {
 }
 
 const maxBattleLog = 50
+
+// Outcomes of a battle for one player.
+const (
+	OutcomeLoss = -1
+	OutcomeDraw = 0
+	OutcomeWin  = 1
+)
+
+// BattleFiling is one battle as one human player saw it.
+type BattleFiling struct {
+	Log BattleLog
+	// Total is this player's battle total; Scored is false when the
+	// battle had no winner because a human turn went unjudged (then only
+	// the log is kept: no win, loss or draw, no best).
+	Total  int
+	Scored bool
+	// Overall is OutcomeWin / Draw / Loss; Against is the outcome per
+	// opponent key ("rival:<name>", "profile:<id>", "ghost",
+	// "session:<level>").
+	Overall int
+	Against map[string]int
+	BonusXP int
+}
+
+func (t *BattleTotals) add(outcome int) {
+	switch outcome {
+	case OutcomeWin:
+		t.Wins++
+	case OutcomeLoss:
+		t.Losses++
+	default:
+		t.Draws++
+	}
+}
+
+// RecordBattle files a battle on a profile's record and credits its XP
+// bonus to that profile (never negative); it reports a level up. An
+// unknown profile is ignored.
+func (s *Store) RecordBattle(profileID string, f BattleFiling) (leveledUp bool, err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	prof := s.f.Profiles[profileID]
+	if prof == nil {
+		return false, nil
+	}
+	r := &prof.Battles
+	if f.Scored {
+		r.Totals.add(f.Overall)
+		for key, o := range f.Against {
+			if r.PerOpponent == nil {
+				r.PerOpponent = map[string]BattleTotals{}
+			}
+			t := r.PerOpponent[key]
+			t.add(o)
+			r.PerOpponent[key] = t
+		}
+		r.Best = max(r.Best, f.Total)
+	}
+	r.Log = append(r.Log, f.Log)
+	if n := len(r.Log); n > maxBattleLog {
+		r.Log = append([]BattleLog(nil), r.Log[n-maxBattleLog:]...)
+	}
+	if f.BonusXP > 0 {
+		leveledUp = prof.XP.Add(f.BonusXP)
+		prof.Level = prof.XP.Level()
+	}
+	return leveledUp, s.saveLocked()
+}
+
+// BattleRecordOf is a profile's battle record (a copy).
+func (s *Store) BattleRecordOf(profileID string) (BattleRecord, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	prof := s.f.Profiles[profileID]
+	if prof == nil {
+		return BattleRecord{}, false
+	}
+	r := prof.Battles
+	r.PerOpponent = make(map[string]BattleTotals, len(prof.Battles.PerOpponent))
+	for k, v := range prof.Battles.PerOpponent {
+		r.PerOpponent[k] = v
+	}
+	r.Log = append([]BattleLog(nil), prof.Battles.Log...)
+	return r, true
+}

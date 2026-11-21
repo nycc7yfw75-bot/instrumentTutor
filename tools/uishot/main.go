@@ -205,7 +205,7 @@ func build(which, piece string) (ui.Screen, error) {
 		app.SetLiveWarning(fmt.Sprintf("imported with %d warnings: %s (and %d more)", len(w), w[0], len(w)-1))
 		app.SetWarnListOpen(true)
 		return app, nil
-	case "battle-setup", "battle-vs", "battle-banner", "battle-result", "battle-results":
+	case "battle-setup", "battle-records", "battle-vs", "battle-banner", "battle-result", "battle-results":
 		eng.ClearLoop()
 		st := shotProgress()
 		st.AddProfile("Friend")
@@ -217,6 +217,11 @@ func build(which, piece string) (ui.Screen, error) {
 			Close:      func() {},
 		}
 		bs := ui.NewBattleSetup(nil, st, deps)
+		if which == "battle-records" {
+			seedBattles(st)
+			bs.ShowRecordsForShot()
+			return bs, nil
+		}
 		if which == "battle-setup" {
 			return bs, nil
 		}
@@ -438,4 +443,40 @@ func shotProgress() *progress.Store {
 	pass(1, 0.96, 300)
 	pass(1, 0.96, 300)
 	return st
+}
+
+// seedBattles fills the active profile's battle record for the Records
+// screenshot.
+func seedBattles(st *progress.Store) {
+	var me, friend string
+	for _, p := range st.Profiles() {
+		if p.Active {
+			me = p.ID
+		} else {
+			friend = p.ID
+		}
+	}
+	day := time.Date(2026, 11, 14, 20, 0, 0, 0, time.Local)
+	type b struct {
+		mat, opp, key string
+		mine, theirs  int
+	}
+	for i, x := range []b{
+		{"Neon Alley", "Basement Benny", "rival:Basement Benny", 912, 640},
+		{"Porch Light", "Rusher Rex", "rival:Rusher Rex", 701, 733},
+		{"Fixture Riff, bars 1-4", "Friend", "profile:" + friend, 820, 820},
+		{"Highway Hum", "Session Player (Medium)", "session:Medium", 1040, 860},
+		{"Neon Alley", "Basement Benny", "rival:Basement Benny", 980, 702},
+	} {
+		o, winner := progress.OutcomeWin, "Aarsh"
+		switch {
+		case x.mine < x.theirs:
+			o, winner = progress.OutcomeLoss, x.opp
+		case x.mine == x.theirs:
+			o, winner = progress.OutcomeDraw, ""
+		}
+		st.RecordBattle(me, progress.BattleFiling{Scored: true, Total: x.mine, Overall: o, Against: map[string]int{x.key: o},
+			Log: progress.BattleLog{Date: day.AddDate(0, 0, i), Material: x.mat, Participants: []string{"Aarsh", x.opp},
+				Totals: []int{x.mine, x.theirs}, Winner: winner}})
+	}
 }

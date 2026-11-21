@@ -99,3 +99,34 @@ func TestABotBattleRunsToTheResults(t *testing.T) {
 		t.Error("a bot battle came out unscored")
 	}
 }
+
+// The results file the battle once on each human's record, with the
+// winner's XP bonus; the bots keep nothing.
+func TestABattleIsFiledOnTheHumansRecord(t *testing.T) {
+	b, _ := battleFixture(t, true)
+	s, _, err := b.setup() // you vs Basement Benny
+	if err != nil {
+		t.Fatal(err)
+	}
+	bt, err := battle.New(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	me := s.Participants[0].ID
+	before, _ := b.st.Profile(me)
+	scr := &BattleScreen{st: b.st, b: bt, result: battle.Result{Totals: []int{900, 600}, Winner: 0}}
+	scr.bonuses = scr.result.Bonuses()
+	scr.fileBattle()
+	scr.fileBattle() // the results screen may ask again: still one battle
+	r, _ := b.st.BattleRecordOf(me)
+	if r.Totals.Wins != 1 || len(r.Log) != 1 || r.PerOpponent["rival:Basement Benny"].Wins != 1 || r.Best != 900 {
+		t.Errorf("record after one win: %+v", r)
+	}
+	after, _ := b.st.Profile(me)
+	if got := after.XP.TotalXP - before.XP.TotalXP; got != battle.WinBonusPer {
+		t.Errorf("the win paid %d XP, want %d", got, battle.WinBonusPer)
+	}
+	if r.Log[0].Winner != s.Participants[0].Name || r.Log[0].Material == "" {
+		t.Errorf("log entry %+v", r.Log[0])
+	}
+}
