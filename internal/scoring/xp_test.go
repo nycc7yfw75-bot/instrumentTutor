@@ -87,12 +87,19 @@ func TestMissNeverReducesXP(t *testing.T) {
 	}
 }
 
-func TestRepeatFactorShrinksAndResetsAtMidnight(t *testing.T) {
-	for n, want := range map[int]float64{1: 1, 2: 0.85, 3: 0.70, 5: 0.40, 6: 0.25, 9: 0.25} {
-		if got := RepeatFactor(n); math.Abs(got-want) > 1e-9 {
-			t.Errorf("pass %d of the day: factor %.2f, want %.2f", n, got, want)
+func TestRepeatedPassesEarnEqualXP(t *testing.T) {
+	in := PassInput{Summary: passOf(hits(12, 0)...), Difficulty: Medium, TempoScale: 1, Section: "bars 5-8", Credible: true}
+	var d DailyPasses
+	now := time.Date(2026, 11, 21, 12, 0, 0, 0, time.Local)
+	first := AwardXP(in, &d, now)
+	for i := 2; i <= 10; i++ {
+		if xp := AwardXP(in, &d, now); xp != first {
+			t.Fatalf("pass %d earned %d XP, want the same %d as the first (no diminishing returns)", i, xp, first)
 		}
 	}
+}
+
+func TestDailyPassCountResetsAtMidnight(t *testing.T) {
 	day := time.Date(2026, 11, 20, 23, 50, 0, 0, time.Local)
 	var d DailyPasses
 	for i := 1; i <= 3; i++ {

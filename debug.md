@@ -172,7 +172,7 @@ Use **First Steps** first (fairest), then try Sultans.
 
 - [ ] Set a short loop (A … B, about 4 bars) in First Steps and play it through. When the loop goes round, a "+N XP" message appears and the XP bar grows.
   Notes:
-- [ ] Play the same loop 6 times in a row. The XP per pass gets smaller each time but never drops to zero.
+- [ ] Play the same loop 6 times in a row at the same speed and about the same accuracy. Every pass earns the same XP (no shrinking for repeats).
   Notes:
 - [ ] **Slow practice earns more.** Play the same loop at 100% and at 50% (press ↓ ten times). At 50% the "+N XP" is bigger, up to 1.5× (for example +36 instead of +27; the flat 10 XP per pass doesn't grow). At 75% it's about 1.25×. Going faster than 100% earns no extra.
   Notes:

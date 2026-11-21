@@ -2,6 +2,8 @@
 
 Save as `docs/BATTLES.md` in the repo. Re-read at the start of every stage and after any context compaction.
 
+**Build order:** REDESIGN → SCORING → CAREER → BATTLES.
+
 **Prerequisites (stop and tell me if any is missing):** `docs/REDESIGN.md` landed (tokens, pixel kit) · `docs/SCORING.md` landed (`internal/scoring`, per-profile `progress.json`, best-pass replays, tap calibration, ghosts). Battles reuse all of it — do not duplicate scoring logic. **All battle motion follows `docs/MOTION.md` Part B2** (setup, VS intro, turn banner, scoreboard, result card chain, lead-change crown, crowd meter, final results, confirms); where this file and MOTION.md disagree on motion, MOTION.md wins.
 
 ---
@@ -131,7 +133,7 @@ Locked rivals show as silhouettes with "Unlocks at level N". These are all origi
 Follow REDESIGN tokens, pixel kit, notched corners. Every screen keyboard-operable; Esc backs out (mid-battle Esc asks "Abandon battle? No record will be saved").
 
 ### 6.1 Entry
-Start screen gets a **Battles** item (pixel crossed-picks icon) next to Open song. Available from level 1.
+If `docs/CAREER.md` has landed, Battles is entered from the landing page's **Battles** door (CAREER.md §1 — make that door visible now). Otherwise the start screen gets a **Battles** item (pixel crossed-picks icon) next to Open song. Available from level 1.
 
 ### 6.2 Setup screen (one screen, top to bottom)
 1. **Material**: tabs "Your songs" / "Battle riffs"; pick piece → track → section (existing section markers; else bar range picker).
@@ -167,7 +169,7 @@ Choreographed per MOTION §B2.8 (rows → totals → trophy drop → XP → butt
 ## 8. Stage 6 — Records, XP, validation
 
 ### 8.1 XP (human profiles only)
-- Every scored human turn is a pass under SCORING.md §4.5 (normal XP, linear tempo factor, repeat factor applies per phrase range).
+- Every scored human turn is a pass under SCORING.md §4.5 (normal XP, linear tempo factor, no diminishing returns).
 - Winner bonus: `+25 × (number of other participants)`. Draw: `+10` each. Losing earns no bonus — never negative.
 - Credibility gate from SCORING.md applies per turn.
 

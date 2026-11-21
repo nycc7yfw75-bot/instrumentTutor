@@ -79,12 +79,6 @@ func TempoFactor(tempoScale float64) float64 {
 	return 1 + (SlowBonusMax-1)*(1-tempoScale)/(1-SlowBonusAt)
 }
 
-// RepeatFactor shrinks XP for playing the same section again today: the
-// nth pass earns max(RepeatFloor, 1 - RepeatStep×(n-1)).
-func RepeatFactor(timesToday int) float64 {
-	return max(RepeatFloor, 1-RepeatStep*float64(timesToday-1))
-}
-
 // DailyPasses counts today's passes of each section ("bars 5-8", or the
 // whole song); the counts restart at local midnight.
 type DailyPasses struct {
@@ -119,12 +113,13 @@ type PassInput struct {
 }
 
 // AwardXP is the XP a completed pass earns: 0 for an unscored (uncredible)
-// pass or one too short to judge, which also do not count toward the
-// repeat factor; otherwise PassXP × RepeatFactor, rounded.
+// pass or one too short to judge; otherwise PassXP, rounded. Repeats earn
+// the same every time (SCORING.md §4.5: no diminishing returns); the daily
+// count is still kept for the pass log.
 func AwardXP(in PassInput, daily *DailyPasses, now time.Time) int {
 	if !in.Credible || in.Summary.Judged < MinJudgedNotes {
 		return 0
 	}
-	n := daily.Record(in.Section, now)
-	return int(math.Round(PassXP(in.Summary, in.Difficulty, in.TempoScale) * RepeatFactor(n)))
+	daily.Record(in.Section, now)
+	return int(math.Round(PassXP(in.Summary, in.Difficulty, in.TempoScale)))
 }

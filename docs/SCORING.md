@@ -102,12 +102,12 @@ difficulty  = Easy 1.0 | Medium 1.25 | Hard 1.5 | Expert 2.0
                computed once per piece+track from score events, cached)
 tempoFactor = min(playbackScale, 1.0)            -- 60% speed earns 60%
 passXP      = 10  +  Σ noteScore × difficulty × tempoFactor     -- Σ noteScore = judgedNotes × accuracy
-repeatFactor= max(0.25, 1 − 0.15 × (timesThisSectionPassedToday − 1))
-xpAwarded   = round(passXP × repeatFactor)
+xpAwarded   = round(passXP)
 ```
 
+**No diminishing returns.** Repeating the same loop earns the same XP every pass — the app exists to reward practice, never to punish it. (Level alone therefore isn't proof of skill; that's why the career in `docs/CAREER.md` also requires mastered songs and gig ratings.)
+
 - A pass with judgedNotes < 8 earns nothing.
-- "Section" = the loop's bar range, or the whole song for a full run; counts reset at local midnight.
 - **Credibility gate:** XP and excitement only count in live sessions where the input is calibrated (stored offset with confidence ≥ 0.5) and no capture samples were dropped during the pass. Otherwise accuracy and ghosts still show, the HUD says "Unscored — calibrate to earn XP", and nothing is saved to XP.
 
 ### 4.6 Levels
@@ -137,7 +137,7 @@ Level and title are stored for the future venue ladder; nothing is gated now.
 - `TestMissNeverReducesXP`: note that `judgedNotes × accuracy = Σ noteScore`, so a miss adds 0 to XP. Assert: inserting a miss at any position leaves the pass's XP unchanged (accuracy % drops — that's honest and intended), XP is never negative, and stored total XP only ever increases.
 - Excitement: drain freezes while paused/waiting/count-in; caps at 0 and 100; streak bonus at exactly 10, 20.
 - Tightness sign and labels; spread labels.
-- Repeat factor and midnight reset with an injected clock.
+- `TestRepeatedPassesEarnEqualXP`: the same pass replayed N times earns identical XP each time.
 - Level curve and title boundaries.
 - Credibility gate: uncalibrated session awards 0 XP and leaves stored XP untouched.
 
@@ -148,7 +148,7 @@ Level and title are stored for the future venue ladder; nothing is gated now.
 - `progress.json` beside the existing `config.json` (same directory helper). Do not touch `config.json`.
 - Atomic write (temp file + rename), versioned schema (`"version": 1`).
 - **Everything is stored per profile.** Top level: `{"version":1, "activeProfile":"<id>", "profiles":{"<id>":{...}}}`. Create one profile on first run: id = random 8-char, name "Player 1" (renamable in Settings). Every read/write goes through the active profile — no global XP anywhere.
-- Each profile holds: name, created date, total XP, level, per-piece+track bests (best accuracy, best tightness mean, best tempo), today's section pass counts, a capped log of the last 200 passes (date, piece, track, bars, tempo, accuracy, tightness, xp).
+- Each profile holds: name, created date, total XP, level, per-piece+track bests (best accuracy, best tightness mean, best tempo), a capped log of the last 200 passes (date, piece, track, bars, tempo, accuracy, tightness, xp).
 - **Best-pass replays** (needed later by Battles' "your own ghost" opponent): for each (piece, track, bar range) keep the per-note results of that profile's best-accuracy pass — note index, verdict, timing offset ms. Cap at 300 stored ranges per profile (drop least-recently-used).
 - Piece identity: file path for now (hashing comes later); store the title alongside.
 - Corrupt file → rename aside to `progress.json.bad-<timestamp>` and start fresh; never crash a session over it.
@@ -202,7 +202,7 @@ Opens automatically when a full run ends, and on demand for the last completed l
    - Run Tap calibrate; confirm the offset is saved and the HUD stops saying Unscored.
    - Play a 4-bar loop at 70%: accuracy shows, excitement moves and drains when you stop playing, ghosts appear on late/early notes, "+N XP" toast after the pass.
    - Pause mid-pass: excitement freezes.
-   - Play the same loop 6 times: XP per pass shrinks, never below 25%.
+   - Play the same loop 6 times in a row: every pass earns the same XP.
    - Quit and reopen: level and XP persist.
    - Open the pass review; hover dots; jump to a note.
 3. Run the MOTION.md §C checks for Part B1 (especially audio isolation: identical verdicts and offsets with animations on/off).
@@ -210,14 +210,14 @@ Opens automatically when a full run ends, and on demand for the last completed l
 
 ---
 
-## 10. Owner's decisions (2026-11-20) — these override the defaults above
+## 10. Owner's decisions — these override the defaults above
 
-Stage 1 checkpoint:
+2026-11-20, Stage 1 checkpoint:
 - **Grace notes** are excluded from scoring, like dead notes and bends.
 - **Chords** are judged by majority of their judgeable strings: a hit when more than half were hits, a miss when more than half were missed, close otherwise. Timed from the strum.
 - **Wait mode is unscored**: notes confirmed by wait mode count neither for nor against, earn no XP and move no excitement; the HUD shows Unscored while WAIT is on.
 
-Progress saving (Stage 2):
+2026-11-20, progress saving (Stage 2):
 - **Song identity is a fingerprint of the song's contents** (its notes), not the file path: renaming or moving a file keeps its progress; editing its notes makes it a new song. The path and title are stored alongside for display. (Replaces §5 "Piece identity: file path for now".)
 - **Per-song practice setup stays shared** (track, tempo, loop, mixer, mutes in config.json, as today); only progress is per profile.
 - **Unscored passes are still logged**: the pass history and practice time record them, marked Unscored, with 0 XP.
@@ -225,9 +225,12 @@ Progress saving (Stage 2):
 - **A pass also ends when the player pauses** (not only on a loop wrap or the song's end): what was played since the last start counts as a pass for that bar range if it judged ≥ 8 notes.
 - **The first profile is named by the player on first launch** (a one-time prompt), and the name is editable later in Settings under a Profile section.
 - **Keep the last 3 copies** of progress.json (progress.json.1 → .2 → .3, rotated on each save).
-- **Practice time counts while the song is actually playing**, per day and per song; paused or idle time doesn't count. (Stored per profile, as the base for a future streak.)
+- **Practice time counts while the song is actually playing**, per day and per song; paused or idle time doesn't count.
 
-Owner's decisions (2026-11-21):
-- **Slow practice earns more** (ground rule 5 wins over §4.5's tempoFactor): the tempo factor is 1 at full speed or faster, rising in a straight line to **1.5× at half speed**, capped at 1.5× below that (`scoring.TempoFactor`; constants `SlowBonusMax`, `SlowBonusAt`).
-- **Practice streak is built** (ground rule 2): a day counts with ≥ 5 minutes of the song actually playing, scored or not, listening or not (`progress.Streak`). Today not counting yet doesn't break the streak until the day is over. Shown after the level on the practice screen ("LV 1 · Bedroom Player · 3-day streak, 2 min to go today") and in Settings → Profile.
-- **Start screen player card + badges** (owner, 2026-11-21): a player card at the top right of the start screen — name, level + title, XP bar, latest badges, streak (Settings/Help sit in the card's corner). Badges = the 10 in docs/PROGRESS.md §Badges, set-only, drawn as 16×16 pixel medals in notched tiles: earned = amber icon on a dark tile; not yet = dim outline with a lock, tooltip says how to earn it. Streak follows PROGRESS.md invariant 6 (2 freezes, +1 per 7 consecutive days, max 3; a break restarts at 1, never 0; total days practised shown and never goes down; a clock earlier than the last day does nothing). Build after REDESIGN Stage 5.
+2026-11-21:
+- **Slow practice earns more** (CLAUDE.md ground rule 5; overrides §4.5's `tempoFactor`, confirmed again after this file was updated): the tempo factor is 1 at full speed or faster, rising in a straight line to **1.5× at half speed**, capped at 1.5× below that (`scoring.TempoFactor`; constants `SlowBonusMax`, `SlowBonusAt`). BATTLES.md §8.1's "linear tempo factor" for turn XP follows this too; the battle *score* keeps its own square-root handicap.
+- **No diminishing returns**: as §4.5 says, every repeat of a loop earns the same XP.
+- **Streak and badges are built** (overrides §0's "do not build achievements, streaks"): a day counts with ≥ 5 minutes of the song playing, scored or not; the PROGRESS.md streak rules (2 freezes, +1 per 7 days in a row, max 3; a break restarts at 1, never 0; total days and longest never go down). The 11 PROGRESS.md badges, set-only (`progress/badges.go`), shown as pixel medals.
+- **Start screen player card** (name, level, XP bar, badge tiles, streak line) — moves into the CAREER.md landing page's top strip once that lands; the badge list stays on B in the Practice screen and gets its own place on the landing page.
+- **Tough crowds may boo you off** in CAREER.md performance mode (overrides CLAUDE.md ground rule 1 "no booing" for gigs only; XP already earned is still kept).
+- **Battle riffs** written by Claude into the pieces folder are allowed (not "bundled songs").

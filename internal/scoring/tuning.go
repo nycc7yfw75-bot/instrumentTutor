@@ -66,9 +66,6 @@ const (
 	HardMult   = 1.5
 	ExpertMult = 2.0
 
-	RepeatStep  = 0.15 // XP lost per extra pass of the same section today
-	RepeatFloor = 0.25
-
 	// CredibleConfidence is the calibration confidence a session needs for
 	// XP and excitement to count.
 	CredibleConfidence = 0.5
