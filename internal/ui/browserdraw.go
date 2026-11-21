@@ -303,7 +303,9 @@ func (b *Browser) Draw(screen *ebiten.Image) {
 	l := b.layout()
 	dt := motionDt()
 	b.drawBrowserHeader(screen, l, dt)
-	b.drawPlayerCard(screen, l, dt)
+	if b.hasCard() {
+		b.drawPlayerCard(screen, l, dt)
+	}
 	b.drawHint(screen, l, dt)
 	b.drawActions(screen, l, dt)
 	b.drawSongs(screen, l, dt)
@@ -555,6 +557,9 @@ func (b *Browser) drawSongRow(dst *ebiten.Image, r rect, e browserEntry, hover, 
 	}
 	x := r.x + sp4
 	sub, warn := b.songSub(e)
+	if _, d := b.songStatus(e); d != "" && !warn {
+		sub += " · " + d
+	}
 	drawPixelIcon(dst, songIcon(sub), x, r.y+(r.h-iconSize)/2, iconCol)
 	x += iconSize + sp3
 	w := r.x + r.w - sp4 - x
@@ -564,6 +569,13 @@ func (b *Browser) drawSongRow(dst *ebiten.Image, r rect, e browserEntry, hover, 
 		titleCol = colMissing
 	}
 	face := faceOf(srcBody, sizeUILarge)
+	mastered, _ := b.songStatus(e)
+	if mastered {
+		// The MASTERED tag at the row's right (CAREER.md §2).
+		pw := pillW("MASTERED")
+		drawPill(dst, r.x+r.w-sp4-pw, r.y+(r.h-pillH)/2, "MASTERED", pillYou)
+		w -= pw + sp3
+	}
 	drawFace(dst, fitToWidth(title, w, face, false), face, x, r.y+sp1, titleCol)
 	subCol := colDim
 	if warn {

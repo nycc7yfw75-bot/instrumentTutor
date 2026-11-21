@@ -70,6 +70,8 @@ type browserEntry struct {
 	problem bool
 
 	from browserPane // on the All tab: the list the row came from
+
+	difficulty string // from the library scan
 }
 
 type browserRecentRemover interface {
@@ -439,7 +441,7 @@ func libraryEntries(pieces []PieceInfo) []browserEntry {
 				name = p.Name
 			}
 		}
-		out = append(out, browserEntry{name: name, path: p.Path, sub: sub, problem: problem})
+		out = append(out, browserEntry{name: name, path: p.Path, sub: sub, problem: problem, difficulty: p.Difficulty})
 	}
 	return out
 }
@@ -759,7 +761,7 @@ func (b *Browser) handleKey(k ebiten.Key) error {
 	case ebiten.KeyH:
 		b.toggleHint()
 	case ebiten.KeyB:
-		if b.hasCard() {
+		if b.hasBadges() {
 			b.badgesOpen = true
 		}
 	case ebiten.KeyF5:
@@ -819,7 +821,7 @@ func (b *Browser) browserBindings() []helpBinding {
 		{Group: "session", Keys: "S", Hint: "S settings", Off: b.settings == nil,
 			Desc: "Audio devices, latency calibration, SoundFont and count-in"},
 		{Group: "session", Keys: "H", Desc: "Show or hide the getting-started card"},
-		{Group: "session", Keys: "B", Off: !b.hasCard(), Desc: "Every badge: the ones you have, and how to earn the rest"},
+		{Group: "session", Keys: "B", Off: !b.hasBadges(), Desc: "Every badge: the ones you have, and how to earn the rest"},
 		{Group: "session", Keys: "? or F1", Hint: "? help", Desc: "This key-binding list"},
 		leave,
 		{Group: "session", Keys: "Q", Desc: "Quit HEADLINER"},

@@ -10,6 +10,7 @@ import (
 	"github.com/S95F/musicTutor/internal/appconfig"
 	"github.com/S95F/musicTutor/internal/score"
 	"github.com/S95F/musicTutor/internal/score/textfmt"
+	"github.com/S95F/musicTutor/internal/scoring"
 	"github.com/S95F/musicTutor/internal/ui"
 )
 
@@ -56,6 +57,9 @@ func (pieceLibrary) Scan() ([]ui.PieceInfo, error) {
 		} else {
 			info.Title = sc.Title
 			info.Summary = describePiece(sc)
+			if len(sc.Tracks) > 0 {
+				info.Difficulty = scoring.DifficultyOf(sc, firstPlayable(sc)).String()
+			}
 		}
 		out = append(out, info)
 	}
@@ -110,4 +114,14 @@ func instrumentName(tr *score.Track) string {
 		parts = append(parts, fmt.Sprintf("capo %d", tr.Capo))
 	}
 	return strings.Join(parts, " · ")
+}
+
+// firstPlayable is the first track that is not drums.
+func firstPlayable(sc *score.Score) int {
+	for i, tr := range sc.Tracks {
+		if !tr.Drums {
+			return i
+		}
+	}
+	return 0
 }

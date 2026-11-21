@@ -112,8 +112,9 @@ type Practice struct {
 
 // SongInfo is how a song is shown: its title and where it was last seen.
 type SongInfo struct {
-	Title string `json:"title"`
-	Path  string `json:"path"`
+	Title      string `json:"title"`
+	Path       string `json:"path"`
+	Difficulty string `json:"difficulty,omitempty"` // of the track last practised
 }
 
 // Store is the open progress file. Its methods are safe to call from any

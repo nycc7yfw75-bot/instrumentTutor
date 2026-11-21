@@ -115,36 +115,6 @@ func cardBrowser(t *testing.T, name string) *Browser {
 	return NewBrowser(NewShell(Services{Prefs: &browserFakePrefs{}, Progress: st}, nil))
 }
 
-func TestPlayerCardSitsTopRightClearOfEverything(t *testing.T) {
-	atEachSize(t, func(t *testing.T) {
-		b := cardBrowser(t, "Aarsh")
-		b.hintOpen = true
-		b.errMsg = "cannot open x.gp: broken"
-		b.warns, b.warnsFrom = []string{"a", "b", "c", "d"}, "x.gp"
-		l := b.layout()
-		c := l.card
-		if c.x+c.w > screenW-pgMargin+1 || c.y < 0 {
-			t.Errorf("the card %+v leaves the page", c)
-		}
-		for _, a := range l.actions {
-			if a.x+a.w > c.x {
-				t.Errorf("an action button %+v runs under the card %+v", a, c)
-			}
-		}
-		if l.hint.y < c.y+c.h || l.songsY < c.y+c.h {
-			t.Errorf("the getting-started card (%.0f) or SONGS (%.0f) starts inside the player card (ends %.0f)", l.hint.y, l.songsY, c.y+c.h)
-		}
-		if l.rows < 4 {
-			t.Errorf("only %d song rows fit with the player card", l.rows)
-		}
-		for _, m := range l.medals {
-			if m.x+m.w > c.x+c.w-cardPad {
-				t.Errorf("a medal %+v leaves the card", m)
-			}
-		}
-	})
-}
-
 func TestCardShowsEveryBadgeEarnedFirst(t *testing.T) {
 	b := cardBrowser(t, "Aarsh")
 	ms := b.cardMedals()

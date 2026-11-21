@@ -55,7 +55,7 @@ func (s *Store) RecordPass(p Pass) (Recorded, error) {
 	if prof.Songs == nil {
 		prof.Songs = map[string]SongInfo{}
 	}
-	prof.Songs[p.SongID] = SongInfo{Title: p.Title, Path: p.Path}
+	prof.Songs[p.SongID] = SongInfo{Title: p.Title, Path: p.Path, Difficulty: p.Difficulty.String()}
 	today := now.Local().Format(dayFormat)
 	firstToday, lastBefore := prof.Practice.Days[today] == 0 && p.Seconds > 0, lastDayBefore(prof.Practice.Days, today)
 	if p.Seconds > 0 {

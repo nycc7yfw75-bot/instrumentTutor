@@ -51,8 +51,12 @@ func (b *Browser) store() *progress.Store {
 	return b.sh.Services().Progress
 }
 
-// hasCard reports whether the start screen shows the player card.
-func (b *Browser) hasCard() bool { return b.store() != nil }
+// hasCard reports whether the Practice screen shows the player card: no
+// longer, the landing page carries it (CAREER.md §1).
+func (b *Browser) hasCard() bool { return false }
+
+// hasBadges reports whether B can list the badges.
+func (b *Browser) hasBadges() bool { return b.store() != nil }
 
 // medal is one tile on the card: a badge, earned or not.
 type medal struct {
@@ -62,8 +66,10 @@ type medal struct {
 
 // cardMedals are the card's tiles: earned badges newest first, then the
 // ones still to earn, in catalog order.
-func (b *Browser) cardMedals() []medal {
-	st := b.store()
+func (b *Browser) cardMedals() []medal { return storeMedals(b.store()) }
+
+// storeMedals is every badge, earned ones newest first.
+func storeMedals(st *progress.Store) []medal {
 	if st == nil {
 		return nil
 	}
@@ -202,13 +208,19 @@ func plural(n int, one, many string) string {
 // not yet, a dim outline with a small lock.
 func drawMedal(dst *ebiten.Image, r rect, m medal) {
 	ic := badgeIcon[m.def.ID]
+	scale := 2
+	if r.w < iconSize+4 {
+		scale = 1 // a small tile: the medal at 1x
+	}
+	s := float64(scale * iconPx)
+	ix, iy := math.Round(r.x+(r.w-s)/2), math.Round(r.y+(r.h-s)/2)
 	if m.earned {
 		notchedFill(dst, r, colHover)
-		drawPixelIcon(dst, ic, math.Round(r.x+(r.w-iconSize)/2), math.Round(r.y+(r.h-iconSize)/2), tokBrand)
+		drawPixelIconScaled(dst, ic, ix, iy, scale, tokBrand)
 		return
 	}
 	notchedStroke(dst, r, 1, colPanelEdge)
-	drawPixelIcon(dst, ic, math.Round(r.x+(r.w-iconSize)/2), math.Round(r.y+(r.h-iconSize)/2), colBlockOff)
+	drawPixelIconScaled(dst, ic, ix, iy, scale, colBlockOff)
 	// The lock: a 6×5 body and a 4×3 shackle at the bottom-right corner.
 	lx, ly := float32(r.x+r.w-10), float32(r.y+r.h-10)
 	vector.FillRect(dst, lx, ly+3, 7, 5, colDim, false)
@@ -227,8 +239,10 @@ func badgesCard() rect {
 const badgeRowH = 64.0
 
 // drawBadges draws the overlay listing every badge.
-func (b *Browser) drawBadges(dst *ebiten.Image) {
-	st := b.store()
+func (b *Browser) drawBadges(dst *ebiten.Image) { drawBadgesOverlay(dst, b.store()) }
+
+// drawBadgesOverlay lists every badge: the ones earned, and how to earn the rest.
+func drawBadgesOverlay(dst *ebiten.Image, st *progress.Store) {
 	if st == nil {
 		return
 	}
@@ -268,4 +282,21 @@ func (b *Browser) drawBadges(dst *ebiten.Image) {
 		}
 	}
 	drawTextSmall(dst, "B, Esc or a click closes this", c.x+sp6, c.y+c.h-sp4-14, colBarline)
+}
+
+// songStatus is a row's mastery and difficulty (CAREER.md §2): the
+// library's difficulty, or the one saved when the song was practised.
+func (b *Browser) songStatus(e browserEntry) (mastered bool, difficulty string) {
+	difficulty = e.difficulty
+	if li, ok := b.libInfo[pathKey(e.path)]; ok && li.difficulty != "" {
+		difficulty = li.difficulty
+	}
+	if st := b.store(); st != nil {
+		m, d := st.SongStatus(e.path)
+		mastered = m
+		if difficulty == "" {
+			difficulty = d
+		}
+	}
+	return mastered, difficulty
 }

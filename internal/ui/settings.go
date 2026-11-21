@@ -13,6 +13,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 
+	"github.com/S95F/musicTutor/internal/career"
 	"github.com/S95F/musicTutor/internal/progress"
 	"github.com/S95F/musicTutor/internal/scoring"
 )
@@ -34,6 +35,8 @@ const (
 	srProfile
 	// srMotion turns reduced motion on or off.
 	srMotion
+	// srCareer changes the hometown or guitarist (CAREER.md §5.1).
+	srCareer
 )
 
 type calPhase int
@@ -360,6 +363,9 @@ func (s *Settings) rebuild() {
 	s.rows = s.rows[:0]
 	if s.progress() != nil {
 		s.rows = append(s.rows, srProfile)
+		if s.hasCareer() {
+			s.rows = append(s.rows, srCareer)
+		}
 	}
 	if s.hasDevices() {
 		s.rows = append(s.rows, srCapture, srPlayback, srCalibrate)
@@ -530,6 +536,10 @@ func (s *Settings) adjust(d int) {
 		if d > 0 {
 			s.askName()
 		}
+	case srCareer:
+		if d > 0 {
+			s.openCareer()
+		}
 	case srMotion:
 		s.setReduceMotion(d > 0)
 	}
@@ -548,6 +558,8 @@ func (s *Settings) activate() {
 		s.startCalibrationKind(true)
 	case srProfile:
 		s.askName()
+	case srCareer:
+		s.openCareer()
 	case srMotion:
 		s.setReduceMotion(!reduceMotion)
 	case srCapture, srPlayback:
@@ -1232,6 +1244,14 @@ func (s *Settings) items() []settingsItem {
 			s.focusRow(srProfile)
 			s.askName()
 		}})
+		if s.hasCareer() {
+			cs := st.Career()
+			cv := cs.Hometown + "  ·  " + career.Characters[max(0, min(len(career.Characters)-1, cs.Character))].Name
+			b.addRow("career", cv, colHUD, settingsButton{label: "change", act: func(s *Settings) {
+				s.focusRow(srCareer)
+				s.openCareer()
+			}})
+		}
 	}
 
 	b.section("AUDIO")
@@ -1619,4 +1639,21 @@ func chevronFor(label string) (iconID, bool) {
 		return icChevronRight, true
 	}
 	return 0, false
+}
+
+// hasCareer reports a career to change: a profile whose career is set up.
+func (s *Settings) hasCareer() bool {
+	st := s.progress()
+	if st == nil || st.NeedsProfile() {
+		return false
+	}
+	c := st.Career()
+	return c.Started()
+}
+
+// openCareer opens the career setup to change the hometown or guitarist.
+func (s *Settings) openCareer() {
+	if st := s.progress(); st != nil && s.sh != nil {
+		s.sh.Show(NewCareerSetup(s.sh, st))
+	}
 }

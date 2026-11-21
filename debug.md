@@ -295,7 +295,30 @@ A day counts when the song has been **playing** for 5 minutes or more that day. 
 
 ---
 
-## 11. Overall feel
+## 12. Career: landing page and setup
+
+- [ ] **First start after this update:** a "Start your career" screen appears (your profile has no career yet). Your name is already filled in. Pick a **guitarist** (click one: it starts strumming) and a **hometown** (click a city), then click **Start my career** (or press Enter). Tab moves between name, guitarist and hometown; arrows choose.
+  Notes:
+- [ ] Press Esc on that screen instead: it closes and the landing page shows; it asks again next time you start the app.
+  Notes:
+- [ ] **Landing page:** HEADLINER top left. Top right: your name, "LV … · Bedroom Player", an amber XP bar, a star with your Fame (0), and the Settings and Help icons. Under them: your streak line, a row of 7 small badge tiles and "n / 11". Hover a tile to see what it is and how to earn it; click the tiles (or press **A**) to see every badge.
+  Notes:
+- [ ] Two big doors: **Practice** (left, a guitar) and **Perform** (right, amber, with a small stage and your guitarist). The Perform door reads "Your career: <a venue>, <your hometown>" and "Master 1 song to play your first gig". There is no Battles door yet.
+  Notes:
+- [ ] Click **Practice** (or press **P**): your song list opens, the same as before, with **Back** at the top left. Esc (or Back) returns to the landing page. Esc on the landing page quits.
+  Notes:
+- [ ] In Practice, songs you've practised show their difficulty at the end of the grey line ("… · Medium"). A song you've mastered shows an amber **MASTERED** tag at the right.
+  Notes:
+- [ ] **Mastering a song:** open First Steps, set speed to 100%, no loop, calibrated, and play it start to finish with 90% or better. It becomes mastered (the tag appears in Practice). Playing it again doesn't un-master it.
+  Notes:
+- [ ] Settings → PROFILE now has a **career** row ("Mumbai · Rae"). Click **change**: pick a different hometown and Save. A "Change hometown?" box asks first; **Cancel** is highlighted by default (Enter = Cancel). Click **Change hometown** to confirm; the Perform door now names cities from the new hometown.
+  Notes:
+- [ ] Your old progress is safe: level, XP, badges and streak are the same as before the update. A file `progress.json.v1` (the old save) now sits next to `progress.json` in `C:SERSDELLAPPDATAROAMINGMUSICTUTOR`.
+  NOTES:
+
+---
+
+## 11. OVERALL FEEL
 
 - [ ] Nothing crashed during any of the above.
   Notes:

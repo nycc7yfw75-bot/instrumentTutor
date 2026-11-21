@@ -44,6 +44,8 @@ type PieceInfo struct {
 
 	Summary string
 
+	Difficulty string // Easy..Expert, of the first playable track
+
 	Modified time.Time
 
 	Problem string

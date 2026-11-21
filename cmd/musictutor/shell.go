@@ -50,7 +50,13 @@ func runShell(initialPath string) error {
 		svc.Audio = &shellAudio{backend: b, prefs: prefs}
 	}
 
+	// The landing page is the first screen; the song library behind it is
+	// the Practice door (CAREER.md §1).
 	sh, browser := ui.NewBrowserShell(svc)
+	landing := ui.NewLanding(sh)
+	sh.Replace(landing)
+	landing.SetPractice(func() { sh.Show(browser) })
+	landing.SetSettings(func() { opener.showSettings(nil) })
 	opener.shell = sh
 	opener.browser = browser
 	browser.SetSettingsOpener(func() { opener.showSettings(nil) })
@@ -64,14 +70,15 @@ func runShell(initialPath string) error {
 	browser.SetNewPiece(func() { opener.showEditor(nil, "") })
 	browser.SetEditPiece(opener.editPiece)
 
-	if store != nil && store.NeedsProfile() {
-		sh.Show(ui.NewNamePrompt(sh, store))
+	if store != nil && needsCareerSetup(store) {
+		sh.Show(ui.NewCareerSetup(sh, store))
 	}
 	if ui.KitRequested() {
 		sh.Show(ui.NewKitScreen())
 	}
 
 	if initialPath != "" {
+		sh.Show(browser)
 		browser.OfferDialogResult(initialPath, "")
 	}
 	return sh.Run()
@@ -848,4 +855,14 @@ func (o *shellOpener) closeAudio() {
 		o.player.Close()
 		o.player = nil
 	}
+}
+
+// needsCareerSetup: no profile yet, or a profile whose career was never
+// set up (one made before the career existed).
+func needsCareerSetup(st *progress.Store) bool {
+	if st.NeedsProfile() {
+		return true
+	}
+	c := st.Career()
+	return !c.Started() && !st.ReadOnly()
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 
+	"github.com/S95F/musicTutor/internal/career"
 	"github.com/S95F/musicTutor/internal/edit"
 	"github.com/S95F/musicTutor/internal/engine"
 	"github.com/S95F/musicTutor/internal/pitch"
@@ -35,7 +36,7 @@ const (
 )
 
 func main() {
-	which := flag.String("screen", "practice", "glyphs, start, start-bare, settings, editor, editor-new, editor-pick, editor-text, editor-help, practice, practice-live, mixer, warnings, help or tuner")
+	which := flag.String("screen", "practice", "landing, career-setup, glyphs, start, start-bare, settings, editor, editor-new, editor-pick, editor-text, editor-help, practice, practice-live, mixer, warnings, help or tuner")
 	out := flag.String("o", "shot.png", "output PNG")
 	piece := flag.String("piece", "testdata/fixture_riff.gtab", "piece for the practice screens")
 	hover := flag.String("hover", "", "pin the cursor at x,y so hover states and tooltips are drawn")
@@ -73,6 +74,19 @@ func main() {
 
 func build(which, piece string) (ui.Screen, error) {
 	switch which {
+	case "landing", "career-setup":
+		st := shotProgress()
+		if which == "career-setup" {
+			return ui.NewCareerSetup(nil, st), nil
+		}
+		st.UpdateCareer(func(c *career.State) { c.Setup("Mumbai", 0, 42) })
+		sh := ui.NewShell(ui.Services{Prefs: &memPrefs{}, Audio: fakeAudio{}, Progress: st}, nil)
+		l := ui.NewLanding(sh)
+		l.SetPractice(func() {})
+		l.SetPerform(func() {})
+		l.SetSettings(func() {})
+		return l, nil
+
 	case "start", "start-bare", "settings":
 		prefs := &memPrefs{}
 		lib := shotLibrary{}

@@ -144,7 +144,9 @@ func helpRowH(b helpBinding) float64 {
 }
 
 // helpKeyLines wraps a key label too long for keycaps within the key column.
-func helpKeyLines(keys string) []string { return wrapTextW(strings.ReplaceAll(keys, " · ", " "), helpKeysW) }
+func helpKeyLines(keys string) []string {
+	return wrapTextW(strings.ReplaceAll(keys, " · ", " "), helpKeysW)
+}
 
 // helpLayout places the groups in two columns, splitting near the middle
 // of the total height; a group never splits.

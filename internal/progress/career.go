@@ -2,6 +2,7 @@ package progress
 
 import (
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -59,6 +60,7 @@ type MasteredSong struct {
 	Track  int
 	Title  string
 	Path   string
+	Difficulty string // "Easy".."Expert", or "" if never saved
 	career.Mastery
 }
 
@@ -79,7 +81,7 @@ func (s *Store) Mastered() []MasteredSong {
 		track, _ := strconv.Atoi(key[i+1:])
 		id := key[:i]
 		info := prof.Songs[id]
-		out = append(out, MasteredSong{SongID: id, Track: track, Title: info.Title, Path: info.Path, Mastery: m})
+		out = append(out, MasteredSong{SongID: id, Track: track, Title: info.Title, Path: info.Path, Difficulty: info.Difficulty, Mastery: m})
 	}
 	return out
 }
@@ -109,4 +111,28 @@ func (s *Store) BestAccuracy(songID string, track int) (float64, bool) {
 		return 0, false
 	}
 	return b.Accuracy, true
+}
+
+// SongStatus is what the Practice list shows of a file: whether any of its
+// tracks is mastered, and the difficulty last practised, found by the path
+// the song was last seen at.
+func (s *Store) SongStatus(path string) (mastered bool, difficulty string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	prof := s.active()
+	if prof == nil || path == "" {
+		return false, ""
+	}
+	for id, info := range prof.Songs {
+		if !strings.EqualFold(filepath.Clean(info.Path), filepath.Clean(path)) {
+			continue
+		}
+		difficulty = info.Difficulty
+		for key := range prof.Mastered {
+			if strings.HasPrefix(key, id+"#") {
+				mastered = true
+			}
+		}
+	}
+	return mastered, difficulty
 }
