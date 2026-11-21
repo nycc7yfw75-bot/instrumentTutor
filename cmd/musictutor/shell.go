@@ -76,6 +76,7 @@ func runShell(initialPath string) error {
 	if store != nil && needsCareerSetup(store) {
 		sh.Show(ui.NewCareerSetup(sh, store))
 	}
+	grantForTesting(store)
 	if ui.KitRequested() {
 		sh.Show(ui.NewKitScreen())
 	}

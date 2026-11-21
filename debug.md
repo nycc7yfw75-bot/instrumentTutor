@@ -360,11 +360,13 @@ You need one mastered song (see 12) and calibrated timing.
   Notes:
 - [ ] **Leaving early:** press Esc during a gig. "Leave the stage?" asks; **Cancel** is highlighted (Enter = stay). Choose **Leave the stage**: you're back on the tour, the gig gets no stars, XP for notes you played is kept.
   Notes:
-- [ ] **Tough crowd:** start the app with the dev setting `HEADLINER_FORCE_TOUGH=1` (ask me to make a shortcut) and play a gig you haven't played before. The intro card shows **TOUGH CROWD** with flames. The crowd starts cooler and cools faster; below a low point they cross their arms and "BOO" puffs appear. If the bar hits zero after the first 10 seconds of a song, you're **Booed off**: the crowd boos, the lights dim, the guitarist slumps, the card says 0 stars and your XP is kept; **Retry** starts again. Afterwards the gig's card shows TOUGH CROWD with little flames.
+- [ ] **Tough crowd:** double-click **Try a tough crowd.bat** in the instrumentTutor folder and play a gig you haven't played before. The intro card shows **TOUGH CROWD** with flames. The crowd starts cooler and cools faster; below a low point they cross their arms and "BOO" puffs appear. If the bar hits zero after the first 10 seconds of a song, you're **Booed off**: the crowd boos, the lights dim, the guitarist slumps, the card says 0 stars and your XP is kept; **Retry** starts again. Afterwards the gig's card shows TOUGH CROWD with little flames.
   Notes:
 - [ ] **Recording session** (the fifth card): no crowd, no crowd sound, a red **REC** light blinks while you play. It's rated on accuracy and how steady your timing was.
   Notes:
 - [ ] Not calibrated: the gig still plays but ends "Unscored": no stars or Fame; XP from your notes still counts.
+  Notes:
+- [ ] **Skipping ahead to test the Jam room:** double-click **Try with the Bedroom cleared.bat**. The tour map shows the Bedroom "cleared" (3 gigs at 3 stars filled in for testing). Opening the app normally never does this.
   Notes:
 
 ## 12d. Career: the little moments

@@ -134,7 +134,7 @@ func rectImage(r rect) image.Rectangle {
 func drawSceneFilled(dst, src *ebiten.Image, area rect) {
 	clip := dst.SubImage(rectImage(area)).(*ebiten.Image)
 	sw, sh := float64(src.Bounds().Dx()), float64(src.Bounds().Dy())
-	scale := max(1, int(area.w/sw))
+	scale := max(1, min(int(area.w/sw), int(area.h/sh))) // whole, and it fits
 	w, h := sw*float64(scale), sh*float64(scale)
 	x := math.Round(area.x + (area.w-w)/2)
 	y := math.Round(area.y + (area.h-h)/2)

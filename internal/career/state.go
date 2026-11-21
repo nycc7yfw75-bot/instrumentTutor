@@ -171,7 +171,7 @@ func (s *State) FinishGig(g Gig, res Result) Reward {
 
 // TierCleared: any ClearGigs gigs of the tier (the recording counts) at
 // ClearStars or more.
-func (s *State) TierCleared(tier int) bool {
+func (s State) TierCleared(tier int) bool {
 	n := 0
 	for slot := 0; slot <= RecordingSlot; slot++ {
 		if r := s.Gigs[GigID(tier, slot)]; r != nil && r.BestStars >= ClearStars {
@@ -191,7 +191,7 @@ func (s *State) isCleared(tier int) bool {
 }
 
 // TierProgress is "how many gigs of a tier are at 3 stars".
-func (s *State) TierProgress(tier int) int {
+func (s State) TierProgress(tier int) int {
 	n := 0
 	for slot := 0; slot <= RecordingSlot; slot++ {
 		if r := s.Gigs[GigID(tier, slot)]; r != nil && r.BestStars >= ClearStars {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"os"
 
 	"github.com/S95F/musicTutor/internal/career"
 	"github.com/S95F/musicTutor/internal/engine"
@@ -46,3 +47,21 @@ type crowdSound struct {
 func (c *crowdSound) SetLevel(l float64) { c.eng.SetCrowdLevel(l) }
 func (c *crowdSound) Cheer()             { c.eng.PlayCrowd(c.cheer) }
 func (c *crowdSound) Boo()               { c.eng.PlayCrowd(c.boo) }
+
+// grantForTesting is the HEADLINER_GRANT=tier1 dev flag (CAREER.md §10):
+// it fills in three 3-star Bedroom gigs so the Jam room can be tried
+// without playing them. It does nothing in a normal run.
+func grantForTesting(st *progress.Store) {
+	if st == nil || os.Getenv("HEADLINER_GRANT") != "tier1" {
+		return
+	}
+	c := st.Career()
+	if !c.Started() || c.TierCleared(1) {
+		return
+	}
+	st.UpdateCareer(func(c *career.State) {
+		for _, g := range c.Route()[0][:career.ClearGigs] {
+			c.FinishGig(g, career.Result{Stars: career.ClearStars})
+		}
+	})
+}
