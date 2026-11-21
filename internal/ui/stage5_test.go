@@ -1,6 +1,9 @@
 package ui
 
-import "testing"
+import (
+	"path/filepath"
+	"testing"
+)
 
 // Stage 5 (REDESIGN §8) layout checks.
 
@@ -154,9 +157,9 @@ func TestHelpKeyTextNeverRunsIntoItsDescription(t *testing.T) {
 
 func TestHyphenatedFileNamesKeepEveryWord(t *testing.T) {
 	cases := map[string]string{
-		`C:\x\little-wing.musicxml`:                        "Little Wing",
-		`C:\x\Dire Straits-Sultans Of Swing-10-29-2026.gp`: "Sultans of Swing",
-		`C:\x\First steps on guitar.gtab`:                  "First Steps on Guitar",
+		filepath.Join("x", "little-wing.musicxml"):                        "Little Wing",
+		filepath.Join("x", "Dire Straits-Sultans Of Swing-10-29-2026.gp"): "Sultans of Swing",
+		filepath.Join("x", "First steps on guitar.gtab"):                  "First Steps on Guitar",
 	}
 	for path, want := range cases {
 		if got := cleanPieceTitle("", path); got != want {

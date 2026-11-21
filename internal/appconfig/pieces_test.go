@@ -2,14 +2,18 @@ package appconfig
 
 import (
 	"fmt"
+	"path/filepath"
 	"testing"
 )
+
+// songA is an absolute-looking path on any OS.
+var songA = filepath.Join(string(filepath.Separator)+"songs", "a.gp")
 
 func TestPieceSetupRoundTripsAndPrunesTheOldest(t *testing.T) {
 	t.Setenv(EnvConfigDir, t.TempDir())
 	var c Config
 	c.Version = CurrentVersion
-	c.SetPiece(`C:\songs\a.gp`, PieceSetup{Track: 1, Tempo: 0.7, Pos: 3840, LoopA: 1920, LoopB: 5760,
+	c.SetPiece(songA, PieceSetup{Track: 1, Tempo: 0.7, Pos: 3840, LoopA: 1920, LoopB: 5760,
 		Muted: []bool{false, true}, Mix: &PieceMix{Master: 0.8, Tracks: []float64{1, 0}}, Used: 10})
 	if err := c.Save(); err != nil {
 		t.Fatal(err)
@@ -18,7 +22,7 @@ func TestPieceSetupRoundTripsAndPrunesTheOldest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, ok := got.Piece(`C:\songs\.\a.gp`)
+	s, ok := got.Piece(filepath.Dir(songA) + string(filepath.Separator) + "." + string(filepath.Separator) + "a.gp")
 	if !ok || s.Track != 1 || s.Tempo != 0.7 || s.LoopB != 5760 || !s.Muted[1] || s.Mix.Tracks[1] != 0 {
 		t.Fatalf("setup did not survive a save and load: %+v (found %v)", s, ok)
 	}
@@ -32,7 +36,7 @@ func TestPieceSetupRoundTripsAndPrunesTheOldest(t *testing.T) {
 	if len(c.Pieces) != MaxPieces {
 		t.Fatalf("kept %d setups, want the cap of %d", len(c.Pieces), MaxPieces)
 	}
-	if _, ok := c.Piece(`C:\songs\a.gp`); ok {
+	if _, ok := c.Piece(songA); ok {
 		t.Error("the least recently used piece survived pruning")
 	}
 	if _, ok := c.Piece(fmt.Sprintf("p%03d.gtab", MaxPieces+4)); !ok {
