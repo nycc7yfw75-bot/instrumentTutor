@@ -23,10 +23,12 @@ import (
 	"github.com/S95F/musicTutor/internal/ui"
 )
 
-const (
+var (
 	shotW = 1280
 	shotH = 720
+)
 
+const (
 	warmup = 12
 
 	settle = 700 * time.Millisecond
@@ -37,7 +39,13 @@ func main() {
 	out := flag.String("o", "shot.png", "output PNG")
 	piece := flag.String("piece", "testdata/fixture_riff.gtab", "piece for the practice screens")
 	hover := flag.String("hover", "", "pin the cursor at x,y so hover states and tooltips are drawn")
+	size := flag.String("size", "1280x720", "window size WxH the UI is laid out for")
 	flag.Parse()
+	if _, err := fmt.Sscanf(*size, "%dx%d", &shotW, &shotH); err != nil {
+		fmt.Fprintln(os.Stderr, "uishot: -size wants WxH")
+		os.Exit(2)
+	}
+	ui.SetScreenSize(shotW, shotH)
 
 	if *hover != "" {
 		var x, y float64

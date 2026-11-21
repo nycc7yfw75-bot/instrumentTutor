@@ -8,7 +8,7 @@ Work down the list. For each test:
   (what you clicked, what you expected, what you saw). That's all I need to fix it.
 - If you skip one, write "skipped" in Notes.
 
-Last updated: 2026-11-21 (after redesign Stage 5, the player card and badges).
+Last updated: 2026-11-21 (after redesign Stage 6, validation).
 
 ---
 
@@ -282,6 +282,15 @@ A day counts when the song has been **playing** for 5 minutes or more that day. 
   - The **IN** meter's top block hangs for a moment after a loud note, then drops back block by block.
   - When the song moves into a new section, the amber section name under the timeline fades from the old name to the new one.
   - With Settings → **reduce motion** on, the dot stays still and the swaps happen instantly.
+  Notes:
+
+- [ ] **Esc closes only the top layer.** In a song, open Help (?), then press Esc: Help closes and you're still in the song. Same with the Mixer (V), the Tuner (T), the warnings list (I), the pass review (P) and the BPM box (Shift+B). On the start screen, open the badges (B) and press Esc: only the badges close.
+  Notes:
+- [ ] **Keys never wait for animations.** In a song, press M, R, C, W and the arrow keys quickly many times: every toggle changes instantly, nothing lags behind.
+  Notes:
+- [ ] **Cutting an animation short.** Open Help and close it straight away; hover a button and move off quickly; press Space while a level-up card shows. Each one turns around or jumps to the end; nothing gets stuck.
+  Notes:
+- [ ] **Nothing pops up mid-song.** The "+N XP" and "Badge earned" messages and the level-up card only appear after you stop playing, never while a pass is playing.
   Notes:
 
 ---

@@ -136,8 +136,15 @@ type helpFlow struct {
 func helpRowLines(b helpBinding) []string { return wrapTextW(overlayDesc(b), helpDescW()) }
 
 func helpRowH(b helpBinding) float64 {
-	return math.Max(helpKeyH, float64(len(helpRowLines(b)))*helpLineH) + helpRowGap
+	keys := helpKeyH
+	if !helpKeysFit(b.Keys) {
+		keys = float64(len(helpKeyLines(b.Keys))) * helpLineH
+	}
+	return math.Max(keys, float64(len(helpRowLines(b)))*helpLineH) + helpRowGap
 }
+
+// helpKeyLines wraps a key label too long for keycaps within the key column.
+func helpKeyLines(keys string) []string { return wrapTextW(strings.ReplaceAll(keys, " · ", " "), helpKeysW) }
 
 // helpLayout places the groups in two columns, splitting near the middle
 // of the total height; a group never splits.
@@ -216,7 +223,9 @@ func drawHelpOverlay(dst *ebiten.Image, title string, rows []helpBinding, footno
 				kx += w + sp1
 			}
 		} else {
-			drawText(dst, b.Keys, it.x, it.y+1, kcol)
+			for j, l := range helpKeyLines(b.Keys) {
+				drawText(dst, l, it.x, it.y+1+float64(j)*helpLineH, kcol)
+			}
 		}
 		for j, l := range it.lines {
 			drawText(dst, l, it.x+helpKeysW+sp3, it.y+1+float64(j)*helpLineH, col)

@@ -93,3 +93,7 @@ func shotWindowSize() (int, int, bool) {
 	}
 	return w, h, true
 }
+
+// SetScreenSize lays the UI out for a w×h window without one, for the
+// dev screenshot tool (tools/uishot).
+func SetScreenSize(w, h int) { resize(w, h) }

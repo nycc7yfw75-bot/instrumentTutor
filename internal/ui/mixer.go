@@ -302,7 +302,9 @@ func (a *App) paintMixer(c *ebiten.Image, rows []mixerRow, card rect) {
 			labelCol = colNote // your track
 		}
 		for j, l := range []string{line1, line2} {
-			l = truncateW(l, col.w-4)
+			if textWSmall(l) > col.w-4 {
+				l = ellipsizeWSmall(l, col.w-4)
+			}
 			drawTextSmall(c, l, math.Round(col.x+(col.w-textWSmall(l))/2), y+float64(j)*16, labelCol)
 		}
 	}

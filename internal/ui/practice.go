@@ -111,8 +111,10 @@ func cleanPieceTitle(title, path string) string {
 			}
 			t = s
 		}
-		if i := strings.Index(t, "-"); i > 0 && i < len(t)-1 {
+		if i := strings.Index(t, "-"); i > 0 && i < len(t)-1 && strings.Contains(t, " ") {
 			t = t[i+1:] // "Dire Straits-Sultans Of Swing": the song
+		} else {
+			t = strings.ReplaceAll(t, "-", " ") // "little-wing": one name
 		}
 		t = strings.ReplaceAll(t, "_", " ")
 	}

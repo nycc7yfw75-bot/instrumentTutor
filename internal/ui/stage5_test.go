@@ -137,3 +137,30 @@ func TestLiveDotPulsesUnlessReduced(t *testing.T) {
 		t.Error("with reduced motion the LIVE dot should hold steady and lit")
 	}
 }
+
+func TestHelpKeyTextNeverRunsIntoItsDescription(t *testing.T) {
+	e := newTestEditor()
+	for _, b := range e.editorBindings() {
+		if helpKeysFit(b.Keys) {
+			continue
+		}
+		for _, l := range helpKeyLines(b.Keys) {
+			if w := textW(l); w > helpKeysW {
+				t.Errorf("key text %q measures %.0f px, past the %.0f px key column", l, w, helpKeysW)
+			}
+		}
+	}
+}
+
+func TestHyphenatedFileNamesKeepEveryWord(t *testing.T) {
+	cases := map[string]string{
+		`C:\x\little-wing.musicxml`:                        "Little Wing",
+		`C:\x\Dire Straits-Sultans Of Swing-10-29-2026.gp`: "Sultans of Swing",
+		`C:\x\First steps on guitar.gtab`:                  "First Steps on Guitar",
+	}
+	for path, want := range cases {
+		if got := cleanPieceTitle("", path); got != want {
+			t.Errorf("%s is titled %q, want %q", path, got, want)
+		}
+	}
+}
