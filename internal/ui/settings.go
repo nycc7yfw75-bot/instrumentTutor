@@ -39,6 +39,8 @@ const (
 	srCareer
 	// srAbout opens About & updates (ONLINE.md §A1, §A6, §A7).
 	srAbout
+	// srAccount opens the Account screen (ONLINE.md §B2).
+	srAccount
 )
 
 type calPhase int
@@ -158,7 +160,9 @@ func calibrateWith(ctx context.Context, a AudioServices, captureID, playbackID s
 type Settings struct {
 	sh *Shell
 
-	system *SystemHooks // About & updates; nil hides the row
+	system        *SystemHooks // About & updates; nil hides the row
+	account       func()       // opens Account; nil hides the row
+	accountStatus func() string
 
 	anim animator
 
@@ -385,6 +389,9 @@ func (s *Settings) rebuild() {
 	if s.motionPrefs() != nil {
 		s.rows = append(s.rows, srMotion)
 	}
+	if s.account != nil {
+		s.rows = append(s.rows, srAccount)
+	}
 	if s.system != nil {
 		s.rows = append(s.rows, srAbout)
 	}
@@ -571,6 +578,8 @@ func (s *Settings) activate() {
 		s.setReduceMotion(!reduceMotion)
 	case srAbout:
 		s.openAbout()
+	case srAccount:
+		s.account()
 	case srCapture, srPlayback:
 		s.notice = ""
 		if s.deviceStateOf(r) == devUnchosen {
@@ -1385,6 +1394,13 @@ func (s *Settings) items() []settingsItem {
 			s.setReduceMotion(!reduceMotion)
 		}})
 	}
+	if s.account != nil {
+		b.section("ACCOUNT")
+		b.addRow("account", s.accountStatus(), colHUD, settingsButton{label: "open", act: func(s *Settings) {
+			s.focusRow(srAccount)
+			s.account()
+		}})
+	}
 	if s.system != nil {
 		b.section("HEADLINER")
 		v := Build.Version
@@ -1693,4 +1709,10 @@ func (s *Settings) openAbout() {
 	if s.sh != nil && s.system != nil {
 		s.sh.Show(NewAboutScreen(s.sh, *s.system))
 	}
+}
+
+// SetAccount shows the ACCOUNT row: status is its value, open opens it.
+func (s *Settings) SetAccount(open func(), status func() string) {
+	s.account, s.accountStatus = open, status
+	s.rebuild()
 }

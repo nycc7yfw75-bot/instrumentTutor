@@ -60,7 +60,7 @@ jobs:
         run: |
           mkdir -p dist
           go build -trimpath \
-            -ldflags "-s -w -H windowsgui -X main.version=${{ steps.ver.outputs.tag }} -X main.channel=${{ steps.ver.outputs.channel }} -X main.repo=${GITHUB_REPOSITORY}" \
+            -ldflags "-s -w -H windowsgui -X main.version=${{ steps.ver.outputs.tag }} -X main.channel=${{ steps.ver.outputs.channel }} -X main.repo=${GITHUB_REPOSITORY} -X github.com/S95F/musicTutor/internal/online.projectURL=${{ secrets.SUPABASE_URL }} -X github.com/S95F/musicTutor/internal/online.anonKey=${{ secrets.SUPABASE_ANON_KEY }}" \
             -o dist/headliner.exe ./cmd/musictutor
 
       - name: Portable zip

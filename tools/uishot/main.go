@@ -15,6 +15,7 @@ import (
 	"github.com/S95F/musicTutor/internal/career"
 	"github.com/S95F/musicTutor/internal/edit"
 	"github.com/S95F/musicTutor/internal/engine"
+	"github.com/S95F/musicTutor/internal/online"
 	"github.com/S95F/musicTutor/internal/pitch"
 	"github.com/S95F/musicTutor/internal/practice"
 	"github.com/S95F/musicTutor/internal/progress"
@@ -75,6 +76,19 @@ func main() {
 
 func build(which, piece string) (ui.Screen, error) {
 	switch which {
+	case "account-signedout", "account-link", "account-friends":
+		st := shotProgress()
+		ms := &online.MemoryStore{}
+		c := &online.Client{Project: online.Project{URL: "https://example.supabase.co", AnonKey: "anon"}, Store: ms}
+		if which != "account-signedout" {
+			ms.Save(online.Saved{RefreshToken: "rt", UserID: "u1", Email: "alex@example.com"})
+		}
+		if which == "account-friends" {
+			st.Link("u1", "alex@example.com", st.Profiles()[0].ID)
+		}
+		a := ui.NewAccountScreen(nil, ui.AccountDeps{Client: c, Syncer: online.NewSyncer(c, st), Store: st})
+		a.ShotState(strings.TrimPrefix(which, "account-"))
+		return a, nil
 	case "about":
 		ui.Build = ui.BuildInfo{Version: "v0.1.0-beta.1", Channel: "beta", Repo: "owner/headliner"}
 		ch := "beta"

@@ -266,6 +266,10 @@ func (o *shellOpener) systemHooks() ui.SystemHooks {
 // memory can't be written over the ones just put back.
 func (o *shellOpener) closeForNewSaves() {
 	o.restored = true
+	if o.account != nil && o.account.stop != nil {
+		o.account.stop() // never send the replaced saves' old copy
+		o.account.stop = nil
+	}
 	o.prefs.saveMu.Lock()
 	o.prefs.frozen = true
 	o.prefs.saveMu.Unlock()

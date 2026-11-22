@@ -47,6 +47,8 @@ func runShell(initialPath string) error {
 		store = nil
 	}
 	opener.store = store
+	opener.account = startAccount(store)
+	defer opener.account.finish()
 	svc := ui.Services{Opener: opener, Prefs: prefs, Library: pieceLibrary{}}
 	svc.Progress = store
 
@@ -60,6 +62,7 @@ func runShell(initialPath string) error {
 	landing := ui.NewLanding(sh)
 	sh.Replace(landing)
 	opener.wireUpdates(landing, store)
+	landing.SetSignInLink(opener.showAccount, opener.account.signedIn)
 	landing.SetPractice(func() { sh.Show(browser) })
 	landing.SetSettings(func() { opener.showSettings(nil) })
 	if store != nil {
@@ -226,6 +229,9 @@ func (o *shellOpener) showSettings(app *ui.App) {
 	}
 	st := ui.NewSettings(o.shell)
 	st.SetSystem(o.systemHooks())
+	if o.store != nil {
+		st.SetAccount(o.showAccount, o.account.status)
+	}
 
 	st.SetFilePicker(func(exts []string, chosen func(string)) {
 		if !o.sfDialog.CompareAndSwap(false, true) {
@@ -553,6 +559,7 @@ type shellOpener struct {
 	// cur is the piece on screen, so its setup can be saved when it is left.
 	cur *openPiece
 
+	account  *accountSide
 	landing  *ui.Landing
 	updates  updateState
 	restored bool // saves were replaced: nothing in memory may be written

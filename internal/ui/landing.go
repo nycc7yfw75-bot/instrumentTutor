@@ -39,6 +39,11 @@ type Landing struct {
 	notice    string // e.g. "Update rolled back"
 	landed    func() // called once, the first time the page is up
 	landedRan bool
+
+	// The Battles door's "Sign in to battle friends" link (ONLINE.md §B2).
+	signIn   func()
+	signedIn func() bool
+	linkRect rect
 }
 
 // OfferUpdate queues an update offer; it shows when the landing page is
@@ -301,6 +306,10 @@ func (l *Landing) handleMouse(p pointer) {
 	if !p.pressed {
 		return
 	}
+	if l.linkRect.w > 0 && p.over(l.linkRect) && l.signIn != nil {
+		l.signIn()
+		return
+	}
 	ll := l.layout()
 	switch {
 	case p.over(ll.settings):
@@ -474,6 +483,18 @@ func (l *Landing) drawDoor(dst *ebiten.Image, r rect, d door, dt float64) {
 			drawTextSmall(dst, truncateW(next, r.w-2*sp6), r.x+sp6, ty+uiTextH+2, sub)
 		}
 	}
+	if d.id == "battles" {
+		l.linkRect = rect{}
+		if l.signIn != nil && l.signedIn != nil && !l.signedIn() {
+			const link = "Sign in to battle friends →"
+			l.linkRect = rect{r.x + sp6, ty + uiTextH + 2, textW(link), uiTextH + 4}
+			col := colAccent
+			if l.ptr.over(l.linkRect) {
+				col = colNote
+			}
+			drawTextSmall(dst, link, l.linkRect.x, l.linkRect.y, col)
+		}
+	}
 }
 
 // drawPerformArt draws the current venue's stage inside the Perform door,
@@ -500,4 +521,10 @@ func (l *Landing) drawPerformArt(dst *ebiten.Image, art rect) {
 	drawSprite(l.venue, "characters/"+presetSlug(preset), "guitarist", "idle", int(l.clock*2)%2, 140, 168, 1)
 
 	drawSceneFilled(dst, l.venue, art)
+}
+
+// SetSignInLink shows "Sign in to battle friends" on the Battles door
+// while signedIn reports false.
+func (l *Landing) SetSignInLink(open func(), signedIn func() bool) {
+	l.signIn, l.signedIn = open, signedIn
 }
