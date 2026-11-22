@@ -30,6 +30,9 @@ type File struct {
 	Version       int                 `json:"version"`
 	ActiveProfile string              `json:"activeProfile"`
 	Profiles      map[string]*Profile `json:"profiles"`
+	// Account is the online account a profile here is linked to (ONLINE.md
+	// §B3): one account, one linked profile.
+	Account *AccountLink `json:"account,omitempty"`
 }
 
 // Profile is one player's progress. Nothing is stored outside a profile.
@@ -135,6 +138,12 @@ type Store struct {
 
 	// readOnly: the file was saved by a newer HEADLINER; never write it.
 	readOnly bool
+	// onSave runs (in its own goroutine) after every save: the account sync
+	// uses it to know there is something to send.
+	onSave func()
+	// quiet is set while the sync saves its own result, so that save does
+	// not ask for another sync.
+	quiet bool
 	// quarantined is where an unreadable progress.json was moved aside.
 	quarantined string
 }
@@ -310,6 +319,9 @@ func (s *Store) saveLocked() error {
 	if err := os.Rename(tmp.Name(), s.path); err != nil {
 		os.Remove(tmp.Name())
 		return fmt.Errorf("progress: saving: %w", err)
+	}
+	if s.onSave != nil && !s.quiet {
+		go s.onSave() // off the lock: the sync reads the store
 	}
 	return nil
 }

@@ -1,6 +1,11 @@
 package progress
 
-import "time"
+import (
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
+	"time"
+)
 
 // Battle records (BATTLES.md §8.2), kept per profile.
 
@@ -23,11 +28,19 @@ type BattleRecord struct {
 
 // BattleLog is one battle in the history.
 type BattleLog struct {
+	// ID tells one battle from another when two devices' logs merge.
+	ID           string    `json:"id,omitempty"`
 	Date         time.Time `json:"date"`
 	Material     string    `json:"material"`
 	Participants []string  `json:"participants"`
 	Totals       []int     `json:"totals"`
 	Winner       string    `json:"winner"` // a name, or "" for a draw
+	// How it went for this profile, kept so records can be rebuilt from
+	// the log after a sync merge (ONLINE.md §B4).
+	Scored  bool           `json:"scored,omitempty"`
+	Outcome int            `json:"outcome,omitempty"`
+	Against map[string]int `json:"against,omitempty"`
+	Total   int            `json:"total,omitempty"`
 }
 
 const maxBattleLog = 50
@@ -76,6 +89,11 @@ func (s *Store) RecordBattle(profileID string, f BattleFiling) (leveledUp bool, 
 	if prof == nil {
 		return false, nil
 	}
+	entry := f.Log
+	entry.Scored, entry.Outcome, entry.Against, entry.Total = f.Scored, f.Overall, f.Against, f.Total
+	if entry.ID == "" {
+		entry.ID = newBattleID()
+	}
 	r := &prof.Battles
 	if f.Scored {
 		r.Totals.add(f.Overall)
@@ -89,7 +107,7 @@ func (s *Store) RecordBattle(profileID string, f BattleFiling) (leveledUp bool, 
 		}
 		r.Best = max(r.Best, f.Total)
 	}
-	r.Log = append(r.Log, f.Log)
+	r.Log = append(r.Log, entry)
 	if n := len(r.Log); n > maxBattleLog {
 		r.Log = append([]BattleLog(nil), r.Log[n-maxBattleLog:]...)
 	}
@@ -115,4 +133,20 @@ func (s *Store) BattleRecordOf(profileID string) (BattleRecord, bool) {
 	}
 	r.Log = append([]BattleLog(nil), prof.Battles.Log...)
 	return r, true
+}
+
+// newBattleID is a random id for a battle log entry.
+func newBattleID() string {
+	var b [8]byte
+	_, _ = rand.Read(b[:])
+	return hex.EncodeToString(b[:])
+}
+
+// logKey identifies a battle: its ID, or for entries from before IDs,
+// its date and totals.
+func (l BattleLog) logKey() string {
+	if l.ID != "" {
+		return l.ID
+	}
+	return fmt.Sprintf("%d|%s|%v", l.Date.UnixNano(), l.Material, l.Totals)
 }
