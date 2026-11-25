@@ -26,6 +26,7 @@ const (
 	ghostFadeSteps = 3 // steps3
 	ghostDash      = 2.0
 	maxGhosts      = 512
+	ghostMinGap    = 14 // px between a note and its ghost, at the least
 )
 
 type ghost struct {
@@ -124,6 +125,14 @@ func (a *App) drawGhosts(screen *ebiten.Image, tickToX func(int64) float32, posT
 func drawGhost(dst *ebiten.Image, gh ghost, alpha float64, nx, gx, ny float32, size float64) {
 	w := float32(textWFret(gh.label, size))
 	h := float32(size)
+	// A few tens of ms is only a few pixels on the tab, which would hide the
+	// ghost behind its own note: it always sits clear of it, on the side it
+	// was played (early left, late right).
+	if gh.offTicks > 0 {
+		gx = max(gx, nx+w+ghostMinGap)
+	} else {
+		gx = min(gx, nx-w-ghostMinGap)
+	}
 	// The joining line, from the written note's edge to the ghost's.
 	lineCol := withAlpha(colGhostLine, alpha/ghostAlpha)
 	if gh.offTicks > 0 {

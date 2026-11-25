@@ -278,6 +278,12 @@ func build(which, piece string) (ui.Screen, error) {
 		gs := ui.NewGigScreen(nil, st, g, crowd, false, st.Mastered(), func(progress.MasteredSong, bool) (*ui.App, error) { return app, nil }, func() {}, nil)
 		gs.ShotState(map[string]string{"gig": "playing", "gig-tough": "intro-tough", "gig-booed": "booed", "gig-end": "end"}[which])
 		return gs, nil
+	case "practice-ghosts":
+		// Early and late notes in the bar just played: their timing ghosts.
+		app.SetLiveStatus(func() (float64, int64) { return -14, 0 })
+		app.SetProgress(shotProgress(), progress.SongID(s), "Fixture Riff", piece, true)
+		app.OfferResults(timedResults(s))
+		return app, nil
 	case "practice-live":
 		app.SetLiveStatus(func() (float64, int64) { return -14, 0 })
 		app.SetWaitControl(true)
@@ -303,6 +309,21 @@ func sampleResults(s *score.Score) []practice.NoteResult {
 				i++
 			}
 		}
+	}
+	return out
+}
+
+// timedResults plays the notes before the playhead early and late by
+// turns (90 ms, then 60 ms), so each leaves a ghost.
+func timedResults(s *score.Score) []practice.NoteResult {
+	var out []practice.NoteResult
+	offs := []int64{90, -60, 40, -90}
+	for i, ev := range s.Events() {
+		if ev.Start > s.Tracks[0].Bars[1].Start+480 {
+			break
+		}
+		out = append(out, practice.NoteResult{Event: ev, Verdict: practice.VerdictHit, Matched: true, Timed: true,
+			OnsetErrFrames: offs[i%len(offs)] * 48})
 	}
 	return out
 }
