@@ -90,7 +90,7 @@ Google needs to know Headliner is allowed to ask "Sign in with Google".
 
 1. **SQL Editor** → **New query**.
 2. Copy all of `supabase/tests/rls_test.sql` from VS Code, paste, **Run**.
-3. **Success. No rows returned** = every rule works. (The test makes three
+3. One row, **All security tests passed** = every rule works. (The test makes three
    pretend players and deletes them again; nothing is left behind.)
    If you see an error starting with `FAIL:`, send me the whole message.
 

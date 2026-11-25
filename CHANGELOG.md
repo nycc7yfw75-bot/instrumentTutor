@@ -4,6 +4,11 @@ Each release's notes come from its section here (the release workflow
 copies the section whose heading matches the tag). Newest first.
 Versions: `v1.2.0` is Stable, `v1.3.0-beta.1` is Beta.
 
+## [0.1.0-beta.2]
+
+- **Accounts (new, optional)**: sign in with Google or an emailed link to keep your progress in step across laptops, and add friends by code. Settings → Account. Signed out, the game plays exactly as before.
+- **Timing ghosts**: the faint copies showing early and late notes now sit beside the note, so you can see them while practising.
+
 ## [0.1.0-beta.1]
 
 The first Headliner build you can install.

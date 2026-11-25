@@ -42,15 +42,23 @@ func (p Project) Configured() bool {
 // the save folder.
 func LoadProject(saveDir string) Project {
 	if projectURL != "" && anonKey != "" {
-		return Project{URL: strings.TrimRight(projectURL, "/"), AnonKey: anonKey}
+		return Project{URL: baseURL(projectURL), AnonKey: anonKey}
 	}
 	if u, k := os.Getenv("HEADLINER_SUPABASE_URL"), os.Getenv("HEADLINER_SUPABASE_ANON_KEY"); u != "" && k != "" {
-		return Project{URL: strings.TrimRight(u, "/"), AnonKey: k}
+		return Project{URL: baseURL(u), AnonKey: k}
 	}
 	var p Project
 	if b, err := os.ReadFile(filepath.Join(saveDir, "online.json")); err == nil {
 		_ = json.Unmarshal(b, &p)
-		p.URL = strings.TrimRight(p.URL, "/")
+		p.URL = baseURL(p.URL)
 	}
 	return p
+}
+
+// baseURL is the project's address with any trailing "/" or the API path
+// people copy from the dashboard ("…supabase.co/rest/v1/") taken off.
+func baseURL(u string) string {
+	u = strings.TrimRight(strings.TrimSpace(u), "/")
+	u = strings.TrimSuffix(u, "/rest/v1")
+	return strings.TrimRight(u, "/")
 }
